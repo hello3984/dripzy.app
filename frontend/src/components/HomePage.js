@@ -473,14 +473,21 @@ const HomePage = () => {
       {/* Hero Section */}
       <section className="hero-section">
         <div className="hero-content">
-          <h1>Discover Your Perfect Look with Dripzy</h1>
-          <p>AI-powered fashion styling tailored to your preferences</p>
-          <button 
-            className="primary-button"
-            onClick={() => document.getElementById('style-generator').scrollIntoView({ behavior: 'smooth' })}
-          >
-            Generate My Style
-          </button>
+          <h1>Discover Your Perfect Look</h1>
+          <p>AI-powered fashion styling tailored just for you</p>
+          <div className="hero-cta">
+            <button 
+              className="primary-button"
+              onClick={() => {
+                const generatorSection = document.querySelector('.style-generator');
+                if (generatorSection) {
+                  generatorSection.scrollIntoView({ behavior: 'smooth' });
+                }
+              }}
+            >
+              Generate My Style
+            </button>
+          </div>
         </div>
       </section>
       
@@ -509,90 +516,107 @@ const HomePage = () => {
         </div>
       </section>
       
-      {/* Style Generator */}
-      <section id="style-generator" className="style-generator">
-        <h2>Generate Your Custom Outfit</h2>
-        
-        <div className="trending-styles">
-          <h3>Trending Styles</h3>
-          <div className="style-tags">
-            {flattenedStyles.slice(0, 8).map((style) => (
-              <button
-                key={style}
-                className={`style-tag ${selectedStyle === style ? 'active' : ''}`}
-                onClick={() => handleStyleClick(style)}
-                data-style={style}
-              >
-                {style}
-              </button>
-            ))}
+      {/* Style Generator Section - simplified to focus on generation */}
+      <section className="style-generator" id="generate">
+        <div className="container">
+          <div className="ai-badge">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+              <path d="M12 7v10"></path>
+              <path d="M8 15l4 4 4-4"></path>
+            </svg>
+            Powered by AI
           </div>
-        </div>
-        
-        <form onSubmit={(e) => {
-          e.preventDefault();
-          handleGenerateOutfit();
-        }} className="style-form">
-          <div className="form-row">
-            <div className="form-group">
-              <label htmlFor="prompt">Describe your outfit</label>
-              <input
-                type="text"
-                id="prompt"
-                value={prompt}
-                onChange={(e) => setPrompt(e.target.value)}
-                placeholder="e.g., Casual weekend outfit for spring"
-                className="form-control"
-              />
-            </div>
-            
-            <div className="form-group gender-select">
-              <label>Gender</label>
-              <div className="radio-group">
-                <label className={selectedGender === 'women' ? 'active' : ''}>
-                  <input
-                    type="radio"
-                    name="gender"
-                    value="women"
-                    checked={selectedGender === 'women'}
-                    onChange={(e) => setSelectedGender(e.target.value)}
-                  />
-                  Women
-                </label>
-                <label className={selectedGender === 'men' ? 'active' : ''}>
-                  <input
-                    type="radio"
-                    name="gender"
-                    value="men"
-                    checked={selectedGender === 'men'}
-                    onChange={(e) => setSelectedGender(e.target.value)}
-                  />
-                  Men
-                </label>
-                <label className={selectedGender === 'unisex' ? 'active' : ''}>
-                  <input
-                    type="radio"
-                    name="gender"
-                    value="unisex"
-                    checked={selectedGender === 'unisex'}
-                    onChange={(e) => setSelectedGender(e.target.value)}
-                  />
-                  Unisex
-                </label>
-              </div>
+          <h2 className="section-title">Generate Your Outfit</h2>
+          
+          <div className="trending-styles">
+            <h3>Trending Styles</h3>
+            <div className="style-tags">
+              {flattenedStyles.slice(0, 8).map((style) => (
+                <button
+                  key={style}
+                  className={`style-tag ${selectedStyle === style ? 'active' : ''}`}
+                  onClick={() => handleStyleClick(style)}
+                  data-style={style}
+                >
+                  {style}
+                </button>
+              ))}
             </div>
           </div>
           
-          <div className="form-group">
-            <button 
-              type="submit" 
-              className="primary-button generate-button"
-              disabled={generating}
-            >
-              {generating ? 'Generating...' : 'Generate Outfit'}
-            </button>
-          </div>
-        </form>
+          <form onSubmit={(e) => {
+            e.preventDefault();
+            handleGenerateOutfit();
+          }} className="style-form">
+            <div className="form-row">
+              <div className="form-group">
+                <label htmlFor="prompt">Describe your outfit</label>
+                <input
+                  type="text"
+                  id="prompt"
+                  value={prompt}
+                  onChange={(e) => setPrompt(e.target.value)}
+                  placeholder="e.g., Casual weekend outfit for spring"
+                  className="form-control"
+                />
+              </div>
+              
+              <div className="form-group gender-select">
+                <label>Gender</label>
+                <div className="radio-group">
+                  <label className={selectedGender === 'women' ? 'active' : ''}>
+                    <input
+                      type="radio"
+                      name="gender"
+                      value="women"
+                      checked={selectedGender === 'women'}
+                      onChange={(e) => setSelectedGender(e.target.value)}
+                    />
+                    Women
+                  </label>
+                  <label className={selectedGender === 'men' ? 'active' : ''}>
+                    <input
+                      type="radio"
+                      name="gender"
+                      value="men"
+                      checked={selectedGender === 'men'}
+                      onChange={(e) => setSelectedGender(e.target.value)}
+                    />
+                    Men
+                  </label>
+                  <label className={selectedGender === 'unisex' ? 'active' : ''}>
+                    <input
+                      type="radio"
+                      name="gender"
+                      value="unisex"
+                      checked={selectedGender === 'unisex'}
+                      onChange={(e) => setSelectedGender(e.target.value)}
+                    />
+                    Unisex
+                  </label>
+                </div>
+              </div>
+            </div>
+            
+            <div className="form-group">
+              <button 
+                type="submit" 
+                className="primary-button generate-button"
+                disabled={generating}
+              >
+                {generating ? (
+                  <div className="loading-dots">
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                    Generating
+                  </div>
+                ) : 'Generate Outfit'}
+              </button>
+            </div>
+          </form>
+        </div>
       </section>
       
       {/* Outfit Results Section */}

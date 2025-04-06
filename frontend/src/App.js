@@ -44,32 +44,30 @@ function App() {
             <div className="footer-content">
               <div className="footer-section">
                 <h3>AI Fashion Assistant</h3>
-                <p>Discover your perfect style with the help of AI</p>
+                <p>Discover your perfect style with AI</p>
               </div>
               
               <div className="footer-section">
-                <h3>Quick Links</h3>
-                <ul>
+                <h3>Links</h3>
+                <ul className="footer-links">
                   <li><a href="/">Home</a></li>
-                  <li><a href="/products">Shop</a></li>
-                  <li><a href="/tryon">Virtual Try-On</a></li>
+                  <li><a href="#how">How It Works</a></li>
                 </ul>
               </div>
               
               <div className="footer-section">
-                <h3>Connect With Us</h3>
+                <h3>Connect</h3>
                 <div className="social-links">
-                  <a href="/#" className="social-link">Facebook</a>
-                  <a href="/#" className="social-link">Twitter</a>
                   <a href="/#" className="social-link">Instagram</a>
+                  <a href="/#" className="social-link">TikTok</a>
                 </div>
               </div>
             </div>
             
             <div className="footer-bottom">
-              <p>&copy; 2023 AI Fashion Assistant. All rights reserved.</p>
+              <p>&copy; 2023 Dripzy. All rights reserved.</p>
               <div className="affiliate-disclosure">
-                <p>Dripzy is a participant in the Amazon Services LLC Associates Program, an affiliate advertising program designed to provide a means for sites to earn advertising fees by advertising and linking to Amazon.com.</p>
+                <p>Dripzy participates in the Amazon Associates Program.</p>
               </div>
             </div>
           </div>

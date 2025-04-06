@@ -30,7 +30,7 @@ const Navbar = ({ user, onLogin, onLogout }) => {
         <div className="navbar-search">
           <input 
             type="text" 
-            placeholder="Search for styles, items, or brands..." 
+            placeholder="Search styles..." 
             className="search-input"
           />
           <button className="search-button">🔍</button>
@@ -47,13 +47,10 @@ const Navbar = ({ user, onLogin, onLogout }) => {
           
           <ul className="menu-items">
             <li className="menu-item">
-              <a href="#styles">Explore Styles</a>
+              <a href="#generate">Generate</a>
             </li>
             <li className="menu-item">
-              <a href="#how-it-works">How It Works</a>
-            </li>
-            <li className="menu-item">
-              <a href="#pricing">Pricing</a>
+              <a href="#how">How It Works</a>
             </li>
             {user ? (
               <>
@@ -65,9 +62,8 @@ const Navbar = ({ user, onLogin, onLogout }) => {
                     <span className="user-name">{user.name}</span>
                   </button>
                   <div className="user-dropdown">
-                    <a href="#profile">My Profile</a>
-                    <a href="#saved">Saved Outfits</a>
-                    <a href="#settings">Settings</a>
+                    <a href="#profile">Profile</a>
+                    <a href="#saved">Saved</a>
                     <button onClick={handleLogout}>Log Out</button>
                   </div>
                 </li>
@@ -79,12 +75,6 @@ const Navbar = ({ user, onLogin, onLogout }) => {
                   onClick={handleLogin}
                 >
                   Log In
-                </button>
-                <button 
-                  className="signup-button"
-                  onClick={handleLogin}
-                >
-                  Sign Up
                 </button>
               </li>
             )}
