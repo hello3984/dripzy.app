@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { getTrendingStyles, generateOutfit } from '../services/api';
+import { getAffiliateUrl } from '../services/amazon';
 import TrendingStylesDisplay from './TrendingStylesDisplay';
 import './HomePage.css';
 
@@ -441,6 +442,32 @@ const HomePage = () => {
     );
   };
 
+  // Add this in the render function where outfit items are displayed
+  const renderOutfitItem = (item) => {
+    const affiliateUrl = getAffiliateUrl(item.url, item.source);
+    
+    return (
+      <div className="outfit-item" key={item.id}>
+        <div className="outfit-item-image">
+          <img src={item.image_url || 'https://via.placeholder.com/300x400'} alt={item.name} />
+        </div>
+        <div className="outfit-item-details">
+          <h4>{item.name}</h4>
+          <p className="brand">{item.brand}</p>
+          <p className="price">${item.price.toFixed(2)}</p>
+          <a 
+            href={affiliateUrl} 
+            target="_blank" 
+            rel="noopener noreferrer" 
+            className="view-item-btn"
+          >
+            Shop Now
+          </a>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="homepage">
       {/* Hero Section */}
@@ -622,36 +649,7 @@ const HomePage = () => {
               <div className="outfit-items">
                 {outfit.items
                   .filter(item => activeCategory === 'all' || item.category.toLowerCase() === activeCategory)
-                  .map((item) => (
-                  <div key={item.product_id} className="outfit-item">
-                    <div className="item-image-container">
-                      <div className={`category-tag ${item.category.toLowerCase()}`}>
-                        {item.category.charAt(0).toUpperCase() + item.category.slice(1)}
-                      </div>
-                      <div className="brand-tag">
-                        {item.brand}
-                      </div>
-                      <img
-                        src={item.image_url}
-                        alt={item.product_name}
-                        onError={(e) => handleImageError(e, item.category)}
-                        className={loadingImages[item.product_id] ? 'loading' : ''}
-                        onLoad={() => {
-                          setLoadingImages(prev => ({...prev, [item.product_id]: false}));
-                        }}
-                      />
-                    </div>
-                    
-                    <div className="item-details">
-                      <div className="item-brand">{item.brand}</div>
-                      <h4 className="item-name">{item.product_name}</h4>
-                      <p className="item-price">${Number(item.price).toFixed(2)}</p>
-                      <a href={item.url || '#'} target="_blank" rel="noopener noreferrer" className="buy-now-button">
-                        Buy Now
-                      </a>
-                    </div>
-                  </div>
-                ))}
+                  .map((item) => renderOutfitItem(item))}
               </div>
             </div>
           ))}

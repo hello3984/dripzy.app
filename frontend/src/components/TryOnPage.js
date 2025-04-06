@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { getAvatarOptions, uploadUserImage, generateTryOn } from '../services/api';
+import { getAffiliateUrl, getAmazonSearchUrl } from '../services/amazon';
 import VirtualTryOn from './VirtualTryOn';
 
 const TryOnPage = () => {
@@ -15,35 +16,43 @@ const TryOnPage = () => {
   const [tryOnLoading, setTryOnLoading] = useState(false);
   const fileInputRef = useRef(null);
   
-  // Demo products
+  // Updated demo products with Amazon URLs
   const demoProducts = [
     {
       id: 'p1',
       name: 'Fringe Crop Top',
       brand: 'ASOS',
       image_url: 'https://via.placeholder.com/300x400?text=Fringe+Crop+Top',
-      price: 45.99
+      price: 45.99,
+      url: getAmazonSearchUrl('Fringe Crop Top Women Fashion'),
+      source: 'amazon'
     },
     {
       id: 'p5',
       name: 'Casual White T-Shirt',
       brand: 'GAP',
       image_url: 'https://via.placeholder.com/300x400?text=White+T-Shirt',
-      price: 24.99
+      price: 24.99,
+      url: getAmazonSearchUrl('Casual White T-Shirt GAP'),
+      source: 'amazon'
     },
     {
       id: 'p6',
       name: 'Black Skinny Jeans',
       brand: 'Levi\'s',
       image_url: 'https://via.placeholder.com/300x400?text=Black+Jeans',
-      price: 59.99
+      price: 59.99,
+      url: getAmazonSearchUrl('Levi\'s Black Skinny Jeans'),
+      source: 'amazon'
     },
     {
       id: 'p7',
       name: 'White Sneakers',
       brand: 'Nike',
       image_url: 'https://via.placeholder.com/300x400?text=White+Sneakers',
-      price: 89.99
+      price: 89.99,
+      url: getAmazonSearchUrl('Nike White Sneakers'),
+      source: 'amazon'
     }
   ];
 
@@ -143,6 +152,14 @@ const TryOnPage = () => {
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
       }
+    }
+  };
+
+  // Add a function to open the product page
+  const openProductPage = (productId) => {
+    const product = demoProducts.find(p => p.id === productId);
+    if (product && product.url) {
+      window.open(getAffiliateUrl(product.url, product.source), '_blank', 'noopener,noreferrer');
     }
   };
 
@@ -264,6 +281,15 @@ const TryOnPage = () => {
                     <div className="product-info">
                       <h4>{product.name}</h4>
                       <p>{product.brand} - ${product.price.toFixed(2)}</p>
+                      <button 
+                        className="buy-now-btn"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          openProductPage(product.id);
+                        }}
+                      >
+                        Buy Now
+                      </button>
                     </div>
                   </div>
                 ))}

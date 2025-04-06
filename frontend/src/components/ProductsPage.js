@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { searchProducts } from '../services/api';
+import { getAffiliateUrl } from '../services/amazon';
 
 const ProductsPage = () => {
   const [products, setProducts] = useState([]);
@@ -246,7 +247,12 @@ const ProductsPage = () => {
                           <p className="product-brand">{product.brand}</p>
                           <p className="product-price">${product.price.toFixed(2)}</p>
                           <div className="product-actions">
-                            <a href={product.url} target="_blank" rel="noopener noreferrer" className="view-product-btn">
+                            <a 
+                              href={getAffiliateUrl(product.url, product.source)} 
+                              target="_blank" 
+                              rel="noopener noreferrer" 
+                              className="view-product-btn"
+                            >
                               View Product
                             </a>
                             <button className="try-on-btn">Try On</button>

@@ -68,6 +68,9 @@ function App() {
             
             <div className="footer-bottom">
               <p>&copy; 2023 AI Fashion Assistant. All rights reserved.</p>
+              <div className="affiliate-disclosure">
+                <p>Dripzy is a participant in the Amazon Services LLC Associates Program, an affiliate advertising program designed to provide a means for sites to earn advertising fees by advertising and linking to Amazon.com.</p>
+              </div>
             </div>
           </div>
         </footer>
