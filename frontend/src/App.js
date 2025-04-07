@@ -50,10 +50,16 @@ function App() {
               <div className="footer-section">
                 <h3>Links</h3>
                 <ul className="footer-links">
-                  <li><a href="/">FEATURES</a></li>
-                  <li><a href="#how">HOW TO USE</a></li>
-                  <li><a href="#pricing">PRICING</a></li>
-                  <li><a href="#about">ABOUT</a></li>
+                  <li><a href="/">Features</a></li>
+                  <li><a href="#how">How It Works</a></li>
+                </ul>
+              </div>
+              
+              <div className="footer-section">
+                <h3>Legal</h3>
+                <ul className="footer-links">
+                  <li><a href="/privacy">Privacy Policy</a></li>
+                  <li><a href="/terms">Terms of Service</a></li>
                 </ul>
               </div>
               
@@ -62,6 +68,7 @@ function App() {
                 <div className="social-links">
                   <a href="/#" className="social-link">Instagram</a>
                   <a href="/#" className="social-link">TikTok</a>
+                  <a href="mailto:hello@dripzy.app" className="social-link">Contact</a>
                 </div>
               </div>
             </div>
@@ -69,7 +76,7 @@ function App() {
             <div className="footer-bottom">
               <p>&copy; 2023 Dripzy. All rights reserved.</p>
               <div className="affiliate-disclosure">
-                <p>Dripzy participates in the Amazon Associates Program.</p>
+                <p>Dripzy participates in affiliate programs and may earn commissions from qualifying purchases.</p>
               </div>
             </div>
           </div>

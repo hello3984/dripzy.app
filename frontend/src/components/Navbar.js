@@ -22,7 +22,7 @@ const Navbar = ({ user, onLogin, onLogout }) => {
   return (
     <>
       <div className="announcement-banner">
-        DRIPZY IS THE MOST ADVANCED AI STYLIST APP ON THE PLANET
+        The Most Advanced AI Stylist—Now at Your Fingertips
       </div>
       
       <nav className="navbar">
@@ -45,16 +45,15 @@ const Navbar = ({ user, onLogin, onLogout }) => {
                 <Link to="/" data-tooltip="Explore AI fashion">FEATURES</Link>
               </li>
               <li className="menu-item">
-                <a href="#generate" data-tooltip="Create your AI-powered outfit">SHOWCASE</a>
+                <a href="#generate" data-tooltip="Create your AI-powered outfit">TRY IT</a>
               </li>
-              <li className="menu-item">
-                <a href="#pricing" data-tooltip="View our pricing options">PRICING</a>
-              </li>
-              <li className="menu-item">
-                <a href="#how" data-tooltip="Learn about our AI fashion technology">HOW TO USE</a>
-              </li>
-              <li className="menu-item">
-                <a href="#about" data-tooltip="Learn about Dripzy">ABOUT</a>
+              <li className="menu-item dropdown">
+                <a href="#" data-tooltip="Learn more about Dripzy">MORE</a>
+                <div className="dropdown-menu">
+                  <a href="#pricing">Pricing</a>
+                  <a href="#how">How It Works</a>
+                  <a href="#about">About Us</a>
+                </div>
               </li>
             </ul>
           </div>

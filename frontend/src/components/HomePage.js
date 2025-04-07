@@ -498,8 +498,7 @@ const HomePage = () => {
         <div className="hero-content">
           <h1 className="hero-title">Showcase</h1>
           <p className="hero-subtitle">
-            Dripzy users can leverage advanced algorithms to generate innovative fashion
-            concepts, pushing the boundaries of creativity and efficiency in the design process.
+            Generate personalized outfits in seconds using AI-driven fashion intelligence.
           </p>
           <div className="hero-cta">
             <button 
@@ -519,6 +518,10 @@ const HomePage = () => {
       
       {/* Showcase Image Gallery */}
       <section className="showcase-gallery">
+        <div className="section-header">
+          <h2>Fashion Inspiration</h2>
+          <p>Dripzy's AI algorithms generate on-trend fashion concepts—perfect for any style, any event.</p>
+        </div>
         <div className="gallery-grid">
           <div className="gallery-item">
             <img src="https://images.unsplash.com/photo-1509631179647-0177331693ae?q=80&w=1976&auto=format&fit=crop" alt="Fashion model in burgundy suit" />
