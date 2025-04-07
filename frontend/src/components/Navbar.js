@@ -22,7 +22,7 @@ const Navbar = ({ user, onLogin, onLogout }) => {
   return (
     <>
       <div className="announcement-banner">
-        Dripzy is now part of the LVMH Startup Acceleration Program at La Maison des Startups
+        DRIPZY IS THE MOST ADVANCED AI STYLIST APP ON THE PLANET
       </div>
       
       <nav className="navbar">
