@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { getTrendingStyles, generateOutfit } from '../services/api';
 import { getAffiliateUrl } from '../services/amazon';
 import TrendingStylesDisplay from './TrendingStylesDisplay';
@@ -21,6 +21,9 @@ const HomePage = () => {
 
   // New state for tracking active category tab
   const [activeCategory, setActiveCategory] = useState('all');
+
+  const [selectedPhoto, setSelectedPhoto] = useState(null);
+  const fileInputRef = useRef(null);
 
   // Budget tier options
   const budgetTiers = [
@@ -105,6 +108,14 @@ const HomePage = () => {
     
     // Auto-generation for specific styles with appropriate prompts
     const stylePrompts = {
+      'Classic': 'Create a timeless classic outfit for everyday wear',
+      'Coastal': 'Create a beach-inspired coastal outfit with light colors',
+      'Goth': 'Create a dark gothic outfit with black elements',
+      'Chic': 'Create an elegant and sophisticated chic outfit',
+      'Preppy': 'Create a polished preppy outfit with classic elements',
+      'Rustic': 'Create a rustic bohemian outfit with earthy tones',
+      'Androgynous': 'Create a gender-neutral outfit with modern styling',
+      'Romantic': 'Create a soft and feminine romantic outfit',
       'Coachella': 'Create a festival outfit for Coachella with bohemian vibes',
       'Festival': 'Create a trendy music festival outfit',
       'Business': 'Create a professional office outfit',
@@ -117,10 +128,11 @@ const HomePage = () => {
     if (stylePrompts[style]) {
       setPrompt(stylePrompts[style]);
       
-      // Auto-generate after a short delay
-      setTimeout(() => {
-        handleGenerateOutfit();
-      }, 300);
+      // Scroll to the top of the style generation section
+      const generatorSection = document.querySelector('.style-prompt-container');
+      if (generatorSection) {
+        generatorSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
     }
   };
 
@@ -468,6 +480,17 @@ const HomePage = () => {
     );
   };
 
+  const handlePhotoUpload = (event) => {
+    const file = event.target.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setSelectedPhoto(reader.result);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
   return (
     <div className="homepage">
       {/* Hero Section */}
@@ -529,80 +552,66 @@ const HomePage = () => {
           </div>
           <h2 className="section-title">Generate Your Outfit</h2>
           
-          <div className="trending-styles">
-            <h3>Trending Styles</h3>
-            <div className="style-tags">
-              {flattenedStyles.slice(0, 8).map((style) => (
-                <button
-                  key={style}
-                  className={`style-tag ${selectedStyle === style ? 'active' : ''}`}
-                  onClick={() => handleStyleClick(style)}
-                  data-style={style}
-                >
-                  {style}
-                </button>
-              ))}
+          <div className="style-prompt-container">
+            <div className="prompt-input-wrapper">
+              <input
+                type="text"
+                value={prompt}
+                onChange={(e) => setPrompt(e.target.value)}
+                placeholder="Describe what you want to generate..."
+                className="prompt-input"
+              />
+              <button 
+                className="close-button"
+                onClick={() => setPrompt('')}
+              >×</button>
             </div>
-          </div>
-          
-          <form onSubmit={(e) => {
-            e.preventDefault();
-            handleGenerateOutfit();
-          }} className="style-form">
-            <div className="form-row">
-              <div className="form-group">
-                <label htmlFor="prompt">Describe your outfit</label>
-                <input
-                  type="text"
-                  id="prompt"
-                  value={prompt}
-                  onChange={(e) => setPrompt(e.target.value)}
-                  placeholder="e.g., Casual weekend outfit for spring"
-                  className="form-control"
-                />
+            
+            <div className="suggestion-chips">
+              <div 
+                className="suggestion-chip"
+                onClick={() => setPrompt('Gardening gifts for a retiree with a green thumb')}
+              >
+                <span>Gardening gifts for a retiree with a green thumb</span>
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="7" y1="17" x2="17" y2="7"></line>
+                  <polyline points="7 7 17 7 17 17"></polyline>
+                </svg>
               </div>
-              
-              <div className="form-group gender-select">
-                <label>Gender</label>
-                <div className="radio-group">
-                  <label className={selectedGender === 'women' ? 'active' : ''}>
-                    <input
-                      type="radio"
-                      name="gender"
-                      value="women"
-                      checked={selectedGender === 'women'}
-                      onChange={(e) => setSelectedGender(e.target.value)}
-                    />
-                    Women
-                  </label>
-                  <label className={selectedGender === 'men' ? 'active' : ''}>
-                    <input
-                      type="radio"
-                      name="gender"
-                      value="men"
-                      checked={selectedGender === 'men'}
-                      onChange={(e) => setSelectedGender(e.target.value)}
-                    />
-                    Men
-                  </label>
-                  <label className={selectedGender === 'unisex' ? 'active' : ''}>
-                    <input
-                      type="radio"
-                      name="gender"
-                      value="unisex"
-                      checked={selectedGender === 'unisex'}
-                      onChange={(e) => setSelectedGender(e.target.value)}
-                    />
-                    Unisex
-                  </label>
-                </div>
+              <div 
+                className="suggestion-chip"
+                onClick={() => setPrompt('Birthday outfits for women')}
+              >
+                <span>Birthday outfits for women</span>
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="7" y1="17" x2="17" y2="7"></line>
+                  <polyline points="7 7 17 7 17 17"></polyline>
+                </svg>
               </div>
             </div>
             
-            <div className="form-group">
+            <div className="action-buttons">
+              <input
+                type="file"
+                ref={fileInputRef}
+                onChange={handlePhotoUpload}
+                accept="image/*"
+                style={{ display: 'none' }}
+              />
               <button 
-                type="submit" 
-                className="primary-button generate-button"
+                className="photo-upload-button"
+                onClick={() => fileInputRef.current.click()}
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                  <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                  <polyline points="21 15 16 10 5 21"></polyline>
+                </svg>
+                Use a photo
+              </button>
+              <button 
+                className="generate-button"
+                onClick={handleGenerateOutfit}
                 disabled={generating}
               >
                 {generating ? (
@@ -612,10 +621,126 @@ const HomePage = () => {
                     <span></span>
                     Generating
                   </div>
-                ) : 'Generate Outfit'}
+                ) : 'Generate'}
               </button>
             </div>
-          </form>
+            
+            {selectedPhoto && (
+              <div className="photo-preview">
+                <div className="photo-preview-wrapper">
+                  <img src={selectedPhoto} alt="User uploaded" />
+                  <button 
+                    className="remove-photo"
+                    onClick={() => setSelectedPhoto(null)}
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <circle cx="12" cy="12" r="10"></circle>
+                      <line x1="15" y1="9" x2="9" y2="15"></line>
+                      <line x1="9" y1="9" x2="15" y2="15"></line>
+                    </svg>
+                  </button>
+                </div>
+                <p className="photo-note">We'll generate outfits that would look great on you</p>
+              </div>
+            )}
+          </div>
+          
+          <div className="style-categories">
+            <h3>Choose a style</h3>
+            <div className="style-grid">
+              <div 
+                className={`style-tile ${selectedStyle === 'Classic' ? 'active' : ''}`}
+                onClick={() => handleStyleClick('Classic')}
+              >
+                <div className="style-image classic-style"></div>
+                <span className="style-name">Classic</span>
+              </div>
+              <div 
+                className={`style-tile ${selectedStyle === 'Coastal' ? 'active' : ''}`}
+                onClick={() => handleStyleClick('Coastal')}
+              >
+                <div className="style-image coastal-style"></div>
+                <span className="style-name">Coastal</span>
+              </div>
+              <div 
+                className={`style-tile ${selectedStyle === 'Goth' ? 'active' : ''}`}
+                onClick={() => handleStyleClick('Goth')}
+              >
+                <div className="style-image goth-style"></div>
+                <span className="style-name">Goth</span>
+              </div>
+              <div 
+                className={`style-tile ${selectedStyle === 'Chic' ? 'active' : ''}`}
+                onClick={() => handleStyleClick('Chic')}
+              >
+                <div className="style-image chic-style"></div>
+                <span className="style-name">Chic</span>
+              </div>
+              <div 
+                className={`style-tile ${selectedStyle === 'Preppy' ? 'active' : ''}`}
+                onClick={() => handleStyleClick('Preppy')}
+              >
+                <div className="style-image preppy-style"></div>
+                <span className="style-name">Preppy</span>
+              </div>
+              <div 
+                className={`style-tile ${selectedStyle === 'Rustic' ? 'active' : ''}`}
+                onClick={() => handleStyleClick('Rustic')}
+              >
+                <div className="style-image rustic-style"></div>
+                <span className="style-name">Rustic</span>
+              </div>
+              <div 
+                className={`style-tile ${selectedStyle === 'Androgynous' ? 'active' : ''}`}
+                onClick={() => handleStyleClick('Androgynous')}
+              >
+                <div className="style-image androgynous-style"></div>
+                <span className="style-name">Androgynous</span>
+              </div>
+              <div 
+                className={`style-tile ${selectedStyle === 'Romantic' ? 'active' : ''}`}
+                onClick={() => handleStyleClick('Romantic')}
+              >
+                <div className="style-image romantic-style"></div>
+                <span className="style-name">Romantic</span>
+              </div>
+            </div>
+          </div>
+          
+          <div className="gender-preference">
+            <div className="radio-group">
+              <label className={selectedGender === 'women' ? 'active' : ''}>
+                <input
+                  type="radio"
+                  name="gender"
+                  value="women"
+                  checked={selectedGender === 'women'}
+                  onChange={(e) => setSelectedGender(e.target.value)}
+                />
+                Women
+              </label>
+              <label className={selectedGender === 'men' ? 'active' : ''}>
+                <input
+                  type="radio"
+                  name="gender"
+                  value="men"
+                  checked={selectedGender === 'men'}
+                  onChange={(e) => setSelectedGender(e.target.value)}
+                />
+                Men
+              </label>
+              <label className={selectedGender === 'unisex' ? 'active' : ''}>
+                <input
+                  type="radio"
+                  name="gender"
+                  value="unisex"
+                  checked={selectedGender === 'unisex'}
+                  onChange={(e) => setSelectedGender(e.target.value)}
+                />
+                Unisex
+              </label>
+            </div>
+          </div>
         </div>
       </section>
       
