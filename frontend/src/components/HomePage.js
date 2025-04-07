@@ -17,21 +17,12 @@ const HomePage = () => {
   const [error, setError] = useState(null); // Add state for error handling
   const [outfits, setOutfits] = useState([]);
   const [loadingImages, setLoadingImages] = useState({});
-  const [budgetTier, setBudgetTier] = useState(null);
 
   // New state for tracking active category tab
   const [activeCategory, setActiveCategory] = useState('all');
 
   const [selectedPhoto, setSelectedPhoto] = useState(null);
   const fileInputRef = useRef(null);
-
-  // Budget tier options
-  const budgetTiers = [
-    { name: 'Luxury', min: 1000, description: 'Premium designer brands' },
-    { name: 'Premium', min: 400, max: 999, description: 'High-quality fashion' },
-    { name: 'Mid-range', min: 150, max: 399, description: 'Quality everyday pieces' },
-    { name: 'Budget', max: 149, description: 'Affordable style picks' }
-  ];
 
   useEffect(() => {
     // Fetch trending styles when component mounts
@@ -416,18 +407,6 @@ const HomePage = () => {
     e.target.classList.add('fallback-image');
   };
 
-  // Handle budget tier selection
-  const handleBudgetTierSelect = (tier) => {
-    setBudgetTier(tier);
-    if (tier.min && tier.max) {
-      setBudget(tier.max); // Set to max of the range
-    } else if (tier.min) {
-      setBudget(tier.min); // For luxury, set to minimum
-    } else if (tier.max) {
-      setBudget(tier.max); // For budget, set to maximum
-    }
-  };
-
   // Force show the Coachella outfits if the user clicked Coachella
   useEffect(() => {
     if (selectedStyle === 'Coachella') {
@@ -538,31 +517,6 @@ const HomePage = () => {
           <div className="gallery-item">
             <img src="https://images.unsplash.com/photo-1618522285348-559a4f369c3e?q=80&w=1972&auto=format&fit=crop" alt="Fashion model closeup" />
           </div>
-        </div>
-      </section>
-      
-      {/* Budget Tier Selection */}
-      <section className="budget-tiers">
-        <h2>Shop By Budget</h2>
-        <div className="tier-selector">
-          {budgetTiers.map((tier) => (
-            <div 
-              key={tier.name}
-              className={`tier-card ${budgetTier?.name === tier.name ? 'active' : ''}`}
-              onClick={() => handleBudgetTierSelect(tier)}
-            >
-              <h3>{tier.name}</h3>
-              <p className="price-range">
-                {tier.min && tier.max 
-                  ? `$${tier.min} - $${tier.max}`
-                  : tier.min 
-                    ? `$${tier.min}+` 
-                    : `Up to $${tier.max}`
-                }
-              </p>
-              <p className="tier-desc">{tier.description}</p>
-            </div>
-          ))}
         </div>
       </section>
       
