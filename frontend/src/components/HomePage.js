@@ -3,6 +3,7 @@ import { getTrendingStyles, generateOutfit } from '../services/api';
 import { getAffiliateUrl } from '../services/amazon';
 import TrendingStylesDisplay from './TrendingStylesDisplay';
 import './HomePage.css';
+import Banner from './Banner';
 
 const HomePage = () => {
   const [trendingStyles, setTrendingStyles] = useState({});
@@ -493,6 +494,8 @@ const HomePage = () => {
 
   return (
     <div className="homepage">
+      <Banner />
+      
       {/* Hero Section */}
       <section className="hero-section">
         <div className="hero-content">
@@ -538,31 +541,6 @@ const HomePage = () => {
           <div className="gallery-item">
             <img src="https://images.unsplash.com/photo-1618522285348-559a4f369c3e?q=80&w=1972&auto=format&fit=crop" alt="Fashion model closeup" />
           </div>
-        </div>
-      </section>
-      
-      {/* Budget Tier Selection */}
-      <section className="budget-tiers">
-        <h2>Shop By Budget</h2>
-        <div className="tier-selector">
-          {budgetTiers.map((tier) => (
-            <div 
-              key={tier.name}
-              className={`tier-card ${budgetTier?.name === tier.name ? 'active' : ''}`}
-              onClick={() => handleBudgetTierSelect(tier)}
-            >
-              <h3>{tier.name}</h3>
-              <p className="price-range">
-                {tier.min && tier.max 
-                  ? `$${tier.min} - $${tier.max}`
-                  : tier.min 
-                    ? `$${tier.min}+` 
-                    : `Up to $${tier.max}`
-                }
-              </p>
-              <p className="tier-desc">{tier.description}</p>
-            </div>
-          ))}
         </div>
       </section>
       
