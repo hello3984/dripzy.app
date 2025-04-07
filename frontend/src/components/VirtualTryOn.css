@@ -40,6 +40,45 @@
   line-height: 1.5;
 }
 
+.upload-buttons {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  margin-bottom: 20px;
+}
+
+.camera-button, .gallery-button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 20px;
+  border-radius: 30px;
+  font-size: 16px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.camera-button {
+  background-color: #201B17;
+  color: white;
+  border: none;
+}
+
+.gallery-button {
+  background-color: transparent;
+  color: #201B17;
+  border: 1px solid #201B17;
+}
+
+.camera-button:hover {
+  background-color: #333;
+}
+
+.gallery-button:hover {
+  background-color: rgba(32, 27, 23, 0.1);
+}
+
 .upload-button {
   background-color: #201B17;
   color: white;

@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import './VirtualTryOn.css';
 
 const VirtualTryOn = ({ onComplete }) => {
@@ -7,6 +7,10 @@ const VirtualTryOn = ({ onComplete }) => {
   const [loading, setLoading] = useState(false);
   const [step, setStep] = useState('upload'); // 'upload', 'preview', 'avatar'
   const fileInputRef = useRef(null);
+  
+  // Check if iOS Safari
+  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+  const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
 
   // Handle file selection
   const handleFileSelect = (e) => {
@@ -21,8 +25,29 @@ const VirtualTryOn = ({ onComplete }) => {
     reader.readAsDataURL(file);
   };
 
-  // Trigger file input click
-  const handleUploadClick = () => {
+  // Handle camera access
+  const handleCameraClick = async () => {
+    if (isIOS && isSafari) {
+      // For iOS Safari, just open the file picker with capture attribute
+      fileInputRef.current.setAttribute('capture', 'user');
+      fileInputRef.current.click();
+    } else {
+      try {
+        // For other browsers, request camera permission first
+        await navigator.mediaDevices.getUserMedia({ video: true });
+        fileInputRef.current.setAttribute('capture', 'user');
+        fileInputRef.current.click();
+      } catch (err) {
+        console.error("Camera permission denied:", err);
+        alert("Please allow camera access to use this feature");
+      }
+    }
+  };
+
+  // Handle gallery access
+  const handleGalleryClick = () => {
+    // Remove capture attribute to access photo gallery
+    fileInputRef.current.removeAttribute('capture');
     fileInputRef.current.click();
   };
 
@@ -92,12 +117,30 @@ const VirtualTryOn = ({ onComplete }) => {
               style={{ display: 'none' }}
             />
             
-            <button 
-              className="upload-button"
-              onClick={handleUploadClick}
-            >
-              Upload Selfie
-            </button>
+            <div className="upload-buttons">
+              <button 
+                className="camera-button"
+                onClick={handleCameraClick}
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
+                  <circle cx="12" cy="13" r="4"></circle>
+                </svg>
+                Take Selfie
+              </button>
+              
+              <button 
+                className="gallery-button"
+                onClick={handleGalleryClick}
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                  <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                  <polyline points="21 15 16 10 5 21"></polyline>
+                </svg>
+                Gallery
+              </button>
+            </div>
             
             <button 
               className="default-avatar-button"
