@@ -571,6 +571,7 @@ const HomePage = () => {
               <div 
                 className="suggestion-chip"
                 onClick={() => setPrompt('Gardening gifts for a retiree with a green thumb')}
+                data-tooltip="Use this suggestion"
               >
                 <span>Gardening gifts for a retiree with a green thumb</span>
                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -581,6 +582,7 @@ const HomePage = () => {
               <div 
                 className="suggestion-chip"
                 onClick={() => setPrompt('Birthday outfits for women')}
+                data-tooltip="Use this suggestion"
               >
                 <span>Birthday outfits for women</span>
                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -601,6 +603,7 @@ const HomePage = () => {
               <button 
                 className="photo-upload-button"
                 onClick={() => fileInputRef.current.click()}
+                data-tooltip="Upload your photo for personalized styling"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
@@ -613,6 +616,7 @@ const HomePage = () => {
                 className="generate-button"
                 onClick={handleGenerateOutfit}
                 disabled={generating}
+                data-tooltip="Generate AI fashion outfits"
               >
                 {generating ? (
                   <div className="loading-dots">
@@ -651,6 +655,7 @@ const HomePage = () => {
               <div 
                 className={`style-tile ${selectedStyle === 'Classic' ? 'active' : ''}`}
                 onClick={() => handleStyleClick('Classic')}
+                data-tooltip="Timeless and elegant classic style"
               >
                 <div className="style-image classic-style"></div>
                 <span className="style-name">Classic</span>
@@ -658,6 +663,7 @@ const HomePage = () => {
               <div 
                 className={`style-tile ${selectedStyle === 'Coastal' ? 'active' : ''}`}
                 onClick={() => handleStyleClick('Coastal')}
+                data-tooltip="Beach-inspired relaxed coastal look"
               >
                 <div className="style-image coastal-style"></div>
                 <span className="style-name">Coastal</span>
@@ -665,6 +671,7 @@ const HomePage = () => {
               <div 
                 className={`style-tile ${selectedStyle === 'Goth' ? 'active' : ''}`}
                 onClick={() => handleStyleClick('Goth')}
+                data-tooltip="Dark and edgy gothic fashion"
               >
                 <div className="style-image goth-style"></div>
                 <span className="style-name">Goth</span>
@@ -672,6 +679,7 @@ const HomePage = () => {
               <div 
                 className={`style-tile ${selectedStyle === 'Chic' ? 'active' : ''}`}
                 onClick={() => handleStyleClick('Chic')}
+                data-tooltip="Sophisticated and trendy chic looks"
               >
                 <div className="style-image chic-style"></div>
                 <span className="style-name">Chic</span>
@@ -679,6 +687,7 @@ const HomePage = () => {
               <div 
                 className={`style-tile ${selectedStyle === 'Preppy' ? 'active' : ''}`}
                 onClick={() => handleStyleClick('Preppy')}
+                data-tooltip="Clean and polished preppy outfits"
               >
                 <div className="style-image preppy-style"></div>
                 <span className="style-name">Preppy</span>
@@ -686,6 +695,7 @@ const HomePage = () => {
               <div 
                 className={`style-tile ${selectedStyle === 'Rustic' ? 'active' : ''}`}
                 onClick={() => handleStyleClick('Rustic')}
+                data-tooltip="Natural and earthy rustic style"
               >
                 <div className="style-image rustic-style"></div>
                 <span className="style-name">Rustic</span>
@@ -693,6 +703,7 @@ const HomePage = () => {
               <div 
                 className={`style-tile ${selectedStyle === 'Androgynous' ? 'active' : ''}`}
                 onClick={() => handleStyleClick('Androgynous')}
+                data-tooltip="Gender-neutral modern styling"
               >
                 <div className="style-image androgynous-style"></div>
                 <span className="style-name">Androgynous</span>
@@ -700,6 +711,7 @@ const HomePage = () => {
               <div 
                 className={`style-tile ${selectedStyle === 'Romantic' ? 'active' : ''}`}
                 onClick={() => handleStyleClick('Romantic')}
+                data-tooltip="Soft and feminine romantic fashion"
               >
                 <div className="style-image romantic-style"></div>
                 <span className="style-name">Romantic</span>
@@ -709,7 +721,10 @@ const HomePage = () => {
           
           <div className="gender-preference">
             <div className="radio-group">
-              <label className={selectedGender === 'women' ? 'active' : ''}>
+              <label 
+                className={selectedGender === 'women' ? 'active' : ''}
+                data-tooltip="Show women's fashion styles"
+              >
                 <input
                   type="radio"
                   name="gender"
@@ -719,7 +734,10 @@ const HomePage = () => {
                 />
                 Women
               </label>
-              <label className={selectedGender === 'men' ? 'active' : ''}>
+              <label 
+                className={selectedGender === 'men' ? 'active' : ''}
+                data-tooltip="Show men's fashion styles"
+              >
                 <input
                   type="radio"
                   name="gender"
@@ -729,7 +747,10 @@ const HomePage = () => {
                 />
                 Men
               </label>
-              <label className={selectedGender === 'unisex' ? 'active' : ''}>
+              <label 
+                className={selectedGender === 'unisex' ? 'active' : ''}
+                data-tooltip="Show gender-neutral fashion styles"
+              >
                 <input
                   type="radio"
                   name="gender"

@@ -47,24 +47,24 @@ const Navbar = ({ user, onLogin, onLogout }) => {
           
           <ul className="menu-items">
             <li className="menu-item">
-              <a href="#generate">Generate</a>
+              <a href="#generate" data-tooltip="Create your AI-powered outfit">Generate</a>
             </li>
             <li className="menu-item">
-              <a href="#how">How It Works</a>
+              <a href="#how" data-tooltip="Learn about our AI fashion technology">How It Works</a>
             </li>
             {user ? (
               <>
                 <li className="menu-item user-menu">
-                  <button className="user-button">
+                  <button className="user-button" data-tooltip="Your account options">
                     <span className="user-avatar">
                       {user.name.charAt(0)}
                     </span>
                     <span className="user-name">{user.name}</span>
                   </button>
                   <div className="user-dropdown">
-                    <a href="#profile">Profile</a>
-                    <a href="#saved">Saved</a>
-                    <button onClick={handleLogout}>Log Out</button>
+                    <a href="#profile" data-tooltip="View your profile">Profile</a>
+                    <a href="#saved" data-tooltip="See your saved outfits">Saved</a>
+                    <button onClick={handleLogout} data-tooltip="Sign out of your account">Log Out</button>
                   </div>
                 </li>
               </>
@@ -73,6 +73,7 @@ const Navbar = ({ user, onLogin, onLogout }) => {
                 <button 
                   className="login-button"
                   onClick={handleLogin}
+                  data-tooltip="Sign in to your account"
                 >
                   Log In
                 </button>
