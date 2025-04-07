@@ -716,4 +716,105 @@
   color: var(--text-medium);
   max-width: 700px;
   margin: 0 auto;
+}
+
+/* Virtual Try-On Button */
+.try-on-button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background-color: #DBEEA3; /* Lime green accent from Refabric */
+  color: #201B17;
+  border: none;
+  padding: 10px 15px;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.try-on-button:hover {
+  background-color: #C5DC7D;
+}
+
+.try-on-button svg {
+  width: 18px;
+  height: 18px;
+}
+
+/* Modal Overlay */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.7);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+  overflow-y: auto;
+  padding: 20px;
+}
+
+.modal-container {
+  background-color: white;
+  border-radius: 12px;
+  width: 90%;
+  max-width: 900px;
+  max-height: 90vh;
+  overflow-y: auto;
+  position: relative;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+}
+
+.modal-close {
+  position: absolute;
+  top: 15px;
+  right: 15px;
+  background: none;
+  border: none;
+  font-size: 24px;
+  cursor: pointer;
+  color: #666;
+  z-index: 10;
+}
+
+.modal-close:hover {
+  color: #000;
+}
+
+/* Avatar Outfit Preview */
+.avatar-outfit-preview {
+  margin-top: 30px;
+  padding: 20px;
+  background-color: #f9f9f9;
+  border-radius: 12px;
+  text-align: center;
+}
+
+.avatar-outfit-preview h3 {
+  margin-bottom: 20px;
+  font-size: 22px;
+}
+
+.avatar-outfit-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 15px;
+}
+
+.user-avatar {
+  width: 100%;
+  max-width: 300px;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.avatar-outfit-container p {
+  font-size: 16px;
+  color: #666;
 } 

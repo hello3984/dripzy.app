@@ -1,105 +1,189 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
+import './VirtualTryOn.css';
 
-const VirtualTryOn = ({ outfit, avatarType, onClose }) => {
+const VirtualTryOn = ({ onComplete }) => {
+  const [userPhoto, setUserPhoto] = useState(null);
+  const [avatarImage, setAvatarImage] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [tryOnImage, setTryOnImage] = useState(null);
-  const [error, setError] = useState(null);
+  const [step, setStep] = useState('upload'); // 'upload', 'preview', 'avatar'
+  const fileInputRef = useRef(null);
 
-  const generateTryOn = async () => {
+  // Handle file selection
+  const handleFileSelect = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      setUserPhoto(event.target.result);
+      setStep('preview');
+    };
+    reader.readAsDataURL(file);
+  };
+
+  // Trigger file input click
+  const handleUploadClick = () => {
+    fileInputRef.current.click();
+  };
+
+  // Generate avatar from uploaded photo
+  const generateAvatar = async () => {
     setLoading(true);
-    setError(null);
     
     try {
-      // In a real implementation, this would call the backend API
-      // const response = await fetch('http://localhost:8000/tryon/generate', {
-      //   method: 'POST',
-      //   headers: {
-      //     'Content-Type': 'application/json',
-      //   },
-      //   body: JSON.stringify({
-      //     outfit_items: outfit.items,
-      //     avatar_type: avatarType,
-      //     gender: 'neutral'
-      //   }),
-      // });
-      
-      // if (!response.ok) {
-      //   throw new Error('Failed to generate try-on image');
-      // }
-      
-      // const data = await response.json();
-      // setTryOnImage(data.image_base64);
-      
-      // Mock response for demonstration
+      // In a real implementation, you would make an API call to a service like Ready Player Me
+      // For now, we'll simulate the API call with a timeout
       setTimeout(() => {
-        // Use a placeholder image for the demo
-        setTryOnImage('https://via.placeholder.com/400x600?text=Virtual+Try+On+Demo');
+        // This is where we would normally set the avatar from the API response
+        // For demo purposes, we're just using the user's photo as a placeholder
+        setAvatarImage(userPhoto);
+        setStep('avatar');
         setLoading(false);
       }, 2000);
-    } catch (err) {
-      setError(err.message || 'Failed to generate try-on image');
+      
+      // Actual API implementation would look something like this:
+      /*
+      const response = await fetch('https://api.example.com/create-avatar', {
+        method: 'POST',
+        body: JSON.stringify({ image: userPhoto }),
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      const data = await response.json();
+      setAvatarImage(data.avatarUrl);
+      */
+    } catch (error) {
+      console.error('Error generating avatar:', error);
       setLoading(false);
     }
   };
 
-  // Generate the try-on image when the component mounts
-  React.useEffect(() => {
-    generateTryOn();
-  }, []);
+  // Reset and start over
+  const handleReset = () => {
+    setUserPhoto(null);
+    setAvatarImage(null);
+    setStep('upload');
+  };
+
+  // Continue to outfit selection
+  const handleContinue = () => {
+    if (onComplete) {
+      onComplete(avatarImage);
+    }
+  };
 
   return (
-    <div className="virtual-tryon-modal">
-      <div className="tryon-header">
-        <h2>Virtual Try-On</h2>
-        <button className="close-button" onClick={onClose}>×</button>
-      </div>
+    <div className="virtual-try-on">
+      <h2>Virtual Try-On</h2>
       
-      <div className="tryon-content">
-        {loading ? (
-          <div className="loading-indicator">
-            <p>Generating your virtual try-on...</p>
-            <div className="spinner"></div>
-          </div>
-        ) : error ? (
-          <div className="error-message">
-            <p>Error: {error}</p>
-            <button onClick={generateTryOn}>Try Again</button>
-          </div>
-        ) : tryOnImage ? (
-          <div className="tryon-result">
-            <div className="tryon-image">
-              <img 
-                src={tryOnImage.startsWith('data:') ? tryOnImage : tryOnImage} 
-                alt="Virtual try-on" 
-              />
-            </div>
+      {step === 'upload' && (
+        <div className="upload-section">
+          <div className="upload-container">
+            <h3>Let's see what you look like</h3>
+            <p>A face photo will help us create a more accurate try-on experience for you.</p>
             
-            <div className="outfit-summary">
-              <h3>{outfit.outfit_name}</h3>
-              <p>{outfit.style_description}</p>
-              <p className="price-tag">Total: ${outfit.total_price.toFixed(2)}</p>
-              
-              <div className="outfit-items-summary">
-                {outfit.items.map((item, index) => (
-                  <div className="summary-item" key={index}>
-                    <span className="item-name">{item.name}</span>
-                    <span className="item-price">${item.price.toFixed(2)}</span>
-                  </div>
-                ))}
-              </div>
-              
-              <div className="tryon-actions">
-                <button className="shop-all-button">Shop All Items</button>
-                <button className="share-button">Share Look</button>
-              </div>
+            <input
+              type="file"
+              ref={fileInputRef}
+              onChange={handleFileSelect}
+              accept="image/*"
+              style={{ display: 'none' }}
+            />
+            
+            <button 
+              className="upload-button"
+              onClick={handleUploadClick}
+            >
+              Upload Selfie
+            </button>
+            
+            <button 
+              className="default-avatar-button"
+              onClick={() => setStep('avatar')}
+            >
+              Use Default Avatar
+            </button>
+          </div>
+          
+          <div className="example-container">
+            <div className="example-image">
+              <img src="/images/avatar-example.jpg" alt="Avatar Example" />
             </div>
+            <p>Your photo will be used to create a digital avatar for try-on</p>
           </div>
-        ) : (
-          <div className="no-result">
-            <p>No try-on image available.</p>
+        </div>
+      )}
+      
+      {step === 'preview' && (
+        <div className="preview-section">
+          <h3>Your Photo</h3>
+          
+          <div className="photo-preview">
+            <img src={userPhoto} alt="Your uploaded" />
           </div>
-        )}
-      </div>
+          
+          <div className="preview-buttons">
+            <button 
+              className="secondary-button"
+              onClick={handleReset}
+            >
+              Try Another Photo
+            </button>
+            
+            <button 
+              className="primary-button"
+              onClick={generateAvatar}
+              disabled={loading}
+            >
+              {loading ? 'Creating Avatar...' : 'Create My Avatar'}
+            </button>
+          </div>
+        </div>
+      )}
+      
+      {step === 'avatar' && (
+        <div className="avatar-section">
+          <h3>Your Avatar</h3>
+          
+          <div className="avatar-preview">
+            {avatarImage && (
+              <div className="avatar-image">
+                <img src={avatarImage} alt="Your avatar" />
+              </div>
+            )}
+            
+            {!avatarImage && (
+              <div className="default-avatar">
+                <img src="/images/default-avatar.jpg" alt="Default avatar" />
+              </div>
+            )}
+          </div>
+          
+          <div className="avatar-buttons">
+            <button 
+              className="change-avatar-button"
+              onClick={handleReset}
+            >
+              Change Avatar
+            </button>
+            
+            <button 
+              className="continue-button"
+              onClick={handleContinue}
+            >
+              Continue to Outfits
+            </button>
+          </div>
+          
+          <div className="avatar-info">
+            <p>
+              Your avatar is ready! Now you can try on different outfits and styles.
+            </p>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

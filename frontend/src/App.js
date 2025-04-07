@@ -8,6 +8,7 @@ import HomePage from './components/HomePage';
 import ProductsPage from './components/ProductsPage';
 import TryOnPage from './components/TryOnPage';
 import UserAuth from './components/UserAuth';
+import VirtualTryOn from './components/VirtualTryOn';
 
 function App() {
   const [user, setUser] = useState(null);
@@ -36,6 +37,7 @@ function App() {
             <Route path="/" element={<HomePage />} />
             <Route path="/products" element={<ProductsPage />} />
             <Route path="/tryon" element={<TryOnPage />} />
+            <Route path="/virtual-try-on" element={<VirtualTryOn onComplete={() => {}} />} />
           </Routes>
         </main>
         

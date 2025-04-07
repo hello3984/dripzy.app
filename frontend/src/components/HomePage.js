@@ -4,6 +4,7 @@ import { getAffiliateUrl } from '../services/amazon';
 import TrendingStylesDisplay from './TrendingStylesDisplay';
 import './HomePage.css';
 import Banner from './Banner';
+import VirtualTryOn from './VirtualTryOn';
 
 const HomePage = () => {
   const [trendingStyles, setTrendingStyles] = useState({});
@@ -33,6 +34,10 @@ const HomePage = () => {
     { name: 'Mid-range', min: 150, max: 399, description: 'Quality everyday pieces' },
     { name: 'Budget', max: 149, description: 'Affordable style picks' }
   ];
+
+  // Add a state for the virtual try-on modal in the HomePage component
+  const [showTryOn, setShowTryOn] = useState(false);
+  const [userAvatar, setUserAvatar] = useState(null);
 
   useEffect(() => {
     // Fetch trending styles when component mounts
@@ -492,6 +497,13 @@ const HomePage = () => {
     }
   };
 
+  // Add a function to handle avatar creation completion
+  const handleAvatarComplete = (avatarImage) => {
+    setUserAvatar(avatarImage);
+    setShowTryOn(false);
+    setShowResults(true); // Show results after avatar creation
+  };
+
   return (
     <div className="homepage">
       <Banner />
@@ -616,6 +628,16 @@ const HomePage = () => {
                   <polyline points="21 15 16 10 5 21"></polyline>
                 </svg>
                 Use a photo
+              </button>
+              <button 
+                className="try-on-button"
+                onClick={() => setShowTryOn(true)}
+                data-tooltip="Try clothes on your avatar"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M6 2v20l12-10z"></path>
+                </svg>
+                Virtual Try-On
               </button>
               <button 
                 className="generate-button"
@@ -829,6 +851,27 @@ const HomePage = () => {
             </div>
           ))}
         </section>
+      )}
+
+      {/* Virtual Try-On Modal */}
+      {showTryOn && (
+        <div className="modal-overlay">
+          <div className="modal-container">
+            <button className="modal-close" onClick={() => setShowTryOn(false)}>×</button>
+            <VirtualTryOn onComplete={handleAvatarComplete} />
+          </div>
+        </div>
+      )}
+
+      {/* Virtual Try-On Preview */}
+      {showResults && userAvatar && (
+        <div className="avatar-outfit-preview">
+          <h3>Virtual Try-On Preview</h3>
+          <div className="avatar-outfit-container">
+            <img src={userAvatar} alt="Your avatar" className="user-avatar" />
+            <p>Here's how the outfit would look on you!</p>
+          </div>
+        </div>
       )}
     </div>
   );
