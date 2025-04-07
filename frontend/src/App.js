@@ -43,15 +43,17 @@ function App() {
           <div className="container">
             <div className="footer-content">
               <div className="footer-section">
-                <h3>AI Fashion Assistant</h3>
-                <p>Discover your perfect style with AI</p>
+                <h3 className="footer-logo">dripzy</h3>
+                <p>AI-powered fashion styling tailored just for you</p>
               </div>
               
               <div className="footer-section">
                 <h3>Links</h3>
                 <ul className="footer-links">
-                  <li><a href="/">Home</a></li>
-                  <li><a href="#how">How It Works</a></li>
+                  <li><a href="/">FEATURES</a></li>
+                  <li><a href="#how">HOW TO USE</a></li>
+                  <li><a href="#pricing">PRICING</a></li>
+                  <li><a href="#about">ABOUT</a></li>
                 </ul>
               </div>
               

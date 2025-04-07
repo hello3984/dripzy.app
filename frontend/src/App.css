@@ -113,9 +113,9 @@ section {
 }
 
 .navbar {
-  padding: 1rem 0;
-  background-color: white;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.03);
+  background-color: #ffffff;
+  padding: 15px 0;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
   position: sticky;
   top: 0;
   z-index: 1000;
@@ -123,25 +123,28 @@ section {
 
 .navbar-container {
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  max-width: 1200px;
+  justify-content: space-between;
+  max-width: 1280px;
   margin: 0 auto;
-  padding: 0 2rem;
+  padding: 0 20px;
 }
 
 .navbar-logo {
   display: flex;
   align-items: center;
-  font-size: 1.5rem;
-  font-weight: 700;
-  font-family: var(--font-heading);
-  color: var(--dark-color);
+  text-decoration: none;
+  font-size: 1.8rem;
+  letter-spacing: -0.03em;
+  font-weight: 500;
 }
 
-.logo-icon {
-  margin-right: 0.5rem;
-  font-size: 1.8rem;
+.logo-text {
+  color: #000000;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  margin-left: 6px;
+  letter-spacing: -0.05em;
+  line-height: 1;
 }
 
 .navbar-search {
@@ -233,10 +236,10 @@ section {
 
 .menu-items {
   display: flex;
+  gap: 32px;
   list-style: none;
   margin: 0;
   padding: 0;
-  align-items: center;
 }
 
 .menu-item {
@@ -244,12 +247,16 @@ section {
 }
 
 .menu-item a {
-  color: var(--dark-color);
-  font-weight: 500;
-  font-size: 1rem;
+  color: #000000;
   text-decoration: none;
-  transition: all 0.3s ease;
+  font-size: 1rem;
+  font-weight: 500;
+  transition: color 0.2s;
   position: relative;
+}
+
+.menu-item a:hover {
+  color: #555555;
 }
 
 .menu-item a:after {
@@ -261,10 +268,6 @@ section {
   left: 0;
   background-color: var(--primary-color);
   transition: width 0.3s ease;
-}
-
-.menu-item a:hover {
-  color: var(--primary-color);
 }
 
 .menu-item a:hover:after {
@@ -1241,39 +1244,29 @@ section {
 
 /* Footer */
 .app-footer {
-  background-color: #f9f9f9;
-  padding: 4rem 0 2rem;
-  border-top: 1px solid #eaeaea;
+  background-color: #FAFAFA;
+  padding: 60px 0 30px;
+  border-top: 1px solid rgba(0, 0, 0, 0.05);
+  margin-top: 60px;
 }
 
 .footer-content {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 3rem;
-  margin-bottom: 3rem;
+  grid-template-columns: 2fr 1fr 1fr;
+  gap: 40px;
+  margin-bottom: 40px;
 }
 
 .footer-section h3 {
+  margin-bottom: 20px;
+  font-weight: 500;
   font-size: 1.2rem;
-  margin-bottom: 1.5rem;
-  position: relative;
-  display: inline-block;
 }
 
-.footer-section h3::after {
-  content: '';
-  position: absolute;
-  width: 30px;
-  height: 2px;
-  background: var(--primary-color);
-  left: 0;
-  bottom: -8px;
-}
-
-.footer-section p {
-  color: var(--secondary-color);
-  margin-bottom: 1.5rem;
-  font-size: 0.95rem;
+.footer-logo {
+  font-size: 1.8rem;
+  letter-spacing: -0.05em;
+  margin-bottom: 15px;
 }
 
 .footer-links {
@@ -1283,57 +1276,55 @@ section {
 }
 
 .footer-links li {
-  margin-bottom: 0.75rem;
+  margin-bottom: 12px;
 }
 
 .footer-links a {
-  color: var(--secondary-color);
-  font-size: 0.95rem;
-  transition: all 0.3s ease;
+  color: #333;
+  text-decoration: none;
+  font-size: 0.9rem;
+  transition: color 0.2s;
 }
 
 .footer-links a:hover {
-  color: var(--primary-color);
-  transform: translateX(3px);
-  display: inline-block;
+  color: #000;
 }
 
 .social-links {
   display: flex;
-  gap: 1rem;
+  gap: 15px;
 }
 
 .social-link {
-  color: var(--secondary-color);
-  font-size: 0.95rem;
-  transition: all 0.3s ease;
+  color: #333;
+  text-decoration: none;
+  font-size: 0.9rem;
+  transition: color 0.2s;
 }
 
 .social-link:hover {
-  color: var(--primary-color);
+  color: #000;
 }
 
 .footer-bottom {
-  padding-top: 2rem;
-  border-top: 1px solid #eaeaea;
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: space-between;
-  align-items: center;
-  gap: 1rem;
-}
-
-.footer-bottom p {
+  padding-top: 30px;
+  border-top: 1px solid rgba(0, 0, 0, 0.05);
   font-size: 0.9rem;
-  color: var(--secondary-color);
-  margin: 0;
+  color: #666;
+  display: flex;
+  justify-content: space-between;
 }
 
-.affiliate-disclosure p {
-  font-size: 0.8rem;
-  color: #999;
-  max-width: 500px;
-  margin: 0;
+@media (max-width: 768px) {
+  .footer-content {
+    grid-template-columns: 1fr;
+    gap: 30px;
+  }
+  
+  .footer-bottom {
+    flex-direction: column;
+    gap: 10px;
+  }
 }
 
 /* New Style Generator UI */
@@ -1688,5 +1679,71 @@ section {
   color: var(--secondary-color);
   max-width: 260px;
   margin: 0 auto;
+}
+
+/* Add a green announcement banner at the top of the page */
+.announcement-banner {
+  background-color: #D5EF81;
+  color: #000000;
+  text-align: center;
+  padding: 12px 20px;
+  font-size: 15px;
+  font-weight: 500;
+}
+
+/* Update the navigation menu */
+.menu-items {
+  display: flex;
+  gap: 32px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.menu-item a {
+  color: #000000;
+  text-decoration: none;
+  font-size: 1rem;
+  font-weight: 500;
+  transition: color 0.2s;
+  position: relative;
+}
+
+.menu-item a:hover {
+  color: #555555;
+}
+
+/* Update call to action buttons */
+.primary-button, .generate-button, .try-for-free {
+  background-color: #D5EF81;
+  color: #000000;
+  border: none;
+  border-radius: 100px;
+  padding: 14px 30px;
+  font-size: 1rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.primary-button:hover, .generate-button:hover, .try-for-free:hover {
+  background-color: #c5e06b;
+}
+
+/* Add a sign-in button style */
+.sign-in {
+  border: 1px solid #000000;
+  background: transparent;
+  color: #000000;
+  border-radius: 100px;
+  padding: 13px 30px;
+  font-size: 1rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.sign-in:hover {
+  background-color: rgba(0, 0, 0, 0.05);
 }
 

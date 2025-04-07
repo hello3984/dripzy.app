@@ -7,43 +7,31 @@
 
 /* Hero Section */
 .hero-section {
-  background: url('https://images.unsplash.com/photo-1529139574466-a303027c1d8b?ixlib=rb-4.0.3&auto=format&fit=crop&w=2070&q=80') no-repeat center center;
-  background-size: cover;
-  height: 80vh;
-  position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  text-align: center;
-  color: white;
-}
-
-.hero-section:before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background: rgba(0, 0, 0, 0.5);
+  padding: 80px 20px 50px;
+  text-align: left;
+  max-width: 1280px;
+  margin: 0 auto;
 }
 
 .hero-content {
-  z-index: 1;
   max-width: 800px;
-  padding: 0 1rem;
 }
 
-.hero-content h1 {
-  font-size: 3.5rem;
-  margin-bottom: 1rem;
-  color: white;
+.hero-title {
+  font-size: 5rem;
+  font-weight: 600;
+  color: #000000;
+  margin-bottom: 30px;
+  line-height: 1;
+  letter-spacing: -0.03em;
 }
 
-.hero-content p {
+.hero-subtitle {
   font-size: 1.25rem;
-  margin-bottom: 2rem;
-  color: rgba(255, 255, 255, 0.9);
+  line-height: 1.5;
+  color: #333333;
+  margin-bottom: 40px;
+  max-width: 650px;
 }
 
 /* Budget Tier Section */
@@ -601,5 +589,66 @@
   
   .stylist-card {
     padding: 1.25rem;
+  }
+}
+
+/* Showcase Gallery */
+.showcase-gallery {
+  margin: 20px auto 100px;
+  max-width: 1280px;
+  padding: 0 20px;
+}
+
+.gallery-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 20px;
+}
+
+.gallery-item {
+  border-radius: 8px;
+  overflow: hidden;
+  height: 420px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
+  transition: transform 0.3s ease;
+}
+
+.gallery-item:hover {
+  transform: translateY(-5px);
+}
+
+.gallery-item img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+@media (max-width: 1024px) {
+  .gallery-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (max-width: 768px) {
+  .gallery-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  
+  .gallery-item {
+    height: 300px;
+  }
+  
+  .hero-title {
+    font-size: 3.5rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .gallery-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .hero-title {
+    font-size: 2.5rem;
   }
 } 

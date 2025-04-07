@@ -496,11 +496,14 @@ const HomePage = () => {
       {/* Hero Section */}
       <section className="hero-section">
         <div className="hero-content">
-          <h1>Discover Your Perfect Look</h1>
-          <p>AI-powered fashion styling tailored just for you</p>
+          <h1 className="hero-title">Showcase</h1>
+          <p className="hero-subtitle">
+            Dripzy users can leverage advanced algorithms to generate innovative fashion
+            concepts, pushing the boundaries of creativity and efficiency in the design process.
+          </p>
           <div className="hero-cta">
             <button 
-              className="primary-button"
+              className="try-for-free"
               onClick={() => {
                 const generatorSection = document.querySelector('.style-generator');
                 if (generatorSection) {
@@ -508,8 +511,29 @@ const HomePage = () => {
                 }
               }}
             >
-              Generate My Style
+              Try for Free
             </button>
+          </div>
+        </div>
+      </section>
+      
+      {/* Showcase Image Gallery */}
+      <section className="showcase-gallery">
+        <div className="gallery-grid">
+          <div className="gallery-item">
+            <img src="https://images.unsplash.com/photo-1509631179647-0177331693ae?q=80&w=1976&auto=format&fit=crop" alt="Fashion model in burgundy suit" />
+          </div>
+          <div className="gallery-item">
+            <img src="https://images.unsplash.com/photo-1581044777550-4cfa60707c03?q=80&w=1972&auto=format&fit=crop" alt="Fashion model in pink outfit" />
+          </div>
+          <div className="gallery-item">
+            <img src="https://images.unsplash.com/photo-1551803091-e20673f15770?q=80&w=1975&auto=format&fit=crop" alt="Fashion model in red outfit" />
+          </div>
+          <div className="gallery-item">
+            <img src="https://images.unsplash.com/photo-1550614000-4895a10e1bfd?q=80&w=1974&auto=format&fit=crop" alt="Male fashion model in coat" />
+          </div>
+          <div className="gallery-item">
+            <img src="https://images.unsplash.com/photo-1618522285348-559a4f369c3e?q=80&w=1972&auto=format&fit=crop" alt="Fashion model closeup" />
           </div>
         </div>
       </section>
@@ -765,7 +789,7 @@ const HomePage = () => {
         </div>
       </section>
       
-      {/* Outfit Results Section */}
+      {/* Results Section - this is where we display the generated outfits */}
       {showResults && (
         <section className="outfit-results">
           <h2>Your Curated Outfits</h2>
