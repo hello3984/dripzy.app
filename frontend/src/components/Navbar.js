@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
+import Logo from '../logo.svg';
 
 const Navbar = ({ user, onLogin, onLogout }) => {
   const [menuOpen, setMenuOpen] = useState(false);
@@ -28,6 +29,7 @@ const Navbar = ({ user, onLogin, onLogout }) => {
       <nav className="navbar">
         <div className="navbar-container">
           <Link to="/" className="navbar-logo">
+            <img src={Logo} alt="Dripzy" />
             <span className="logo-text">dripzy</span>
           </Link>
           

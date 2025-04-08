@@ -23,6 +23,7 @@
   --text-light: #666666;
   --background-light: #FAFAFA;
   --border-light: rgba(0, 0, 0, 0.05);
+  --dripzy-red: #E50914;
 }
 
 body {
@@ -145,6 +146,12 @@ section {
   font-size: 1.8rem;
   letter-spacing: -0.03em;
   font-weight: 600;
+}
+
+.navbar-logo img, .navbar-logo svg {
+  height: 36px;
+  width: auto;
+  margin-right: 8px;
 }
 
 .logo-text {
@@ -1272,10 +1279,18 @@ section {
 }
 
 .footer-logo {
-  font-size: 1.8rem;
-  letter-spacing: -0.05em;
-  margin-bottom: 15px;
-  font-weight: 600;
+  font-size: 1.6rem;
+  font-weight: bold;
+  margin-bottom: 0.5rem;
+  letter-spacing: -0.03em;
+  display: flex;
+  align-items: center;
+}
+
+.footer-logo img, .footer-logo svg {
+  height: 32px;
+  width: auto;
+  margin-right: 8px;
 }
 
 .footer-section p {

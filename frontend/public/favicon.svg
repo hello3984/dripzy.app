@@ -20,5 +20,5 @@
         fill="white" />
   
   <!-- Black dot inside the D -->
-  <circle cx="55" cy="52" r="15" fill="black" />
+  <circle cx="55" cy="52" r="13" fill="black" />
 </svg>

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { HashRouter as Router, Routes, Route } from 'react-router-dom';
 import './App.css';
+import Logo from './logo.svg';
 
 // Import components
 import Navbar from './components/Navbar';
@@ -45,7 +46,10 @@ function App() {
           <div className="container">
             <div className="footer-content">
               <div className="footer-section">
-                <h3 className="footer-logo">dripzy</h3>
+                <h3 className="footer-logo">
+                  <img src={Logo} alt="Dripzy" />
+                  dripzy
+                </h3>
                 <p>AI-powered fashion styling tailored just for you</p>
               </div>
               
