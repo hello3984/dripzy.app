@@ -1,2 +1,2 @@
-# Services package for business logic
-# This package contains service modules for different business domains. 
+# Services package for Dripzy.app
+# Contains product scraping, matching, and other services 

@@ -5,11 +5,80 @@ import os
 import json
 import random
 
+# --- Added Imports ---
+import anthropic
+from dotenv import load_dotenv
+from app.services.product_scraper import ProductScraper  # Import the product scraper
+# ---------------------
+
 router = APIRouter(
     prefix="/outfits",
     tags=["outfits"],
     responses={404: {"description": "Not found"}},
 )
+
+# --- Load Environment Variables ---
+load_dotenv()
+anthropic_api_key = os.getenv("ANTHROPIC_API_KEY")
+if not anthropic_api_key:
+    print("WARNING: ANTHROPIC_API_KEY not found in .env file. Outfit generation will use mock data.")
+    # raise ValueError("ANTHROPIC_API_KEY not found in environment variables") # Option: raise error if key is essential
+
+anthropic_client = None
+if anthropic_api_key:
+    anthropic_client = anthropic.Anthropic(api_key=anthropic_api_key)
+# --------------------------------
+
+# --- Define System Prompt ---
+SYSTEM_PROMPT = """
+You are 'Dripzy', an expert AI Fashion Stylist. Your primary goal is to create unique, coherent, and stylish outfit recommendations based on user prompts describing occasions, desired styles, preferences, or specific items.
+
+**Your Process:**
+1.  **Analyze Prompt:** Carefully understand the user's request, identifying key elements like occasion, desired style (e.g., casual, formal, boho, minimalist, streetwear), season, weather (if mentioned), specific item requests, and any constraints (e.g., budget level - budget, mid-range, premium, luxury).
+2.  **Consider Context:** Factor in general fashion principles, color theory, item compatibility, layering possibilities (if relevant to season/weather), and current relevant fashion trends (mention specific trends like 'quiet luxury', 'Y2K revival', 'dopamine dressing' if appropriate, but don't force them).
+3.  **Generate Outfit Concepts:** Create 2-3 distinct outfit options that fulfill the user's request. Each outfit should be a complete look.
+4.  **Itemize:** For each outfit concept, specify the necessary item categories (e.g., top, bottom, dress, outerwear, shoes, bag, accessory).
+5.  **Describe Items:** Provide a concise description for each item, including its type and suggested color or material (e.g., "Cream silk blouse", "Dark wash straight-leg jeans", "Black leather ankle boots", "Gold pendant necklace"). Be specific enough to guide product search but generic enough to allow for variations.
+6.  **Add Keywords:** For each item, provide a list of relevant keywords that could be used to find similar products online (e.g., ["blouse", "silk", "cream", "long sleeve", "formal"], ["jeans", "denim", "dark wash", "straight leg", "casual"]).
+7.  **Provide Rationale:** For each complete outfit, write a short "Stylist Rationale" explaining *why* this outfit works for the user's prompt and how the pieces complement each other.
+8.  **Output Format:** Respond *only* in valid JSON format. The structure must be:
+    ```json
+    {
+      "outfits": [
+        {
+          "outfit_name": "Example Outfit Name 1",
+          "items": [
+            {
+              "category": "Top",
+              "description": "Item description (e.g., White cotton t-shirt)",
+              "color": "Suggested color (e.g., White)",
+              "keywords": ["keyword1", "keyword2", "category"]
+            },
+            {
+              "category": "Bottom",
+              "description": "Item description (e.g., Blue denim jeans)",
+              "color": "Suggested color (e.g., Blue)",
+              "keywords": ["keyword3", "keyword4", "category"]
+            }
+            // ... other items (shoes, outerwear, accessories etc.)
+          ],
+          "stylist_rationale": "Explanation why this outfit works..."
+        }
+        // ... potentially more outfit objects
+      ]
+    }
+    ```
+
+**Constraints & Guidelines:**
+*   Always provide the response in the specified JSON format. Do not include any text outside the JSON structure.
+*   Ensure outfits are complete and make sense for the request.
+*   Suggest standard item categories (Top, Bottom, Dress, Outerwear, Shoes, Bag, Accessory).
+*   Item descriptions should be clear but not overly specific to one exact product unless requested.
+*   Keywords should be relevant for searching online fashion retailers.
+*   If the user prompt is ambiguous or lacks detail, you can make reasonable assumptions based on common fashion sense, but state them briefly in the rationale if necessary. Avoid asking clarifying questions in the JSON output.
+*   Maintain a helpful, knowledgeable, and inspiring stylist tone within the 'stylist_rationale'.
+"""
+# ---------------------------
 
 # Models
 class OutfitItem(BaseModel):
@@ -29,6 +98,8 @@ class Outfit(BaseModel):
     style: str
     total_price: float
     items: List[OutfitItem]
+    occasion: Optional[str] = "Everyday"
+    brand_display: Optional[Dict[str, str]] = None
     
 class OutfitGenerateRequest(BaseModel):
     prompt: str
@@ -108,333 +179,195 @@ def get_mock_outfits():
         
     return outfits
 
+# Initialize product scraper
+product_scraper = ProductScraper()
+
 # Routes
 @router.post("/generate", response_model=OutfitGenerateResponse)
 async def generate_outfit(request: OutfitGenerateRequest):
-    """Generate outfit recommendations based on user preferences"""
-    try:
-        from app.routers.products import get_real_products
-        
-        # Get real products for outfit generation
-        real_products = []
-        
-        # Get different types of products for a complete outfit
-        categories = ["tops", "bottoms", "shoes", "accessories", "outerwear", "dresses"]
-        
-        for category in categories:
-            # Get products for each category
-            category_products = await get_real_products(
-                category=category, 
-                page=1, 
-                page_size=10  # Increased to get more product variety
+    """Generate outfit recommendations based on user preferences using Anthropic API"""
+    # --- Use Anthropic API if available ---
+    if anthropic_client:
+        try:
+            print(f"Sending request to Anthropic with prompt: {request.prompt}")
+            message = anthropic_client.messages.create(
+                model="claude-3-haiku-20240307",  # Or use sonnet/opus if needed
+                max_tokens=2048,
+                system=SYSTEM_PROMPT, # Use the detailed system prompt defined above
+                messages=[
+                    {
+                        "role": "user",
+                        "content": f"Generate 2-3 outfit options based on the following request: {request.prompt}"
+                    }
+                ]
             )
             
-            if category_products:
-                real_products.extend(category_products)
+            # --- Process Anthropic Response ---
+            print("Received response from Anthropic.")
+            response_text = message.content[0].text
+            
+            # Find the start and end of the JSON block
+            json_start = response_text.find('{')
+            json_end = response_text.rfind('}')
+            
+            if json_start != -1 and json_end != -1:
+                json_string = response_text[json_start:json_end+1]
+                try:
+                    outfit_data = json.loads(json_string)
+                    
+                    # --- Ground LLM suggestions in real products ---
+                    if "outfits" in outfit_data and isinstance(outfit_data["outfits"], list):
+                        llm_outfits = outfit_data["outfits"]
+                        
+                        # Convert to Outfit models with real product data
+                        formatted_outfits = []
+                        for llm_outfit in llm_outfits:
+                            # Add dummy data for required fields if LLM didn't provide them perfectly
+                            items_list = []
+                            total_price = 0
+                            occasion_keywords = ["formal", "casual", "work", "business", "party", "everyday", "weekend"]
+                            
+                            # Default occasion is "everyday" unless specified
+                            outfit_occasion = "Weekend"  # Default
+                            for keyword in occasion_keywords:
+                                if keyword.lower() in llm_outfit.get("outfit_name", "").lower() or keyword.lower() in request.prompt.lower():
+                                    outfit_occasion = keyword.title()
+                                    break
+                            
+                            # Special case for festival
+                            if "festival" in request.prompt.lower() or "coachella" in request.prompt.lower():
+                                outfit_occasion = "Festival"
+                            
+                            # Process each item in the outfit
+                            item_categories = {}  # To group items by category for display
+                            
+                            for item in llm_outfit.get("items", []):
+                                # Create search keywords from item description and keywords
+                                search_keywords = f"{request.prompt} {item.get('description', '')} {' '.join(item.get('keywords', []))}"
+                                category = item.get("category", "Unknown")
+                                
+                                # Search for real products matching this item
+                                print(f"Searching for products matching: {search_keywords}, category: {category}")
+                                matching_products = product_scraper.search_products(
+                                    keywords=search_keywords,
+                                    category=category,
+                                    limit=1  # Just get the best match for each item
+                                )
+                                
+                                if matching_products and len(matching_products) > 0:
+                                    # Use real product data
+                                    product = matching_products[0]
+                                    outfit_item = OutfitItem(
+                                        product_id=product["product_id"],
+                                        product_name=product["product_name"],
+                                        brand=product["brand"],
+                                        category=category,
+                                        price=product["price"],
+                                        url=product["url"],
+                                        image_url=product["image_url"],
+                                        description=item.get("description", "")
+                                    )
+                                    items_list.append(outfit_item)
+                                    total_price += product["price"]
+                                    
+                                    # Store in category dictionary for display
+                                    if category not in item_categories:
+                                        item_categories[category] = []
+                                    item_categories[category].append(outfit_item)
+                                    
+                                else:
+                                    # Fallback to placeholder data if no real product found
+                                    price = random.uniform(20, 200) # Assign random price for now
+                                    total_price += price
+                                    outfit_item = OutfitItem(
+                                        product_id=f"llm_item_{random.randint(1000,9999)}",
+                                        product_name=item.get("description", "N/A"),
+                                        brand="AI Suggestion",
+                                        category=category,
+                                        price=round(price, 2),
+                                        url="#",
+                                        image_url="https://via.placeholder.com/300x400?text=AI+Item", # Placeholder image
+                                        description=item.get("description", "")
+                                    )
+                                    items_list.append(outfit_item)
+                                    
+                                    # Store in category dictionary for display
+                                    if category not in item_categories:
+                                        item_categories[category] = []
+                                    item_categories[category].append(outfit_item)
+                            
+                            # Create brand display text
+                            brand_display = {}
+                            for category, items in item_categories.items():
+                                # For each category group, display the brands
+                                if items:
+                                    brand_list = [f"{item.brand}" for item in items]
+                                    # Convert category name to plural form for display
+                                    category_display = category
+                                    if category.lower() in ["top", "bottom", "shoe", "accessory", "jacket", "pant", "dress"]:
+                                        category_display = f"{category}s"
+                                    brand_display[category_display] = ", ".join(brand_list)
+                                    
+                            # Build outfit description with more detailed style information
+                            outfit_description = llm_outfit.get("stylist_rationale", "Generated by AI.")
+                            if len(outfit_description) < 20 and "items" in llm_outfit:
+                                # Generate a description if LLM didn't provide a good one
+                                item_names = [item.get("description", "") for item in llm_outfit["items"]]
+                                outfit_description = f"A {llm_outfit.get('outfit_name', 'stylish')} look featuring {', '.join(item_names[:-1])} and {item_names[-1] if item_names else ''}."
+                            
+                            formatted_outfits.append(
+                                Outfit(
+                                    id=f"llm_outfit_{random.randint(1000,9999)}",
+                                    name=llm_outfit.get("outfit_name", "AI Generated Outfit"),
+                                    description=outfit_description,
+                                    style=llm_outfit.get("style", "AI Suggested"), # LLM might not provide this explicitly
+                                    total_price=round(total_price, 2),
+                                    items=items_list,
+                                    occasion=outfit_occasion,
+                                    brand_display=brand_display
+                                )
+                            )
+
+                        if formatted_outfits:
+                             print(f"Successfully parsed {len(formatted_outfits)} outfits from Anthropic response.")
+                             return OutfitGenerateResponse(
+                                outfits=formatted_outfits,
+                                prompt=request.prompt
+                             )
+                        else:
+                            print("Parsed JSON from Anthropic but no valid outfits found.")
+
+                except json.JSONDecodeError as json_err:
+                    print(f"Error decoding JSON from Anthropic: {json_err}")
+                    print(f"Received text: {response_text}")
+            else:
+                 print("Could not find valid JSON block in Anthropic response.")
+                 print(f"Received text: {response_text}")
+
+        except Exception as e:
+            print(f"Error calling Anthropic API: {str(e)}")
+            # Fall through to use mock data if API fails
+
+    # --- Fallback to Mock Data --- 
+    print("Falling back to mock outfit data.")
+    try:
+        # The original mock/manual generation logic is now the fallback
+        mock_outfits_data = get_mock_outfits() # Use existing mock function
         
-        # If no real products were found, fall back to mock data
-        if not real_products:
-            outfits = get_mock_outfits()
-        else:
-            # Determine budget tier based on user input
-            budget_tier = "any"
-            if request.budget:
-                if request.budget >= 1000:
-                    budget_tier = "luxury"
-                elif request.budget >= 400:
-                    budget_tier = "premium"
-                elif request.budget >= 150:
-                    budget_tier = "mid-range"
-                else:
-                    budget_tier = "budget"
-            
-            # Group products by category
-            products_by_category = {}
-            for product in real_products:
-                category = product.get("category", "").lower()
-                if category not in products_by_category:
-                    products_by_category[category] = []
-                products_by_category[category].append(product)
-            
-            # Pre-filter products by price for budget constraint
-            if request.budget:
-                # Get max price per category based on budget distribution
-                # Typical budget distribution: tops 20%, bottoms 25%, shoes 25%, accessories 15%, outerwear 15%
-                max_top_price = request.budget * 0.2
-                max_bottom_price = request.budget * 0.25
-                max_shoe_price = request.budget * 0.25
-                max_accessory_price = request.budget * 0.15
-                max_outerwear_price = request.budget * 0.15
-                max_dress_price = request.budget * 0.45  # If using a dress instead of top+bottom
-                
-                # Filter each category by its max price
-                if "tops" in products_by_category:
-                    products_by_category["tops"] = [p for p in products_by_category["tops"] if p["price"] <= max_top_price]
-                if "bottoms" in products_by_category:
-                    products_by_category["bottoms"] = [p for p in products_by_category["bottoms"] if p["price"] <= max_bottom_price]
-                if "shoes" in products_by_category:
-                    products_by_category["shoes"] = [p for p in products_by_category["shoes"] if p["price"] <= max_shoe_price]
-                if "accessories" in products_by_category:
-                    products_by_category["accessories"] = [p for p in products_by_category["accessories"] if p["price"] <= max_accessory_price]
-                if "outerwear" in products_by_category:
-                    products_by_category["outerwear"] = [p for p in products_by_category["outerwear"] if p["price"] <= max_outerwear_price]
-                if "dresses" in products_by_category:
-                    products_by_category["dresses"] = [p for p in products_by_category["dresses"] if p["price"] <= max_dress_price]
-            
-            # Create outfits from real products
-            outfits = []
-            
-            # Parse the request prompt to identify style keywords
-            prompt_keywords = request.prompt.lower().split()
-            is_festival = any(keyword in prompt_keywords for keyword in ["festival", "coachella", "bohemian", "boho"])
-            is_casual = any(keyword in prompt_keywords for keyword in ["casual", "everyday", "basic"])
-            is_formal = any(keyword in prompt_keywords for keyword in ["formal", "business", "elegant", "office"])
-            
-            # Budget-aware brand selection
-            def get_brand_tier(product_price, category):
-                # Adjust thresholds based on category (shoes tend to be more expensive than tops)
-                if category == "shoes":
-                    if product_price >= 300: return "luxury"
-                    elif product_price >= 150: return "premium"
-                    elif product_price >= 80: return "mid-range"
-                    else: return "budget"
-                elif category == "outerwear":
-                    if product_price >= 400: return "luxury"
-                    elif product_price >= 200: return "premium"
-                    elif product_price >= 100: return "mid-range"
-                    else: return "budget"
-                else:
-                    if product_price >= 200: return "luxury"
-                    elif product_price >= 100: return "premium"
-                    elif product_price >= 50: return "mid-range"
-                    else: return "budget"
-            
-            # Create 3 outfits with different style/brand combinations
-            for outfit_index in range(3):
-                # Determine outfit style based on index and prompt
-                if outfit_index == 0:
-                    # First outfit directly based on prompt
-                    outfit_style = "festival" if is_festival else "casual" if is_casual else "formal" if is_formal else "trendy"
-                elif outfit_index == 1:
-                    # Second outfit slightly different style variation
-                    if is_festival: outfit_style = "bohemian"
-                    elif is_casual: outfit_style = "streetwear"
-                    elif is_formal: outfit_style = "business casual"
-                    else: outfit_style = "contemporary"
-                else:
-                    # Third outfit another variation
-                    if is_festival: outfit_style = "music festival"
-                    elif is_casual: outfit_style = "athleisure"
-                    elif is_formal: outfit_style = "smart casual"
-                    else: outfit_style = "minimalist"
-                
-                outfit_name = f"{outfit_style.title()} Look"
-                outfit_description = f"AI-generated {outfit_style} outfit based on your preferences"
-                
-                # Select products for the outfit from appropriate brand tiers
-                outfit_items = []
-                outfit_total = 0
-                desired_tier = budget_tier
-                
-                # Try to maintain brand coherence by starting with a selected tier
-                if "tops" in products_by_category and products_by_category["tops"]:
-                    # Filter tops based on budget tier if specified
-                    suitable_tops = products_by_category["tops"]
-                    if budget_tier != "any":
-                        tier_tops = [p for p in suitable_tops if get_brand_tier(p["price"], "tops") == budget_tier]
-                        if tier_tops:
-                            suitable_tops = tier_tops
-                    
-                    # Select a top
-                    if suitable_tops:
-                        top = random.choice(suitable_tops)
-                        outfit_items.append(top)
-                        outfit_total += top["price"]
-                        
-                        # Use the selected top's brand tier to guide other selections for coherence
-                        if budget_tier == "any":
-                            desired_tier = get_brand_tier(top["price"], "tops")
-                
-                # Add bottoms (unless we're doing a dress outfit)
-                dress_outfit = False
-                if is_festival and "dresses" in products_by_category and products_by_category["dresses"] and random.random() > 0.5:
-                    dress_outfit = True
-                    
-                    # Filter dresses based on budget tier
-                    suitable_dresses = products_by_category["dresses"]
-                    if desired_tier != "any":
-                        tier_dresses = [p for p in suitable_dresses if get_brand_tier(p["price"], "dresses") == desired_tier]
-                        if tier_dresses:
-                            suitable_dresses = tier_dresses
-                    
-                    if suitable_dresses:
-                        dress = random.choice(suitable_dresses)
-                        outfit_items.append(dress)
-                        outfit_total += dress["price"]
-                elif not dress_outfit and "bottoms" in products_by_category and products_by_category["bottoms"]:
-                    # Filter bottoms based on budget tier
-                    suitable_bottoms = products_by_category["bottoms"]
-                    if desired_tier != "any":
-                        tier_bottoms = [p for p in suitable_bottoms if get_brand_tier(p["price"], "bottoms") == desired_tier]
-                        if tier_bottoms:
-                            suitable_bottoms = tier_bottoms
-                    
-                    if suitable_bottoms:
-                        bottom = random.choice(suitable_bottoms)
-                        outfit_items.append(bottom)
-                        outfit_total += bottom["price"]
-                
-                # Add shoes
-                if "shoes" in products_by_category and products_by_category["shoes"]:
-                    # Check remaining budget if specified
-                    remaining_budget = None
-                    if request.budget:
-                        remaining_budget = request.budget - outfit_total
-                    
-                    # Filter shoes based on budget tier
-                    suitable_shoes = products_by_category["shoes"]
-                    if desired_tier != "any":
-                        tier_shoes = [p for p in suitable_shoes if get_brand_tier(p["price"], "shoes") == desired_tier]
-                        if tier_shoes:
-                            suitable_shoes = tier_shoes
-                    
-                    # Further filter by remaining budget if applicable
-                    if remaining_budget is not None:
-                        budget_shoes = [p for p in suitable_shoes if p["price"] <= remaining_budget]
-                        if budget_shoes:
-                            suitable_shoes = budget_shoes
-                    
-                    if suitable_shoes:
-                        shoes = random.choice(suitable_shoes)
-                        outfit_items.append(shoes)
-                        outfit_total += shoes["price"]
-                
-                # Add accessories if budget allows
-                if request.budget is None or outfit_total < request.budget * 0.85:
-                    if "accessories" in products_by_category and products_by_category["accessories"]:
-                        # Calculate remaining budget for accessories
-                        remaining_budget = None
-                        if request.budget:
-                            remaining_budget = request.budget - outfit_total
-                        
-                        # Filter accessories based on budget tier and remaining budget
-                        suitable_accessories = products_by_category["accessories"]
-                        if desired_tier != "any":
-                            tier_accessories = [p for p in suitable_accessories if get_brand_tier(p["price"], "accessories") == desired_tier]
-                            if tier_accessories:
-                                suitable_accessories = tier_accessories
-                        
-                        if remaining_budget is not None:
-                            budget_accessories = [p for p in suitable_accessories if p["price"] <= remaining_budget]
-                            if budget_accessories:
-                                suitable_accessories = budget_accessories
-                        
-                        if suitable_accessories:
-                            accessory = random.choice(suitable_accessories)
-                            outfit_items.append(accessory)
-                            outfit_total += accessory["price"]
-                
-                # Add outerwear for non-festival outfits if available and budget allows
-                if (not is_festival or random.random() > 0.7) and request.budget is None or outfit_total < request.budget * 0.9:
-                    if "outerwear" in products_by_category and products_by_category["outerwear"]:
-                        # Calculate remaining budget for outerwear
-                        remaining_budget = None
-                        if request.budget:
-                            remaining_budget = request.budget - outfit_total
-                        
-                        # Filter outerwear based on budget tier and remaining budget
-                        suitable_outerwear = products_by_category["outerwear"]
-                        if desired_tier != "any":
-                            tier_outerwear = [p for p in suitable_outerwear if get_brand_tier(p["price"], "outerwear") == desired_tier]
-                            if tier_outerwear:
-                                suitable_outerwear = tier_outerwear
-                        
-                        if remaining_budget is not None:
-                            budget_outerwear = [p for p in suitable_outerwear if p["price"] <= remaining_budget]
-                            if budget_outerwear:
-                                suitable_outerwear = budget_outerwear
-                        
-                        if suitable_outerwear:
-                            outerwear = random.choice(suitable_outerwear)
-                            outfit_items.append(outerwear)
-                            outfit_total += outerwear["price"]
-                
-                # Create the outfit
-                if outfit_items:
-                    # Add tier information to outfit name
-                    if desired_tier != "any":
-                        if desired_tier == "luxury":
-                            outfit_name = f"Luxury {outfit_name}"
-                        elif desired_tier == "premium":
-                            outfit_name = f"Premium {outfit_name}"
-                        elif desired_tier == "mid-range":
-                            outfit_name = f"Contemporary {outfit_name}"
-                        elif desired_tier == "budget":
-                            outfit_name = f"Affordable {outfit_name}"
-                    
-                    outfit = {
-                        "id": f"outfit_{random.randint(1000, 9999)}",
-                        "name": outfit_name,
-                        "description": outfit_description,
-                        "style": outfit_style,
-                        "total_price": round(outfit_total, 2),
-                        "items": []
-                    }
-                    
-                    # Format items to match OutfitItem model
-                    for item in outfit_items:
-                        outfit_item = {
-                            "product_id": item["id"],
-                            "product_name": item["name"],
-                            "brand": item["brand"],
-                            "category": item["category"],
-                            "price": item["price"],
-                            "url": item.get("url", ""),
-                            "image_url": item["image_url"],
-                            "description": item["description"]
-                        }
-                        outfit["items"].append(outfit_item)
-                    
-                    outfits.append(outfit)
-        
-        # Apply filters based on request
-        filtered_outfits = outfits
-        
-        # Filter by budget
+        # Apply budget filter if needed
         if request.budget:
-            filtered_outfits = [o for o in filtered_outfits if o["total_price"] <= request.budget]
-        
-        # Filter by preferred brands (if any match)
-        if request.preferred_brands:
-            brand_list = [brand.lower() for brand in request.preferred_brands]
-            filtered_outfits = [o for o in filtered_outfits if 
-                              any(item["brand"].lower() in brand_list for item in o["items"])]
-        
-        # Filter by style keywords (if any match)
-        if request.style_keywords:
-            style_list = [style.lower() for style in request.style_keywords]
-            filtered_outfits = [o for o in filtered_outfits if 
-                              any(keyword in o["style"].lower() for keyword in style_list) or
-                              any(keyword in o["name"].lower() for keyword in style_list) or
-                              any(keyword in o["description"].lower() for keyword in style_list)]
-        
-        # Use mock data if no outfits match the filters
-        if not filtered_outfits:
-            filtered_outfits = get_mock_outfits()
-            
-            # Apply budget filter to mock outfits if specified
-            if request.budget:
-                filtered_outfits = [o for o in filtered_outfits if o["total_price"] <= request.budget]
+            mock_outfits_data = [o for o in mock_outfits_data if o["total_price"] <= request.budget]
         
         # Convert to Outfit models
-        outfit_models = [Outfit(**o) for o in filtered_outfits]
+        outfit_models = [Outfit(**o) for o in mock_outfits_data]
         
         return OutfitGenerateResponse(
-            outfits=outfit_models,
+            outfits=outfit_models[:3], # Limit to 3 mock outfits
             prompt=request.prompt
         )
         
     except Exception as e:
+        print(f"Error generating mock outfits: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to generate outfits: {str(e)}")
 
 @router.get("/trending", response_model=Dict[str, Dict[str, List[str]]])
