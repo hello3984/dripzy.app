@@ -9,6 +9,7 @@ import random
 import anthropic
 from dotenv import load_dotenv
 from app.services.product_scraper import ProductScraper  # Import the product scraper
+from app.services.image_service import get_google_images, create_outfit_collage, get_images_from_web  # Import image service
 # ---------------------
 
 router = APIRouter(
@@ -100,6 +101,8 @@ class Outfit(BaseModel):
     items: List[OutfitItem]
     occasion: Optional[str] = "Everyday"
     brand_display: Optional[Dict[str, str]] = None
+    collage_image: Optional[str] = None  # Base64 encoded image for outfit collage
+    image_map: Optional[List[Dict[str, Any]]] = None  # Clickable areas for the collage
     
 class OutfitGenerateRequest(BaseModel):
     prompt: str
@@ -248,94 +251,115 @@ async def generate_outfit(request: OutfitGenerateRequest):
                                 
                                 # Search for real products matching this item
                                 print(f"Searching for products matching: {search_keywords}, category: {category}")
-                                matching_products = product_scraper.search_products(
-                                    keywords=search_keywords,
-                                    category=category,
-                                    limit=1  # Just get the best match for each item
-                                )
+                                # Search for products using the scraper
+                                print(f"Searching for products: {search_keywords} in category {category}")
+                                matched_product = product_scraper.search_products(search_keywords, category, limit=1)
                                 
-                                if matching_products and len(matching_products) > 0:
-                                    # Use real product data
-                                    product = matching_products[0]
-                                    outfit_item = OutfitItem(
-                                        product_id=product["product_id"],
-                                        product_name=product["product_name"],
-                                        brand=product["brand"],
-                                        category=category,
-                                        price=product["price"],
-                                        url=product["url"],
-                                        image_url=product["image_url"],
-                                        description=item.get("description", "")
-                                    )
-                                    items_list.append(outfit_item)
-                                    total_price += product["price"]
+                                # If no product found, create a placeholder
+                                if not matched_product:
+                                    # Fetch outfit images from Google instead of using placeholder
+                                    image_results = get_images_from_web(search_keywords, num_images=1, category=category)
+                                    if image_results:
+                                        image_result = image_results[0]
+                                        image_url = image_result['image_url']
+                                        source_url = image_result['source_url']
+                                    else:
+                                        image_url = ""
+                                        source_url = "#"
                                     
-                                    # Store in category dictionary for display
-                                    if category not in item_categories:
-                                        item_categories[category] = []
-                                    item_categories[category].append(outfit_item)
-                                    
+                                    matched_product = {
+                                        "id": f"custom-{len(items_list)}",
+                                        "name": item.get("description", f"Custom {category}"),
+                                        "brand": "Custom",
+                                        "price": 0,
+                                        "category": category,
+                                        "url": source_url,  # Use source URL as product URL
+                                        "image_url": image_url,
+                                        "description": item.get("description", ""),
+                                        "source_url": source_url  # Store the source URL
+                                    }
                                 else:
-                                    # Fallback to placeholder data if no real product found
-                                    price = random.uniform(20, 200) # Assign random price for now
-                                    total_price += price
-                                    outfit_item = OutfitItem(
-                                        product_id=f"llm_item_{random.randint(1000,9999)}",
-                                        product_name=item.get("description", "N/A"),
-                                        brand="AI Suggestion",
-                                        category=category,
-                                        price=round(price, 2),
-                                        url="#",
-                                        image_url="https://via.placeholder.com/300x400?text=AI+Item", # Placeholder image
-                                        description=item.get("description", "")
-                                    )
-                                    items_list.append(outfit_item)
+                                    # If the product was found but has no image, fetch one from Google
+                                    if not matched_product["image_url"] or matched_product["image_url"].startswith("https://via.placeholder.com"):
+                                        image_results = get_images_from_web(search_keywords, num_images=1, category=category)
+                                        if image_results:
+                                            image_result = image_results[0]
+                                            matched_product["image_url"] = image_result['image_url']
+                                            # Store the source URL for the image
+                                            matched_product["source_url"] = image_result['source_url']
                                     
-                                    # Store in category dictionary for display
-                                    if category not in item_categories:
-                                        item_categories[category] = []
-                                    item_categories[category].append(outfit_item)
+                                    # If the source URL isn't set, use the product URL
+                                    if "source_url" not in matched_product:
+                                        matched_product["source_url"] = matched_product["url"]
+                                
+                                # Update total price
+                                total_price += matched_product["price"]
+                                
+                                # Create OutfitItem
+                                outfit_item = {
+                                    "product_id": matched_product["id"],
+                                    "product_name": matched_product["name"],
+                                    "brand": matched_product["brand"],
+                                    "category": matched_product["category"],
+                                    "price": matched_product["price"],
+                                    "url": matched_product["url"],
+                                    "image_url": matched_product["image_url"],
+                                    "description": matched_product["description"]
+                                }
+                                
+                                # Add to items list
+                                items_list.append(outfit_item)
+                                
+                                # Group by category for display
+                                if category not in item_categories:
+                                    item_categories[category] = []
+                                item_categories[category].append(matched_product["brand"])
                             
-                            # Create brand display text
+                            # Create brand display format (e.g. "Tops: Brand1, Brand2")
                             brand_display = {}
-                            for category, items in item_categories.items():
-                                # For each category group, display the brands
-                                if items:
-                                    brand_list = [f"{item.brand}" for item in items]
-                                    # Convert category name to plural form for display
-                                    category_display = category
-                                    if category.lower() in ["top", "bottom", "shoe", "accessory", "jacket", "pant", "dress"]:
-                                        category_display = f"{category}s"
-                                    brand_display[category_display] = ", ".join(brand_list)
-                                    
-                            # Build outfit description with more detailed style information
-                            outfit_description = llm_outfit.get("stylist_rationale", "Generated by AI.")
-                            if len(outfit_description) < 20 and "items" in llm_outfit:
-                                # Generate a description if LLM didn't provide a good one
-                                item_names = [item.get("description", "") for item in llm_outfit["items"]]
-                                outfit_description = f"A {llm_outfit.get('outfit_name', 'stylish')} look featuring {', '.join(item_names[:-1])} and {item_names[-1] if item_names else ''}."
+                            for category, brands in item_categories.items():
+                                # Format as plural if needed
+                                category_plural = f"{category}s" if not category.endswith('s') else category
+                                brand_display[category_plural] = ", ".join(brands)
                             
-                            formatted_outfits.append(
-                                Outfit(
-                                    id=f"llm_outfit_{random.randint(1000,9999)}",
-                                    name=llm_outfit.get("outfit_name", "AI Generated Outfit"),
-                                    description=outfit_description,
-                                    style=llm_outfit.get("style", "AI Suggested"), # LLM might not provide this explicitly
-                                    total_price=round(total_price, 2),
-                                    items=items_list,
-                                    occasion=outfit_occasion,
-                                    brand_display=brand_display
-                                )
-                            )
-
-                        if formatted_outfits:
-                             print(f"Successfully parsed {len(formatted_outfits)} outfits from Anthropic response.")
-                             return OutfitGenerateResponse(
-                                outfits=formatted_outfits,
-                                prompt=request.prompt
-                             )
-                        else:
-                            print("Parsed JSON from Anthropic but no valid outfits found.")
+                            # Create formatted outfit with real products
+                            outfit_name = llm_outfit.get("outfit_name", f"Outfit {len(formatted_outfits) + 1}")
+                            outfit_style = next((s for s in ["casual", "formal", "bohemian", "streetwear", "classic", "trendy"] 
+                                               if s in outfit_name.lower() or s in request.prompt.lower()), "trendy")
+                            
+                            formatted_outfit = {
+                                "id": f"outfit-{len(formatted_outfits) + 1}",
+                                "name": outfit_name,
+                                "description": llm_outfit.get("stylist_rationale", "A curated outfit based on your request"),
+                                "style": outfit_style,
+                                "total_price": round(total_price, 2),
+                                "items": items_list,
+                                "occasion": outfit_occasion,
+                                "brand_display": brand_display
+                            }
+                            
+                            # Generate collage for the outfit
+                            collage_items = []
+                            for item in items_list:
+                                if item["image_url"]:
+                                    collage_items.append({
+                                        "image_url": item["image_url"],
+                                        "category": item["category"],
+                                        "source_url": item.get("source_url", item["url"])  # Use source_url if available, otherwise the product URL
+                                    })
+                            
+                            # Create and add collage image with clickable map
+                            if collage_items:
+                                collage_result = create_outfit_collage(collage_items)
+                                formatted_outfit["collage_image"] = collage_result["image"]
+                                formatted_outfit["image_map"] = collage_result["map"]
+                            
+                            formatted_outfits.append(formatted_outfit)
+                        
+                        print(f"Successfully parsed {len(formatted_outfits)} outfits from Anthropic response.")
+                        return {"outfits": formatted_outfits, "prompt": request.prompt}
+                    else:
+                        print("Parsed JSON from Anthropic but no valid outfits found.")
 
                 except json.JSONDecodeError as json_err:
                     print(f"Error decoding JSON from Anthropic: {json_err}")

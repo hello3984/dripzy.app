@@ -5,6 +5,7 @@ import TrendingStylesDisplay from './TrendingStylesDisplay';
 import './HomePage.css';
 import Banner from './Banner';
 import VirtualTryOn from './VirtualTryOn';
+import OutfitDisplay from './OutfitDisplay';
 
 const HomePage = () => {
   const [trendingStyles, setTrendingStyles] = useState({});
@@ -691,38 +692,10 @@ const HomePage = () => {
           
           {getDisplayOutfits().map((outfit) => (
             <div key={outfit.id} className="outfit-result">
-              <div className="outfit-header">
-                <div className="outfit-title">
-                  <h3>{outfit.name}</h3>
-                  <span className="outfit-price">${outfit.total_price.toFixed(2)}</span>
-                </div>
-                <p className="outfit-description">{outfit.description}</p>
-                <div className="outfit-style">
-                  <span className="style-badge" data-style={outfit.style}>{outfit.style}</span>
-                </div>
-              </div>
-              
-              {/* Stylist Notes Card */}
-              <div className="stylist-card">
-                <div className="trend-badge classic">CLASSIC</div>
-                <h4>Stylist Notes</h4>
-                <ul className="stylist-notes">
-                  <li>This {outfit.style.toLowerCase()} outfit features classic pieces</li>
-                  <li>Perfect for {outfit.style.toLowerCase()} season</li>
-                </ul>
-                
-                <h4>Styling Tips</h4>
-                <p className="styling-tip">
-                  Prioritize self-expression while considering practicality for outdoor conditions.
-                </p>
-              </div>
-              
-              {/* Items Display */}
-              <div className="outfit-items">
-                {outfit.items
-                  .filter(item => activeCategory === 'all' || item.category.toLowerCase() === activeCategory)
-                  .map((item) => renderOutfitItem(item))}
-              </div>
+              <OutfitDisplay 
+                outfit={outfit} 
+                onTryOn={() => setShowTryOn(true)} 
+              />
             </div>
           ))}
         </section>
