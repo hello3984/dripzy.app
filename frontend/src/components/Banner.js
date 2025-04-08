@@ -9,20 +9,6 @@ const Banner = () => {
           AI-powered outfit recommendations tailored to your preferences, 
           budget, and occasions. Try on your looks virtually before you buy!
         </p>
-        <div className="banner-features">
-          <div className="feature">
-            <span className="feature-icon">🧠</span>
-            <span className="feature-text">AI-Powered Styling</span>
-          </div>
-          <div className="feature">
-            <span className="feature-icon">👗</span>
-            <span className="feature-text">Virtual Try-On</span>
-          </div>
-          <div className="feature">
-            <span className="feature-icon">💰</span>
-            <span className="feature-text">Budget-Friendly</span>
-          </div>
-        </div>
       </div>
       <div className="banner-image">
         {/* In a real app, we would use an actual image here */}
