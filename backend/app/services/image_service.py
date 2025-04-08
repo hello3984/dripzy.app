@@ -27,53 +27,67 @@ def get_images_from_web(query, num_images=4, category=None):
     """
     Get images from multiple sources based on a search query
     """
-    # Improve the search query with more targeted terms based on category
+    # Add category-specific terms to the query
     enhanced_query = query
-    if category:
-        category_terms = {
-            "Top": "clothing fashion top blouse shirt",
-            "Bottom": "clothing fashion pants jeans shorts skirt",
-            "Dress": "clothing fashion dress",
-            "Outerwear": "clothing fashion jacket coat cardigan outerwear",
-            "Shoes": "fashion shoes boots sandals footwear",
-            "Accessories": "fashion accessories jewelry bag purse",
-        }
-        if category in category_terms:
-            enhanced_query = f"{query} {category_terms[category]}"
+    if not enhanced_query.endswith("fashion") and "fashion" not in enhanced_query:
+        enhanced_query += " fashion"
+        
+    if "festival" not in enhanced_query.lower() and category:
+        enhanced_query += " festival"
     
-    # Try to get images from Bing first
+    print(f"Enhanced image search query: {enhanced_query}")
+    
+    # Try multiple sources to get the best images
+    all_results = []
+    
+    # Try Bing first - tends to have good fashion images
     try:
-        bing_results = get_bing_images(enhanced_query, num_images)
-        if bing_results and len(bing_results) >= num_images:
-            return bing_results
+        bing_results = get_bing_images(enhanced_query, num_images*2)  # Get more than needed to filter
+        if bing_results:
+            all_results.extend(bing_results)
     except Exception as e:
         print(f"Error fetching Bing images: {str(e)}")
     
-    # Fall back to unsplash if Bing fails
+    # Then try Unsplash - good for high quality lifestyle/fashion photos
     try:
-        unsplash_results = get_unsplash_images(enhanced_query, num_images)
-        if unsplash_results:
-            return unsplash_results
+        if len(all_results) < num_images*2:
+            unsplash_results = get_unsplash_images(enhanced_query, num_images*2)
+            if unsplash_results:
+                all_results.extend(unsplash_results)
     except Exception as e:
         print(f"Error fetching Unsplash images: {str(e)}")
     
-    # Last resort - try Google images
-    try:
-        google_results = get_google_images(enhanced_query, num_images)
-        if google_results:
-            return google_results
-    except Exception as e:
-        print(f"Error fetching Google images: {str(e)}")
+    # Filter results for relevance and quality
+    filtered_results = []
+    for result in all_results:
+        url = result['image_url']
+        # Skip small images, icons, and other irrelevant images
+        if any(skip in url.lower() for skip in ['icon', 'thumbnail', 'placeholder', 'logo']):
+            continue
+            
+        # Prefer images from fashion or retail sites
+        if any(fashion_site in result['source_url'].lower() for fashion_site in 
+              ['amazon', 'asos', 'nordstrom', 'zara', 'urbanoutfitters', 'freepeople', 
+               'anthropologie', 'revolve', 'nastygal', 'forever21', 'hm', 'macys']):
+            filtered_results.insert(0, result)  # Prioritize retail site images
+        else:
+            filtered_results.append(result)
     
-    # If all else fails, return placeholder images
-    placeholder_images = []
-    for i in range(num_images):
-        placeholder_images.append({
-            "image_url": f"https://via.placeholder.com/300x400?text={category or 'Item'}+{i+1}",
-            "source_url": "#"
-        })
+    # If we still don't have enough results, use placeholder
+    if not filtered_results:
+        print(f"Warning: No suitable images found for query: {enhanced_query}")
+        placeholder_images = []
+        for i in range(num_images):
+            placeholder_images.append({
+                "image_url": f"https://via.placeholder.com/400x600?text={category or 'Fashion'}_Item",
+                "source_url": "#"
+            })
+        return placeholder_images
     
-    return placeholder_images
+    # Return most relevant results
+    if len(filtered_results) > num_images:
+        return filtered_results[:num_images]
+    return filtered_results
 
 def get_bing_images(query: str, num_images: int = 5) -> List[Dict[str, str]]:
     """
@@ -302,15 +316,25 @@ def download_image(url: str) -> Optional[Image.Image]:
         logger.error(f"Error downloading image from {url}: {str(e)}")
         return None
 
-def create_outfit_collage(items, width=800, height=600):
+def create_outfit_collage(items, width=800, height=800):
     """
     Create a collage of outfit items with clickable areas
     Returns a dictionary with 'image' (base64 encoded) and 'map' (clickable areas)
     """
     try:
-        # Create a white canvas
-        collage = Image.new('RGBA', (width, height), (255, 255, 255, 255))
+        # Create a white canvas with subtle background texture
+        collage = Image.new('RGBA', (width, height), (252, 252, 252, 255))
         draw = ImageDraw.Draw(collage)
+        
+        # Add a subtle gradient background
+        for y in range(height):
+            color = (252, 252, 252, 255)
+            if y < height/4:  # Top gradient
+                color = (245, 245, 250, 255)
+            elif y > height*3/4:  # Bottom gradient
+                color = (250, 248, 245, 255)
+            draw.line([(0, y), (width, y)], fill=color)
+            
         click_map = []
         
         # Skip if no items
@@ -321,40 +345,68 @@ def create_outfit_collage(items, width=800, height=600):
             img_str = base64.b64encode(buffered.getvalue()).decode()
             return {"image": img_str, "map": []}
         
-        # Define optimal positions for different categories
-        # Each position is (x_center, y_center, max_width, max_height)
+        # Define optimal positions for different categories specifically for festival outfits
+        # Format: (x_center, y_center, max_width, max_height)
         category_positions = {
             "Top": (width // 2, height // 4, width // 2, height // 3),          # Center top
-            "Bottom": (width * 3 // 4, height // 2, width // 3, height // 3),   # Right middle
-            "Dress": (width // 2, height // 2, width // 2, height * 3 // 5),    # Center
+            "Bottom": (width * 3 // 4, height // 2, width // 2.5, height // 2.5),   # Right middle
+            "Dress": (width // 2, height // 2, width // 2, height * 2 // 3),    # Center
             "Shoes": (width // 2, height * 4 // 5, width // 3, height // 6),    # Bottom center
-            "Accessories": (width * 3 // 4, height // 4, width // 4, height // 5), # Top right
-            "Outerwear": (width // 4, height // 2, width // 3, height // 2),    # Left middle
+            "Accessories": (width * 3 // 4, height // 4, width // 4, height // 5),  # Top right
+            "Outerwear": (width // 4, height // 2, width // 2.5, height // 2),  # Left middle
             "Bag": (width * 3 // 4, height * 3 // 5, width // 5, height // 5),  # Right bottom
-            "Jewelry": (width * 3 // 4, height // 5, width // 6, height // 6),  # Top right corner
-            "Hat": (width // 2, height // 7, width // 6, height // 6),          # Top center
+            "Jewelry": (width * 4 // 5, height // 5, width // 8, height // 8),  # Top right corner
+            "Hat": (width // 4, height // 6, width // 6, height // 6),          # Top left
+            "Sunglasses": (width * 3 // 4, height // 3, width // 6, height // 8),  # Right top
         }
         
-        # Default positions if we have items without specific category matching
+        # Fallback positions if specific category position isn't available
         default_positions = [
-            (width // 4, height // 4, width // 3, height // 3),      # Top left
-            (width * 3 // 4, height // 4, width // 3, height // 3),   # Top right
-            (width // 4, height * 3 // 4, width // 3, height // 3),   # Bottom left
-            (width * 3 // 4, height * 3 // 4, width // 3, height // 3), # Bottom right
-            (width // 2, height // 2, width // 3, height // 3),       # Center
+            (width // 4, height // 3, width // 3, height // 3),
+            (width * 3 // 4, height // 3, width // 3, height // 3),
+            (width // 4, height * 2 // 3, width // 3, height // 3),
+            (width * 3 // 4, height * 2 // 3, width // 3, height // 3),
+            (width // 2, height // 2, width // 3, height // 3),
         ]
         
         # Map generic categories to our specific positions
         category_mapping = {
             "tops": "Top",
+            "tee": "Top", 
+            "tshirt": "Top",
+            "shirt": "Top",
+            "tank": "Top",
+            "blouse": "Top",
             "bottoms": "Bottom",
+            "jean": "Bottom",
+            "jeans": "Bottom",
+            "pants": "Bottom",
+            "shorts": "Bottom",
+            "skirt": "Bottom",
             "dresses": "Dress",
+            "dress": "Dress",
             "shoes": "Shoes",
+            "sneakers": "Shoes",
+            "boots": "Shoes",
+            "sandals": "Shoes",
             "accessories": "Accessories",
-            "outerwear": "Outerwear", 
-            "bags": "Bag",
+            "necklace": "Jewelry",
+            "earrings": "Jewelry",
+            "bracelet": "Jewelry",
             "jewelry": "Jewelry",
-            "hats": "Hat"
+            "outerwear": "Outerwear",
+            "jacket": "Outerwear",
+            "kimono": "Outerwear",
+            "cardigan": "Outerwear",
+            "bag": "Bag",
+            "purse": "Bag",
+            "handbag": "Bag",
+            "crossbody": "Bag",
+            "sunglass": "Sunglasses",
+            "glasses": "Sunglasses",
+            "hat": "Hat",
+            "cap": "Hat",
+            "fedora": "Hat",
         }
         
         # Track which positions are used
@@ -368,16 +420,23 @@ def create_outfit_collage(items, width=800, height=600):
             
             # Try direct match first
             if category in category_positions:
-                pos = category_positions[category]
-                used_positions.add(category)
-                return pos
+                if category not in used_positions:
+                    used_positions.add(category)
+                    return category_positions[category]
                 
-            # Try mapped category
+            # Try specific subcategory matches
             for key, value in category_mapping.items():
-                if key == category_lower or key in category_lower or category_lower in key:
+                if key in category_lower:
                     if value not in used_positions:
                         used_positions.add(value)
                         return category_positions[value]
+            
+            # Try generic category match
+            for base_category in ["Top", "Bottom", "Dress", "Shoes", "Accessories", "Outerwear"]:
+                if base_category.lower() in category_lower or category_lower in base_category.lower():
+                    if base_category not in used_positions:
+                        used_positions.add(base_category)
+                        return category_positions[base_category]
             
             # Use default position if no match
             nonlocal default_position_index
@@ -386,22 +445,32 @@ def create_outfit_collage(items, width=800, height=600):
                 default_position_index += 1
                 return pos
             
-            # If all positions are used, just return center
+            # If all positions are used, return center
             return (width // 2, height // 2, width // 3, height // 3)
         
-        # Sort items to ensure consistent display (shoes at bottom, etc.)
-        display_order = ["Hat", "Accessories", "Jewelry", "Top", "Outerwear", "Dress", "Bottom", "Bag", "Shoes"]
+        # Sort items to ensure consistent display (top layer items last)
+        display_order = [
+            "Shoes", "Bottom", "Dress", "Top", "Outerwear", 
+            "Bag", "Hat", "Sunglasses", "Accessories", "Jewelry"
+        ]
         
         # Create a sorted list based on category priority
         def get_category_priority(item):
             category = item.get("category", "").capitalize()
             
-            # Check for exact match
+            # Check for specific category matches first
+            for key, value in category_mapping.items():
+                if key in category.lower():
+                    for i, cat in enumerate(display_order):
+                        if cat == value:
+                            return i
+            
+            # Then check for direct matches with display order
             for i, cat in enumerate(display_order):
                 if cat == category:
                     return i
                     
-            # Check for partial match
+            # Then check for partial matches
             for i, cat in enumerate(display_order):
                 if cat.lower() in category.lower() or category.lower() in cat.lower():
                     return i
@@ -428,7 +497,7 @@ def create_outfit_collage(items, width=800, height=600):
                 # Download image
                 try:
                     # Attempt to download the image with a timeout
-                    response = requests.get(image_url, timeout=5)
+                    response = requests.get(image_url, timeout=8)
                     if response.status_code == 200:
                         img = Image.open(BytesIO(response.content))
                     else:
@@ -474,30 +543,18 @@ def create_outfit_collage(items, width=800, height=600):
                 # Paste the image onto the collage
                 collage.paste(img, (x1, y1))
                 
+                # Add a subtle shadow (draw slight darker rectangle underneath)
+                shadow_offset = 6
+                shadow_color = (230, 230, 230, 255)
+                draw.rectangle([x1+shadow_offset, y1+shadow_offset, x1+new_width+shadow_offset-1, y1+new_height+shadow_offset-1], 
+                              fill=shadow_color, outline=None)
+                
+                # Paste the image again over the shadow
+                collage.paste(img, (x1, y1))
+                
                 # Add a subtle border around the image
-                border_color = (200, 200, 200, 255)  # Light gray
-                draw.rectangle([x1, y1, x1 + new_width - 1, y1 + new_height - 1], outline=border_color, width=2)
-                
-                # Add a label for the category
-                font_size = 18
-                try:
-                    font = ImageFont.truetype("Arial.ttf", font_size)
-                except Exception:
-                    font = ImageFont.load_default()
-                
-                # Draw semi-transparent label background
-                label_text = category.upper()
-                label_width, label_height = draw.textsize(label_text, font=font) if hasattr(draw, 'textsize') else (font_size * len(label_text) * 0.6, font_size * 1.2)
-                label_x = x1 + (new_width - label_width) // 2
-                label_y = y1 + new_height - label_height - 10
-                
-                # Draw rounded rectangle for label
-                draw.rectangle([label_x - 5, label_y - 5, label_x + label_width + 5, label_y + label_height + 5], 
-                              fill=(0, 0, 0, 128), outline=(255, 255, 255, 200), width=1)
-                
-                # Draw text
-                text_color = (255, 255, 255, 255)  # White
-                draw.text((label_x, label_y), label_text, font=font, fill=text_color)
+                border_color = (220, 220, 220, 255)  # Light gray
+                draw.rectangle([x1, y1, x1 + new_width - 1, y1 + new_height - 1], outline=border_color, width=1)
                 
                 # Add to click map
                 click_map.append({
@@ -509,6 +566,24 @@ def create_outfit_collage(items, width=800, height=600):
             except Exception as e:
                 logger.warning(f"Error adding item to collage: {str(e)}")
                 continue
+        
+        # Apply a subtle vignette effect
+        mask = Image.new('L', (width, height), 255)
+        for y in range(height):
+            for x in range(width):
+                # Calculate distance from center
+                distance = ((x - width/2)**2 + (y - height/2)**2)**0.5
+                # Calculate radius from center to corner
+                max_distance = ((width/2)**2 + (height/2)**2)**0.5
+                # Set mask value based on distance ratio
+                if distance > max_distance * 0.7:  # Start vignette at 70% from center
+                    ratio = (distance - max_distance * 0.7) / (max_distance * 0.3)
+                    mask.putpixel((x, y), int(255 * (1 - ratio * 0.2)))  # Slight darkening
+        
+        # Apply the vignette mask
+        alpha = Image.new('L', collage.size, 255)
+        alpha.paste(mask, (0, 0))
+        collage.putalpha(alpha)
         
         # Convert the image to base64
         buffered = BytesIO()
