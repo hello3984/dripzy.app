@@ -5,11 +5,12 @@ import base64
 import logging
 import random
 import re
-from PIL import Image
+from PIL import Image, ImageDraw, ImageFont
 from bs4 import BeautifulSoup
 from dotenv import load_dotenv
 from typing import List, Dict, Any, Optional
 from urllib.parse import quote_plus
+from io import BytesIO
 
 # Load environment variables
 load_dotenv()
@@ -22,135 +23,177 @@ logger = logging.getLogger(__name__)
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 GOOGLE_CSE_ID = os.getenv("GOOGLE_CSE_ID")
 
-def get_images_from_web(query: str, num_images: int = 5, category: str = None) -> List[Dict[str, str]]:
+def get_images_from_web(query, num_images=4, category=None):
     """
-    Scrape images from the web without using Google API
-    Returns a list of dicts with 'image_url' and 'source_url' keys
+    Get images from multiple sources based on a search query
+    """
+    # Improve the search query with more targeted terms based on category
+    enhanced_query = query
+    if category:
+        category_terms = {
+            "Top": "clothing fashion top blouse shirt",
+            "Bottom": "clothing fashion pants jeans shorts skirt",
+            "Dress": "clothing fashion dress",
+            "Outerwear": "clothing fashion jacket coat cardigan outerwear",
+            "Shoes": "fashion shoes boots sandals footwear",
+            "Accessories": "fashion accessories jewelry bag purse",
+        }
+        if category in category_terms:
+            enhanced_query = f"{query} {category_terms[category]}"
+    
+    # Try to get images from Bing first
+    try:
+        bing_results = get_bing_images(enhanced_query, num_images)
+        if bing_results and len(bing_results) >= num_images:
+            return bing_results
+    except Exception as e:
+        print(f"Error fetching Bing images: {str(e)}")
+    
+    # Fall back to unsplash if Bing fails
+    try:
+        unsplash_results = get_unsplash_images(enhanced_query, num_images)
+        if unsplash_results:
+            return unsplash_results
+    except Exception as e:
+        print(f"Error fetching Unsplash images: {str(e)}")
+    
+    # Last resort - try Google images
+    try:
+        google_results = get_google_images(enhanced_query, num_images)
+        if google_results:
+            return google_results
+    except Exception as e:
+        print(f"Error fetching Google images: {str(e)}")
+    
+    # If all else fails, return placeholder images
+    placeholder_images = []
+    for i in range(num_images):
+        placeholder_images.append({
+            "image_url": f"https://via.placeholder.com/300x400?text={category or 'Item'}+{i+1}",
+            "source_url": "#"
+        })
+    
+    return placeholder_images
+
+def get_bing_images(query: str, num_images: int = 5) -> List[Dict[str, str]]:
+    """
+    Get images from Bing image search
     """
     try:
         # Format search query
-        search_query = f"{query} {category if category else ''} fashion outfit"
-        encoded_query = quote_plus(search_query)
-        
-        # We'll try multiple sources to ensure we get enough results
-        image_results = []
-        
-        # Try Pinterest first (good for fashion)
-        headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-        }
+        encoded_query = quote_plus(query)
         
         # Try Bing image search
         bing_url = f"https://www.bing.com/images/search?q={encoded_query}&form=HDRSC2&first=1"
-        try:
-            response = requests.get(bing_url, headers=headers, timeout=8)
-            if response.status_code == 200:
-                soup = BeautifulSoup(response.text, 'html.parser')
-                # Find image elements (specific to Bing's structure)
-                img_tags = soup.find_all('img', {'class': 'mimg'})
-                for img in img_tags:
-                    if 'src' in img.attrs and img['src'].startswith('http'):
-                        # Find parent link
-                        parent_a = img.find_parent('a')
-                        source_url = parent_a.get('href') if parent_a else bing_url
-                        if not source_url.startswith('http'):
-                            source_url = f"https://bing.com{source_url}" if source_url.startswith('/') else bing_url
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+        }
+        response = requests.get(bing_url, headers=headers, timeout=8)
+        if response.status_code == 200:
+            soup = BeautifulSoup(response.text, 'html.parser')
+            # Find image elements (specific to Bing's structure)
+            img_tags = soup.find_all('img', {'class': 'mimg'})
+            image_results = []
+            for img in img_tags:
+                if 'src' in img.attrs and img['src'].startswith('http'):
+                    # Find parent link
+                    parent_a = img.find_parent('a')
+                    source_url = parent_a.get('href') if parent_a else bing_url
+                    if not source_url.startswith('http'):
+                        source_url = f"https://bing.com{source_url}" if source_url.startswith('/') else bing_url
+                    
+                    image_results.append({
+                        'image_url': img['src'],
+                        'source_url': source_url
+                    })
+                elif 'data-src' in img.attrs and img['data-src'].startswith('http'):
+                    parent_a = img.find_parent('a')
+                    source_url = parent_a.get('href') if parent_a else bing_url
+                    if not source_url.startswith('http'):
+                        source_url = f"https://bing.com{source_url}" if source_url.startswith('/') else bing_url
                         
-                        image_results.append({
-                            'image_url': img['src'],
-                            'source_url': source_url
-                        })
-                    elif 'data-src' in img.attrs and img['data-src'].startswith('http'):
-                        parent_a = img.find_parent('a')
-                        source_url = parent_a.get('href') if parent_a else bing_url
-                        if not source_url.startswith('http'):
-                            source_url = f"https://bing.com{source_url}" if source_url.startswith('/') else bing_url
-                            
-                        image_results.append({
-                            'image_url': img['data-src'],
-                            'source_url': source_url
-                        })
-        except Exception as e:
-            logger.warning(f"Error scraping Bing: {str(e)}")
-        
-        # Try Duck Duck Go as a backup
-        ddg_url = f"https://duckduckgo.com/?q={encoded_query}&iax=images&ia=images"
-        try:
-            response = requests.get(ddg_url, headers=headers, timeout=8)
-            if response.status_code == 200:
-                soup = BeautifulSoup(response.text, 'html.parser')
-                # Extract image URLs from the page source
-                # DuckDuckGo dynamically loads images with JavaScript, but we can find some in the initial HTML
-                script_tags = soup.find_all('script')
-                for script in script_tags:
-                    if script.string and 'vqd' in str(script.string):
-                        # Look for image URLs in the script content
-                        urls = re.findall(r'(https://[^"\']+\.(?:jpg|jpeg|png|webp))', str(script.string))
-                        for img_url in urls:
-                            image_results.append({
-                                'image_url': img_url,
-                                'source_url': f"https://duckduckgo.com/?q={encoded_query}&iax=images&ia=images"
-                            })
-        except Exception as e:
-            logger.warning(f"Error scraping DuckDuckGo: {str(e)}")
+                    image_results.append({
+                        'image_url': img['data-src'],
+                        'source_url': source_url
+                    })
             
-        # If we didn't get enough images, try Unsplash (which has high-quality fashion images)
-        if len(image_results) < num_images:
-            unsplash_url = f"https://unsplash.com/s/photos/{encoded_query.replace('+', '-')}"
-            try:
-                response = requests.get(unsplash_url, headers=headers, timeout=8)
-                if response.status_code == 200:
-                    soup = BeautifulSoup(response.text, 'html.parser')
-                    img_tags = soup.find_all('img')
-                    for img in img_tags:
-                        if 'src' in img.attrs and 'images.unsplash.com' in img['src']:
-                            # Find parent link or figure
-                            parent = img.find_parent('a') or img.find_parent('figure')
-                            source_url = unsplash_url
-                            if parent and parent.name == 'a' and parent.get('href'):
-                                source_url = parent['href']
-                                if not source_url.startswith('http'):
-                                    source_url = f"https://unsplash.com{source_url}" if source_url.startswith('/') else unsplash_url
-                                    
-                            image_results.append({
-                                'image_url': img['src'],
-                                'source_url': source_url
-                            })
-            except Exception as e:
-                logger.warning(f"Error scraping Unsplash: {str(e)}")
-        
-        # Unique URLs only - use dict to deduplicate
-        unique_results = {}
-        for result in image_results:
-            img_url = result['image_url']
-            if img_url not in unique_results:
-                unique_results[img_url] = result
-        
-        image_results = list(unique_results.values())
-        
-        # Filter out small images (likely thumbnails or icons)
-        filtered_results = []
-        for result in image_results:
-            url = result['image_url']
-            if not ('icon' in url.lower() or 'thumbnail' in url.lower() or 'logo' in url.lower()):
-                if url.endswith(('.jpg', '.jpeg', '.png', '.webp')) or 'images' in url.lower():
-                    filtered_results.append(result)
-        
-        if not filtered_results:
-            logger.warning(f"No images found for query: {search_query}")
-            return get_mock_images(category, num_images)
+            # Filter out small images (likely thumbnails or icons)
+            filtered_results = []
+            for result in image_results:
+                url = result['image_url']
+                if not ('icon' in url.lower() or 'thumbnail' in url.lower() or 'logo' in url.lower()):
+                    if url.endswith(('.jpg', '.jpeg', '.png', '.webp')) or 'images' in url.lower():
+                        filtered_results.append(result)
             
-        # Return a random subset of the results
-        if len(filtered_results) > num_images:
-            filtered_results = random.sample(filtered_results, num_images)
-        
-        return filtered_results
+            if not filtered_results:
+                logger.warning(f"No images found for query: {query}")
+                return []
+            
+            # Return a random subset of the results
+            if len(filtered_results) > num_images:
+                filtered_results = random.sample(filtered_results, num_images)
+            
+            return filtered_results
     
     except Exception as e:
         logger.error(f"Error searching for images: {str(e)}")
-        return get_mock_images(category, num_images)
+        return []
 
-# Alias the function to maintain compatibility with existing code
+def get_unsplash_images(query: str, num_images: int = 5) -> List[Dict[str, str]]:
+    """
+    Get images from Unsplash
+    """
+    try:
+        # Format search query
+        encoded_query = quote_plus(query)
+        
+        # Try Unsplash
+        unsplash_url = f"https://unsplash.com/s/photos/{encoded_query.replace('+', '-')}"
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+        }
+        response = requests.get(unsplash_url, headers=headers, timeout=8)
+        if response.status_code == 200:
+            soup = BeautifulSoup(response.text, 'html.parser')
+            img_tags = soup.find_all('img')
+            image_results = []
+            for img in img_tags:
+                if 'src' in img.attrs and 'images.unsplash.com' in img['src']:
+                    # Find parent link or figure
+                    parent = img.find_parent('a') or img.find_parent('figure')
+                    source_url = unsplash_url
+                    if parent and parent.name == 'a' and parent.get('href'):
+                        source_url = parent['href']
+                        if not source_url.startswith('http'):
+                            source_url = f"https://unsplash.com{source_url}" if source_url.startswith('/') else unsplash_url
+                            
+                    image_results.append({
+                        'image_url': img['src'],
+                        'source_url': source_url
+                    })
+            
+            # Filter out small images (likely thumbnails or icons)
+            filtered_results = []
+            for result in image_results:
+                url = result['image_url']
+                if not ('icon' in url.lower() or 'thumbnail' in url.lower() or 'logo' in url.lower()):
+                    if url.endswith(('.jpg', '.jpeg', '.png', '.webp')) or 'images' in url.lower():
+                        filtered_results.append(result)
+            
+            if not filtered_results:
+                logger.warning(f"No images found for query: {query}")
+                return []
+            
+            # Return a random subset of the results
+            if len(filtered_results) > num_images:
+                filtered_results = random.sample(filtered_results, num_images)
+            
+            return filtered_results
+    
+    except Exception as e:
+        logger.error(f"Error searching for images: {str(e)}")
+        return []
+
 def get_google_images(query: str, num_images: int = 5, category: str = None) -> List[str]:
     """
     Compatibility function that returns just the image URLs
@@ -259,142 +302,222 @@ def download_image(url: str) -> Optional[Image.Image]:
         logger.error(f"Error downloading image from {url}: {str(e)}")
         return None
 
-def create_outfit_collage(outfit_items: List[Dict[str, Any]]) -> Dict[str, Any]:
+def create_outfit_collage(items, width=800, height=600):
     """
-    Create a collage from outfit items and return as base64 encoded string
-    with clickable areas for each item
+    Create a collage of outfit items with clickable areas
+    Returns a dictionary with 'image' (base64 encoded) and 'map' (clickable areas)
     """
     try:
-        # Download images
-        images = []
-        image_map = []  # To store clickable areas
+        # Create a white canvas
+        collage = Image.new('RGBA', (width, height), (255, 255, 255, 255))
+        draw = ImageDraw.Draw(collage)
+        click_map = []
         
-        for item in outfit_items:
-            if "image_url" in item and item["image_url"]:
-                img = download_image(item["image_url"])
-                if img:
-                    images.append((img, item.get("category", "Unknown")))
-                    # Keep track of the source URL for each image
-                    image_map.append({
-                        "category": item.get("category", "Unknown"),
-                        "url": item.get("source_url", "#")
-                    })
+        # Skip if no items
+        if not items:
+            logger.warning("No items provided for collage creation")
+            buffered = BytesIO()
+            collage.save(buffered, format="PNG")
+            img_str = base64.b64encode(buffered.getvalue()).decode()
+            return {"image": img_str, "map": []}
         
-        if not images:
-            logger.warning("No valid images to create collage")
-            return {"image": None, "map": []}
-        
-        # Calculate collage dimensions
-        width = 1000
-        height = 1200
-        collage = Image.new('RGBA', (width, height), (255, 255, 255, 0))
-        
-        # Define positions for different categories
+        # Define optimal positions for different categories
+        # Each position is (x_center, y_center, max_width, max_height)
         category_positions = {
-            "Top": (50, 50, 450, 450),
-            "Dress": (50, 50, 450, 700),
-            "Bottom": (50, 500, 450, 900),
-            "Shoes": (500, 700, 900, 1100),
-            "Accessory": (500, 50, 900, 450),
-            "Outerwear": (500, 500, 900, 650),
-            "Unknown": (250, 500, 650, 900)
+            "Top": (width // 2, height // 4, width // 2, height // 3),          # Center top
+            "Bottom": (width * 3 // 4, height // 2, width // 3, height // 3),   # Right middle
+            "Dress": (width // 2, height // 2, width // 2, height * 3 // 5),    # Center
+            "Shoes": (width // 2, height * 4 // 5, width // 3, height // 6),    # Bottom center
+            "Accessories": (width * 3 // 4, height // 4, width // 4, height // 5), # Top right
+            "Outerwear": (width // 4, height // 2, width // 3, height // 2),    # Left middle
+            "Bag": (width * 3 // 4, height * 3 // 5, width // 5, height // 5),  # Right bottom
+            "Jewelry": (width * 3 // 4, height // 5, width // 6, height // 6),  # Top right corner
+            "Hat": (width // 2, height // 7, width // 6, height // 6),          # Top center
         }
         
-        # Map for placing additional items of the same category
-        additional_positions = {
-            "Top": [(500, 500, 900, 900)],
-            "Bottom": [(500, 500, 900, 900)],
-            "Accessory": [(700, 500, 950, 750), (250, 700, 500, 950)],
-            "Shoes": [(50, 700, 450, 1100)],
-            "Outerwear": [(50, 500, 450, 900)]
+        # Default positions if we have items without specific category matching
+        default_positions = [
+            (width // 4, height // 4, width // 3, height // 3),      # Top left
+            (width * 3 // 4, height // 4, width // 3, height // 3),   # Top right
+            (width // 4, height * 3 // 4, width // 3, height // 3),   # Bottom left
+            (width * 3 // 4, height * 3 // 4, width // 3, height // 3), # Bottom right
+            (width // 2, height // 2, width // 3, height // 3),       # Center
+        ]
+        
+        # Map generic categories to our specific positions
+        category_mapping = {
+            "tops": "Top",
+            "bottoms": "Bottom",
+            "dresses": "Dress",
+            "shoes": "Shoes",
+            "accessories": "Accessories",
+            "outerwear": "Outerwear", 
+            "bags": "Bag",
+            "jewelry": "Jewelry",
+            "hats": "Hat"
         }
         
-        # Track used positions and categories
+        # Track which positions are used
         used_positions = set()
-        used_categories = set()
-        image_map_with_coords = []  # Store coordinates for clickable areas
+        default_position_index = 0
         
-        # Place images in collage based on category
-        for i, (img, category) in enumerate(images):
-            if category in used_categories and category in additional_positions and additional_positions[category]:
-                # Use alternative position for additional items of the same category
-                position = additional_positions[category].pop(0)
-            elif category in category_positions and category not in used_categories:
-                # Use main position for the category
-                position = category_positions[category]
-                used_categories.add(category)
-            else:
-                # Find any unused position
-                available_positions = [pos for cat, pos in category_positions.items() if cat not in used_categories]
-                if not available_positions:
-                    # If all category positions are used, try additional positions
-                    for cat, positions in additional_positions.items():
-                        if positions:
-                            position = positions.pop(0)
-                            break
+        # Function to get position for a category
+        def get_position_for_category(category):
+            # Normalize category name
+            category_lower = category.lower()
+            
+            # Try direct match first
+            if category in category_positions:
+                pos = category_positions[category]
+                used_positions.add(category)
+                return pos
+                
+            # Try mapped category
+            for key, value in category_mapping.items():
+                if key == category_lower or key in category_lower or category_lower in key:
+                    if value not in used_positions:
+                        used_positions.add(value)
+                        return category_positions[value]
+            
+            # Use default position if no match
+            nonlocal default_position_index
+            if default_position_index < len(default_positions):
+                pos = default_positions[default_position_index]
+                default_position_index += 1
+                return pos
+            
+            # If all positions are used, just return center
+            return (width // 2, height // 2, width // 3, height // 3)
+        
+        # Sort items to ensure consistent display (shoes at bottom, etc.)
+        display_order = ["Hat", "Accessories", "Jewelry", "Top", "Outerwear", "Dress", "Bottom", "Bag", "Shoes"]
+        
+        # Create a sorted list based on category priority
+        def get_category_priority(item):
+            category = item.get("category", "").capitalize()
+            
+            # Check for exact match
+            for i, cat in enumerate(display_order):
+                if cat == category:
+                    return i
+                    
+            # Check for partial match
+            for i, cat in enumerate(display_order):
+                if cat.lower() in category.lower() or category.lower() in cat.lower():
+                    return i
+                    
+            # Default to middle priority if no match
+            return len(display_order) // 2
+        
+        # Sort items by display priority
+        sorted_items = sorted(items, key=get_category_priority)
+        
+        # Draw each item on the collage
+        for item in sorted_items:
+            try:
+                image_url = item.get("image_url")
+                category = item.get("category", "Unknown")
+                source_url = item.get("source_url", "#")
+                
+                if not image_url:
+                    continue
+                
+                # Get position for this category
+                x_center, y_center, max_width, max_height = get_position_for_category(category)
+                
+                # Download image
+                try:
+                    # Attempt to download the image with a timeout
+                    response = requests.get(image_url, timeout=5)
+                    if response.status_code == 200:
+                        img = Image.open(BytesIO(response.content))
                     else:
-                        # Skip if no positions available
+                        logger.warning(f"Failed to download image: {image_url}, status: {response.status_code}")
                         continue
-                else:
-                    position = available_positions[0]
-                    used_categories.add(next(cat for cat, pos in category_positions.items() if pos == position))
-            
-            # Remember this position is used
-            position_key = f"{position[0]},{position[1]}"
-            if position_key in used_positions:
-                continue
-            used_positions.add(position_key)
-            
-            # Calculate dimensions
-            width_pos = position[2] - position[0]
-            height_pos = position[3] - position[1]
-            
-            # Resize and maintain aspect ratio
-            img_width, img_height = img.size
-            ratio = min(width_pos / img_width, height_pos / img_height)
-            new_size = (int(img_width * ratio), int(img_height * ratio))
-            
-            # Resize image
-            img_resized = img.resize(new_size, Image.LANCZOS)
-            
-            # Center image in position
-            x_offset = position[0] + (width_pos - new_size[0]) // 2
-            y_offset = position[1] + (height_pos - new_size[1]) // 2
-            
-            # Create a white background for transparent images
-            if img_resized.mode == 'RGBA':
-                background = Image.new('RGBA', new_size, (255, 255, 255, 255))
-                background.paste(img_resized, (0, 0), img_resized)
-                img_resized = background
-            
-            # Paste image onto collage
-            collage.paste(img_resized, (x_offset, y_offset))
-            
-            # Save the coordinates for the clickable area
-            if i < len(image_map):
-                image_map_with_coords.append({
-                    "category": image_map[i]["category"],
-                    "url": image_map[i]["url"],
-                    "coords": {
-                        "x1": x_offset, 
-                        "y1": y_offset,
-                        "x2": x_offset + new_size[0],
-                        "y2": y_offset + new_size[1]
-                    }
+                except Exception as e:
+                    logger.warning(f"Error loading image {image_url}: {str(e)}")
+                    continue
+                
+                # Convert RGBA images to RGB if needed
+                if img.mode == 'RGBA':
+                    background = Image.new('RGB', img.size, (255, 255, 255))
+                    background.paste(img, mask=img.split()[3])
+                    img = background
+                elif img.mode != 'RGB':
+                    img = img.convert('RGB')
+                
+                # Resize image to fit in the allocated space while maintaining aspect ratio
+                img_width, img_height = img.size
+                aspect_ratio = img_width / img_height
+                
+                # Calculate dimensions to fit within max bounds
+                if aspect_ratio > 1:  # Width > Height
+                    new_width = min(max_width, img_width)
+                    new_height = int(new_width / aspect_ratio)
+                    if new_height > max_height:
+                        new_height = max_height
+                        new_width = int(new_height * aspect_ratio)
+                else:  # Height >= Width
+                    new_height = min(max_height, img_height)
+                    new_width = int(new_height * aspect_ratio)
+                    if new_width > max_width:
+                        new_width = max_width
+                        new_height = int(new_width / aspect_ratio)
+                
+                # Resize the image
+                img = img.resize((new_width, new_height), Image.Resampling.LANCZOS)
+                
+                # Calculate position to paste the image (centered at the specified position)
+                x1 = x_center - new_width // 2
+                y1 = y_center - new_height // 2
+                
+                # Paste the image onto the collage
+                collage.paste(img, (x1, y1))
+                
+                # Add a subtle border around the image
+                border_color = (200, 200, 200, 255)  # Light gray
+                draw.rectangle([x1, y1, x1 + new_width - 1, y1 + new_height - 1], outline=border_color, width=2)
+                
+                # Add a label for the category
+                font_size = 18
+                try:
+                    font = ImageFont.truetype("Arial.ttf", font_size)
+                except Exception:
+                    font = ImageFont.load_default()
+                
+                # Draw semi-transparent label background
+                label_text = category.upper()
+                label_width, label_height = draw.textsize(label_text, font=font) if hasattr(draw, 'textsize') else (font_size * len(label_text) * 0.6, font_size * 1.2)
+                label_x = x1 + (new_width - label_width) // 2
+                label_y = y1 + new_height - label_height - 10
+                
+                # Draw rounded rectangle for label
+                draw.rectangle([label_x - 5, label_y - 5, label_x + label_width + 5, label_y + label_height + 5], 
+                              fill=(0, 0, 0, 128), outline=(255, 255, 255, 200), width=1)
+                
+                # Draw text
+                text_color = (255, 255, 255, 255)  # White
+                draw.text((label_x, label_y), label_text, font=font, fill=text_color)
+                
+                # Add to click map
+                click_map.append({
+                    "coords": [x1, y1, x1 + new_width, y1 + new_height],
+                    "category": category,
+                    "url": source_url
                 })
+                
+            except Exception as e:
+                logger.warning(f"Error adding item to collage: {str(e)}")
+                continue
         
-        # Save collage to bytes buffer
-        buffer = io.BytesIO()
-        collage.save(buffer, format="PNG")
+        # Convert the image to base64
+        buffered = BytesIO()
+        collage.save(buffered, format="PNG")
+        img_str = base64.b64encode(buffered.getvalue()).decode()
         
-        # Convert to base64
-        img_str = base64.b64encode(buffer.getvalue()).decode('utf-8')
-        
-        return {
-            "image": f"data:image/png;base64,{img_str}",
-            "map": image_map_with_coords
-        }
+        return {"image": img_str, "map": click_map}
         
     except Exception as e:
         logger.error(f"Error creating outfit collage: {str(e)}")
-        return {"image": None, "map": []} 
+        # Return empty image
+        return {"image": "", "map": []} 
