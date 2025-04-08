@@ -541,10 +541,10 @@ const HomePage = () => {
             <div className="suggestion-chips">
               <div 
                 className="suggestion-chip"
-                onClick={() => setPrompt('Gardening gifts for a retiree with a green thumb')}
+                onClick={() => setPrompt('Business casual outfit for a tech interview')}
                 data-tooltip="Use this suggestion"
               >
-                <span>Gardening gifts for a retiree with a green thumb</span>
+                <span>Business casual outfit for a tech interview</span>
                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <line x1="7" y1="17" x2="17" y2="7"></line>
                   <polyline points="7 7 17 7 17 17"></polyline>
@@ -553,10 +553,10 @@ const HomePage = () => {
               
               <div 
                 className="suggestion-chip"
-                onClick={() => setPrompt('Birthday outfits for women')}
+                onClick={() => setPrompt('COACHELLA festival LOOK')}
                 data-tooltip="Use this suggestion"
               >
-                <span>Birthday outfits for women</span>
+                <span>COACHELLA festival LOOK</span>
                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <line x1="7" y1="17" x2="17" y2="7"></line>
                   <polyline points="7 7 17 7 17 17"></polyline>
