@@ -224,6 +224,7 @@ async def generate_outfit(request: OutfitGenerateRequest):
                         
                         # Convert to Outfit models with real product data
                         formatted_outfits = []
+                        outfit_index = 0
                         for llm_outfit in llm_outfits:
                             # Add dummy data for required fields if LLM didn't provide them perfectly
                             items_list = []
@@ -244,76 +245,95 @@ async def generate_outfit(request: OutfitGenerateRequest):
                             # Process each item in the outfit
                             item_categories = {}  # To group items by category for display
                             
-                            for item in llm_outfit.get("items", []):
-                                # Create search keywords from item description and keywords
-                                search_keywords = f"{request.prompt} {item.get('description', '')} {' '.join(item.get('keywords', []))}"
-                                category = item.get("category", "Unknown")
-                                
-                                # Search for real products matching this item
-                                print(f"Searching for products matching: {search_keywords}, category: {category}")
-                                # Search for products using the scraper
-                                print(f"Searching for products: {search_keywords} in category {category}")
-                                matched_product = product_scraper.search_products(search_keywords, category, limit=1)
-                                
-                                # If no product found, create a placeholder
-                                if not matched_product:
-                                    # Fetch outfit images from Google instead of using placeholder
-                                    image_results = get_images_from_web(search_keywords, num_images=1, category=category)
-                                    if image_results:
-                                        image_result = image_results[0]
-                                        image_url = image_result['image_url']
-                                        source_url = image_result['source_url']
-                                    else:
-                                        image_url = ""
-                                        source_url = "#"
+                            if "items" in llm_outfit and isinstance(llm_outfit["items"], list):
+                                for item in llm_outfit["items"]:
+                                    # Create search keywords from item description and keywords
+                                    description = item.get("description", "")
+                                    keywords = item.get("keywords", [])
                                     
-                                    matched_product = {
-                                        "id": f"custom-{len(items_list)}",
-                                        "name": item.get("description", f"Custom {category}"),
-                                        "brand": "Custom",
-                                        "price": 0,
-                                        "category": category,
-                                        "url": source_url,  # Use source URL as product URL
-                                        "image_url": image_url,
-                                        "description": item.get("description", ""),
-                                        "source_url": source_url  # Store the source URL
-                                    }
-                                else:
-                                    # If the product was found but has no image, fetch one from Google
-                                    if not matched_product["image_url"] or matched_product["image_url"].startswith("https://via.placeholder.com"):
+                                    # Handle keywords if they're provided as a string instead of list
+                                    if isinstance(keywords, str):
+                                        try:
+                                            # Try to parse as JSON if it looks like a list
+                                            if keywords.startswith('[') and keywords.endswith(']'):
+                                                keywords = json.loads(keywords)
+                                            else:
+                                                # Otherwise split by commas or spaces
+                                                keywords = [k.strip() for k in keywords.replace(',', ' ').split()]
+                                        except:
+                                            # Fallback to empty list if parsing fails
+                                            keywords = []
+                                    
+                                    # Now build the search string
+                                    keyword_str = ' '.join(keywords) if isinstance(keywords, list) else ""
+                                    search_keywords = f"{request.prompt} {description} {keyword_str}"
+                                    category = item.get("category", "Unknown")
+                                    
+                                    # Search for real products matching this item
+                                    print(f"Searching for products matching: {search_keywords}, category: {category}")
+                                    # Search for products using the scraper
+                                    print(f"Searching for products: {search_keywords} in category {category}")
+                                    matched_product = product_scraper.search_products(search_keywords, category, limit=1)
+                                    
+                                    # If no product found, create a placeholder
+                                    if not matched_product:
+                                        # Fetch outfit images from Google instead of using placeholder
                                         image_results = get_images_from_web(search_keywords, num_images=1, category=category)
                                         if image_results:
                                             image_result = image_results[0]
-                                            matched_product["image_url"] = image_result['image_url']
-                                            # Store the source URL for the image
-                                            matched_product["source_url"] = image_result['source_url']
+                                            image_url = image_result['image_url']
+                                            source_url = image_result['source_url']
+                                        else:
+                                            image_url = ""
+                                            source_url = "#"
+                                        
+                                        matched_product = {
+                                            "id": f"custom-{len(items_list)}",
+                                            "name": item.get("description", f"Custom {category}"),
+                                            "brand": "Custom",
+                                            "price": 0,
+                                            "category": category,
+                                            "url": source_url,  # Use source URL as product URL
+                                            "image_url": image_url,
+                                            "description": item.get("description", ""),
+                                            "source_url": source_url  # Store the source URL
+                                        }
+                                    else:
+                                        # If the product was found but has no image, fetch one from Google
+                                        if not matched_product["image_url"] or matched_product["image_url"].startswith("https://via.placeholder.com"):
+                                            image_results = get_images_from_web(search_keywords, num_images=1, category=category)
+                                            if image_results:
+                                                image_result = image_results[0]
+                                                matched_product["image_url"] = image_result['image_url']
+                                                # Store the source URL for the image
+                                                matched_product["source_url"] = image_result['source_url']
+                                        
+                                        # If the source URL isn't set, use the product URL
+                                        if "source_url" not in matched_product:
+                                            matched_product["source_url"] = matched_product["url"]
                                     
-                                    # If the source URL isn't set, use the product URL
-                                    if "source_url" not in matched_product:
-                                        matched_product["source_url"] = matched_product["url"]
-                                
-                                # Update total price
-                                total_price += matched_product["price"]
-                                
-                                # Create OutfitItem
-                                outfit_item = {
-                                    "product_id": matched_product["id"],
-                                    "product_name": matched_product["name"],
-                                    "brand": matched_product["brand"],
-                                    "category": matched_product["category"],
-                                    "price": matched_product["price"],
-                                    "url": matched_product["url"],
-                                    "image_url": matched_product["image_url"],
-                                    "description": matched_product["description"]
-                                }
-                                
-                                # Add to items list
-                                items_list.append(outfit_item)
-                                
-                                # Group by category for display
-                                if category not in item_categories:
-                                    item_categories[category] = []
-                                item_categories[category].append(matched_product["brand"])
+                                    # Update total price
+                                    total_price += matched_product["price"]
+                                    
+                                    # Create OutfitItem
+                                    outfit_item = {
+                                        "product_id": matched_product["id"],
+                                        "product_name": matched_product["name"],
+                                        "brand": matched_product["brand"],
+                                        "category": matched_product["category"],
+                                        "price": matched_product["price"],
+                                        "url": matched_product["url"],
+                                        "image_url": matched_product["image_url"],
+                                        "description": matched_product["description"]
+                                    }
+                                    
+                                    # Add to items list
+                                    items_list.append(outfit_item)
+                                    
+                                    # Group by category for display
+                                    if category not in item_categories:
+                                        item_categories[category] = []
+                                    item_categories[category].append(matched_product["brand"])
                             
                             # Create brand display format (e.g. "Tops: Brand1, Brand2")
                             brand_display = {}

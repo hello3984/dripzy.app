@@ -617,6 +617,35 @@ const HomePage = () => {
             
             {error && <div className="error-message">{error}</div>}
           </div>
+
+          {/* Display outfit results immediately below the Generate button */}
+          {showResults && (
+            <div className="outfit-results-container">
+              <h2>Your Curated Outfits</h2>
+              
+              {/* Category Filters */}
+              <div className="category-filters">
+                {categories.map((category) => (
+                  <button
+                    key={category}
+                    className={`category-filter ${activeCategory === category ? 'active' : ''}`}
+                    onClick={() => setActiveCategory(category)}
+                  >
+                    {category.charAt(0).toUpperCase() + category.slice(1)}
+                  </button>
+                ))}
+              </div>
+              
+              {getDisplayOutfits().map((outfit) => (
+                <div key={outfit.id} className="outfit-result">
+                  <OutfitDisplay 
+                    outfit={outfit} 
+                    onTryOn={() => setShowTryOn(true)} 
+                  />
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </section>
       
@@ -668,39 +697,6 @@ const HomePage = () => {
         </div>
       </section>
       
-      {/* Results Section - this is where we display the generated outfits */}
-      {showResults && (
-        <section className="outfit-results">
-          <h2>Your Curated Outfits</h2>
-          
-          {error && (
-            <div className="error-message">{error}</div>
-          )}
-          
-          {/* Category Filters */}
-          <div className="category-filters">
-            {categories.map((category) => (
-              <button
-                key={category}
-                className={`category-filter ${activeCategory === category ? 'active' : ''}`}
-                onClick={() => setActiveCategory(category)}
-              >
-                {category.charAt(0).toUpperCase() + category.slice(1)}
-              </button>
-            ))}
-          </div>
-          
-          {getDisplayOutfits().map((outfit) => (
-            <div key={outfit.id} className="outfit-result">
-              <OutfitDisplay 
-                outfit={outfit} 
-                onTryOn={() => setShowTryOn(true)} 
-              />
-            </div>
-          ))}
-        </section>
-      )}
-
       {/* Virtual Try-On Modal */}
       {showTryOn && (
         <div className="modal-overlay">
