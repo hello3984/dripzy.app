@@ -247,11 +247,14 @@ async def generate_outfit(request: OutfitGenerateRequest):
                             
                             if "items" in llm_outfit and isinstance(llm_outfit["items"], list):
                                 for item in llm_outfit["items"]:
+                                    # Define category here (outside any conditionals) to solve the scope issue
+                                    category = item.get("category", "Unknown")
+                                    
                                     # Create search keywords from item description and keywords
                                     description = item.get("description", "")
-                                    keywords = item.get("keywords", [])
                                     
-                                    # Handle keywords if they're provided as a string instead of list
+                                    # Handle keywords properly
+                                    keywords = item.get("keywords", [])
                                     if isinstance(keywords, str):
                                         try:
                                             # Try to parse as JSON if it looks like a list
@@ -264,137 +267,105 @@ async def generate_outfit(request: OutfitGenerateRequest):
                                             # Fallback to empty list if parsing fails
                                             keywords = []
                                     
-                                    # Ensure keywords is actually a list
+                                    # Ensure keywords is a list
                                     if not isinstance(keywords, list):
                                         keywords = []
                                     
-                                    # Create a targeted search query for better results
-                                    color = item.get("color", "").lower()
-                                    description = item.get("description", "").lower()
-                                    base_terms = [description, color, category]
+                                    # Safe handling of keyword string
+                                    keyword_str = ' '.join(keywords) if keywords else ""
                                     
-                                    # Add outfit theme context
-                                    context_terms = ["festival", "coachella", "outfit"]
-                                    
-                                    # Direct image search with precise terms
-                                    precise_terms = []
-                                    if "crop" in description:
-                                        precise_terms.append("cropped")
-                                    if "tank" in description:
-                                        precise_terms.append("tank top")
-                                    if "dress" in description:
-                                        precise_terms.append("dress")
-                                    if "boho" in description or "bohemian" in request.prompt.lower():
-                                        precise_terms.append("bohemian")
-                                    if "jean" in description or "denim" in description:
-                                        precise_terms.append("denim")
+                                    # Get color with fallback
+                                    color = item.get("color", "")
                                     
                                     # Create more targeted search terms based on category
                                     if category == "Top":
-                                        item_type = next((term for term in ["tank", "tee", "blouse", "shirt", "crop"] if term in description), "top")
-                                        search_keywords = f"{color} {item_type} {' '.join(precise_terms)} festival fashion"
+                                        search_keywords = f"{description} {keyword_str} {color} top shirt blouse fashion festival"
                                     elif category == "Bottom":
-                                        item_type = next((term for term in ["short", "skirt", "jean", "denim", "pant"] if term in description), "bottom")
-                                        search_keywords = f"{color} {item_type} {' '.join(precise_terms)} festival fashion"
+                                        search_keywords = f"{description} {keyword_str} {color} bottom pants shorts skirt fashion festival"
                                     elif category == "Dress":
-                                        item_type = next((term for term in ["maxi", "mini", "midi", "sundress"] if term in description), "dress")
-                                        search_keywords = f"{color} {item_type} {' '.join(precise_terms)} festival fashion"
+                                        search_keywords = f"{description} {keyword_str} {color} dress fashion festival"
                                     elif category == "Shoes":
-                                        item_type = next((term for term in ["boot", "sandal", "sneaker"] if term in description), "shoes")
-                                        search_keywords = f"{color} {item_type} {' '.join(precise_terms)} festival fashion"
+                                        search_keywords = f"{description} {keyword_str} {color} shoes boots sandals fashion festival"
                                     elif category == "Accessories":
-                                        item_type = next((term for term in ["hat", "necklace", "bracelet", "earring", "sunglasses"] if term in description), "accessory")
-                                        search_keywords = f"{color} {item_type} {' '.join(precise_terms)} festival fashion"
+                                        search_keywords = f"{description} {keyword_str} {color} accessories jewelry fashion festival"
                                     elif category == "Outerwear":
-                                        item_type = next((term for term in ["jacket", "kimono", "cardigan", "vest"] if term in description), "outerwear")
-                                        search_keywords = f"{color} {item_type} {' '.join(precise_terms)} festival fashion"
+                                        search_keywords = f"{description} {keyword_str} {color} jacket coat cardigan fashion festival"
                                     else:
-                                        search_keywords = f"{color} {description} {category} festival fashion"
+                                        search_keywords = f"{description} {keyword_str} {color} fashion festival"
                                     
                                     print(f"Searching for products: {search_keywords} in category {category}")
-                                    try:
-                                        # First try direct image search for more relevant images
-                                        image_results = get_images_from_web(search_keywords, num_images=1, category=category)
+                                    
+                                    # Get image directly first
+                                    image_results = get_images_from_web(search_keywords, num_images=1, category=category)
+                                    
+                                    if image_results and len(image_results) > 0:
+                                        # Create realistic product details
+                                        image_result = image_results[0]
+                                        image_url = image_result['image_url']
+                                        source_url = image_result['source_url']
                                         
-                                        if image_results and len(image_results) > 0:
-                                            image_result = image_results[0]
-                                            image_url = image_result['image_url']
-                                            source_url = image_result['source_url']
-                                            
-                                            # Generate a sensible price based on the category
-                                            category_price_ranges = {
-                                                "Top": (15, 60),
-                                                "Bottom": (25, 80),
-                                                "Dress": (45, 120),
-                                                "Shoes": (40, 150),
-                                                "Accessories": (10, 50),
-                                                "Outerwear": (60, 200),
-                                                "Unknown": (20, 100)
-                                            }
-                                            
-                                            price_range = category_price_ranges.get(category, (20, 100))
-                                            item_price = random.randint(price_range[0], price_range[1])
-                                            
-                                            # Extract possible brand from source URL
-                                            possible_brands = ["Zara", "H&M", "Urban Outfitters", "Free People", 
-                                                              "Anthropologie", "ASOS", "Forever 21", "Topshop", 
-                                                              "American Eagle", "Levi's", "Madewell", "Brandy Melville"]
-                                            
-                                            # Determine a plausible brand based on the item and source
-                                            if "boho" in description.lower() or "festival" in description.lower():
-                                                brand = random.choice(["Free People", "Anthropologie", "Urban Outfitters"])
-                                            elif "denim" in description.lower() or "jean" in description.lower():
-                                                brand = random.choice(["Levi's", "American Eagle", "Madewell"])
-                                            elif "crop" in description.lower() or "tank" in description.lower():
-                                                brand = random.choice(["Brandy Melville", "Forever 21", "Urban Outfitters"])
-                                            else:
-                                                brand = random.choice(possible_brands)
-                                            
-                                            # Create a realistic product name
-                                            product_name = f"{brand} {color.title()} {description.title()}"
-                                            
-                                            matched_product = {
-                                                "id": f"custom-{len(items_list)}",
-                                                "name": product_name,
-                                                "brand": brand,
-                                                "price": item_price,
-                                                "category": category,
-                                                "url": source_url,
-                                                "image_url": image_url,
-                                                "description": item.get("description", ""),
-                                                "source_url": source_url
-                                            }
-                                            
-                                            # Update total price
-                                            total_price += matched_product["price"]
-                                            
-                                            # Create OutfitItem
-                                            outfit_item = {
-                                                "product_id": matched_product["id"],
-                                                "product_name": matched_product["name"],
-                                                "brand": matched_product["brand"],
-                                                "category": matched_product["category"],
-                                                "price": matched_product["price"],
-                                                "url": matched_product["url"],
-                                                "image_url": matched_product["image_url"],
-                                                "description": matched_product["description"]
-                                            }
-                                            
-                                            # Add to items list
-                                            items_list.append(outfit_item)
-                                            
-                                            # Group by category for display
-                                            if category not in item_categories:
-                                                item_categories[category] = []
-                                            item_categories[category].append(matched_product["brand"])
-                                        else:
-                                            # Fallback to a placeholder
-                                            print(f"No image found for {description}")
-                                            
-                                    except Exception as e:
-                                        print(f"Error processing item {description}: {str(e)}")
-                                        # Continue to next item
-                            
+                                        # Generate appropriate price range based on category
+                                        price_ranges = {
+                                            "Top": (15, 60),
+                                            "Bottom": (25, 80),
+                                            "Dress": (45, 120),
+                                            "Shoes": (40, 150),
+                                            "Accessories": (10, 50),
+                                            "Outerwear": (60, 200),
+                                            "Unknown": (20, 100)
+                                        }
+                                        price_range = price_ranges.get(category, (20, 100))
+                                        
+                                        # Generate a brand based on category
+                                        brands = {
+                                            "Top": ["Free People", "Urban Outfitters", "Anthropologie"],
+                                            "Bottom": ["Levi's", "American Eagle", "Madewell"],
+                                            "Dress": ["Reformation", "ASOS", "Urban Outfitters"],
+                                            "Shoes": ["Steve Madden", "Free People", "Vans"],
+                                            "Accessories": ["Madewell", "Urban Outfitters", "Free People"],
+                                            "Outerwear": ["Anthropologie", "Free People", "Zara"],
+                                            "Unknown": ["ASOS", "H&M", "Zara"]
+                                        }
+                                        brand = random.choice(brands.get(category, brands["Unknown"]))
+                                        
+                                        # Create the product
+                                        matched_product = {
+                                            "id": f"custom-{len(items_list)}",
+                                            "name": f"{brand} {color.title()} {description.title()}",
+                                            "brand": brand,
+                                            "price": random.randint(price_range[0], price_range[1]),
+                                            "category": category,
+                                            "url": source_url,
+                                            "image_url": image_url,
+                                            "description": description,
+                                            "source_url": source_url
+                                        }
+                                        
+                                        # Update total price
+                                        total_price += matched_product["price"]
+                                        
+                                        # Create OutfitItem
+                                        outfit_item = {
+                                            "product_id": matched_product["id"],
+                                            "product_name": matched_product["name"],
+                                            "brand": matched_product["brand"],
+                                            "category": matched_product["category"],
+                                            "price": matched_product["price"],
+                                            "url": matched_product["url"],
+                                            "image_url": matched_product["image_url"],
+                                            "description": matched_product["description"]
+                                        }
+                                        
+                                        # Add to items list
+                                        items_list.append(outfit_item)
+                                        
+                                        # Group by category for display
+                                        if category not in item_categories:
+                                            item_categories[category] = []
+                                        item_categories[category].append(matched_product["brand"])
+                                    else:
+                                        print(f"No images found for {description}")
+                                    
                             # Create brand display format (e.g. "Tops: Brand1, Brand2")
                             brand_display = {}
                             for category, brands in item_categories.items():

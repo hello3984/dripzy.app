@@ -1,7 +1,14 @@
 // API service for making calls to our backend
 import stylistService from './stylist';
 
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
+// API configuration
+const API_CONFIG = {
+  // Use localhost with port 8090 for development
+  baseURL: process.env.NODE_ENV === 'development' 
+    ? 'http://localhost:8090' 
+    : 'https://dripzy-backend.herokuapp.com',
+  timeout: 30000, // Increased timeout for image processing
+};
 
 // Reliable fashion API endpoints that don't require authentication
 const API_URLS = {
@@ -31,7 +38,7 @@ export const generateOutfit = async (preferences) => {
     console.log('Generating outfit with preferences:', preferences);
     
     try {
-      const response = await fetch(`${API_BASE_URL}/outfits/generate`, {
+      const response = await fetch(`${API_CONFIG.baseURL}/outfits/generate`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -570,7 +577,7 @@ function createFashionMockOutfits(preferences) {
  */
 export const getTrendingStyles = async () => {
   try {
-    const response = await fetch(`${API_BASE_URL}/outfits/trending`);
+    const response = await fetch(`${API_CONFIG.baseURL}/outfits/trending`);
 
     if (!response.ok) {
       throw new Error(`Error: ${response.status} ${response.statusText}`);
@@ -617,7 +624,7 @@ export const searchProducts = async (filters) => {
       }
     });
 
-    const response = await fetch(`${API_BASE_URL}/products/search?${queryParams}`);
+    const response = await fetch(`${API_CONFIG.baseURL}/products/search?${queryParams}`);
 
     if (!response.ok) {
       throw new Error(`Error: ${response.status} ${response.statusText}`);
@@ -637,7 +644,7 @@ export const searchProducts = async (filters) => {
  */
 export const generateTryOn = async (tryOnRequest) => {
   try {
-    const response = await fetch(`${API_BASE_URL}/tryon/generate`, {
+    const response = await fetch(`${API_CONFIG.baseURL}/tryon/generate`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -666,7 +673,7 @@ export const uploadUserImage = async (imageFile) => {
     const formData = new FormData();
     formData.append('file', imageFile);
 
-    const response = await fetch(`${API_BASE_URL}/tryon/upload-image`, {
+    const response = await fetch(`${API_CONFIG.baseURL}/tryon/upload-image`, {
       method: 'POST',
       body: formData,
     });
@@ -688,7 +695,7 @@ export const uploadUserImage = async (imageFile) => {
  */
 export const getAvatarOptions = async () => {
   try {
-    const response = await fetch(`${API_BASE_URL}/tryon/avatars`);
+    const response = await fetch(`${API_CONFIG.baseURL}/tryon/avatars`);
 
     if (!response.ok) {
       throw new Error(`Error: ${response.status} ${response.statusText}`);

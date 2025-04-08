@@ -27,67 +27,88 @@ def get_images_from_web(query, num_images=4, category=None):
     """
     Get images from multiple sources based on a search query
     """
-    # Add category-specific terms to the query
-    enhanced_query = query
-    if not enhanced_query.endswith("fashion") and "fashion" not in enhanced_query:
-        enhanced_query += " fashion"
+    try:
+        # Enhance query with category and fashion terms
+        if category and category not in query:
+            query = f"{query} {category}"
         
-    if "festival" not in enhanced_query.lower() and category:
-        enhanced_query += " festival"
-    
-    print(f"Enhanced image search query: {enhanced_query}")
-    
-    # Try multiple sources to get the best images
-    all_results = []
-    
-    # Try Bing first - tends to have good fashion images
-    try:
-        bing_results = get_bing_images(enhanced_query, num_images*2)  # Get more than needed to filter
-        if bing_results:
-            all_results.extend(bing_results)
-    except Exception as e:
-        print(f"Error fetching Bing images: {str(e)}")
-    
-    # Then try Unsplash - good for high quality lifestyle/fashion photos
-    try:
-        if len(all_results) < num_images*2:
-            unsplash_results = get_unsplash_images(enhanced_query, num_images*2)
-            if unsplash_results:
-                all_results.extend(unsplash_results)
-    except Exception as e:
-        print(f"Error fetching Unsplash images: {str(e)}")
-    
-    # Filter results for relevance and quality
-    filtered_results = []
-    for result in all_results:
-        url = result['image_url']
-        # Skip small images, icons, and other irrelevant images
-        if any(skip in url.lower() for skip in ['icon', 'thumbnail', 'placeholder', 'logo']):
-            continue
+        if "fashion" not in query.lower():
+            query = f"{query} fashion"
             
-        # Prefer images from fashion or retail sites
-        if any(fashion_site in result['source_url'].lower() for fashion_site in 
-              ['amazon', 'asos', 'nordstrom', 'zara', 'urbanoutfitters', 'freepeople', 
-               'anthropologie', 'revolve', 'nastygal', 'forever21', 'hm', 'macys']):
-            filtered_results.insert(0, result)  # Prioritize retail site images
-        else:
+        if "festival" not in query.lower() and "coachella" not in query.lower():
+            query = f"{query} festival"
+            
+        print(f"Enhanced image search query: {query}")
+        
+        # Try Bing images first (usually most relevant)
+        bing_results = get_bing_images(query, num_images * 2)  # Get extra to filter
+        
+        # Try Unsplash as backup for high-quality images
+        unsplash_results = []
+        if len(bing_results) < num_images:
+            unsplash_results = get_unsplash_images(query, num_images * 2)
+            
+        # Combine and filter results
+        all_results = bing_results + unsplash_results
+        
+        # Remove duplicates and filter low quality images
+        filtered_results = []
+        seen_urls = set()
+        
+        for result in all_results:
+            url = result.get('image_url', '')
+            
+            # Skip if we've seen this URL or it's empty
+            if not url or url in seen_urls:
+                continue
+                
+            # Skip icons, thumbnails, placeholders, etc.
+            if any(term in url.lower() for term in ['icon', 'thumbnail', 'logo', 'placeholder']):
+                continue
+                
+            # Skip very small images
+            if 'width=' in url and 'height=' in url:
+                try:
+                    width_match = re.search(r'width=(\d+)', url)
+                    height_match = re.search(r'height=(\d+)', url)
+                    if width_match and height_match:
+                        width = int(width_match.group(1))
+                        height = int(height_match.group(1))
+                        if width < 200 or height < 200:
+                            continue
+                except:
+                    pass
+            
+            seen_urls.add(url)
             filtered_results.append(result)
-    
-    # If we still don't have enough results, use placeholder
-    if not filtered_results:
-        print(f"Warning: No suitable images found for query: {enhanced_query}")
-        placeholder_images = []
+            
+            # Break early if we have enough results
+            if len(filtered_results) >= num_images:
+                break
+                
+        # Return filtered results, or placeholders if none found
+        if filtered_results:
+            return filtered_results[:num_images]
+        else:
+            print(f"Warning: No suitable images found for query: {query}")
+            placeholders = []
+            for i in range(num_images):
+                placeholders.append({
+                    "image_url": f"https://via.placeholder.com/400x600?text={category}+Item",
+                    "source_url": "#"
+                })
+            return placeholders
+            
+    except Exception as e:
+        print(f"Error in get_images_from_web: {str(e)}")
+        # Return placeholders on error
+        placeholders = []
         for i in range(num_images):
-            placeholder_images.append({
-                "image_url": f"https://via.placeholder.com/400x600?text={category or 'Fashion'}_Item",
+            placeholders.append({
+                "image_url": f"https://via.placeholder.com/400x600?text=Error",
                 "source_url": "#"
             })
-        return placeholder_images
-    
-    # Return most relevant results
-    if len(filtered_results) > num_images:
-        return filtered_results[:num_images]
-    return filtered_results
+        return placeholders
 
 def get_bing_images(query: str, num_images: int = 5) -> List[Dict[str, str]]:
     """
