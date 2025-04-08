@@ -20,6 +20,8 @@ const HomePage = () => {
   const [outfits, setOutfits] = useState([]);
   const [loadingImages, setLoadingImages] = useState({});
   const [budgetTier, setBudgetTier] = useState(null);
+  // Add state for controlling style grid visibility
+  const [showStyleGrid, setShowStyleGrid] = useState(false);
 
   // New state for tracking active category tab
   const [activeCategory, setActiveCategory] = useState('all');
@@ -508,6 +510,115 @@ const HomePage = () => {
     <div className="homepage">
       <Banner />
       
+      {/* Style Generator Section - moved to first position */}
+      <section className="style-generator" id="generate">
+        <div className="container">
+          <div className="ai-badge">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+              <path d="M12 7v10"></path>
+              <path d="M8 15l4 4 4-4"></path>
+            </svg>
+            Powered by AI
+          </div>
+          <h2 className="section-title">Generate Your Outfit</h2>
+          
+          <div className="style-prompt-container">
+            <div className="prompt-input-wrapper">
+              <input
+                type="text"
+                value={prompt}
+                onChange={(e) => setPrompt(e.target.value)}
+                placeholder="Describe what you want to generate..."
+                className="prompt-input"
+              />
+              <button 
+                className="close-button"
+                onClick={() => setPrompt('')}
+              >×</button>
+            </div>
+            
+            <div className="suggestion-chips">
+              <div 
+                className="suggestion-chip"
+                onClick={() => setPrompt('Gardening gifts for a retiree with a green thumb')}
+                data-tooltip="Use this suggestion"
+              >
+                <span>Gardening gifts for a retiree with a green thumb</span>
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="7" y1="17" x2="17" y2="7"></line>
+                  <polyline points="7 7 17 7 17 17"></polyline>
+                </svg>
+              </div>
+              
+              <div 
+                className="suggestion-chip"
+                onClick={() => setPrompt('Birthday outfits for women')}
+                data-tooltip="Use this suggestion"
+              >
+                <span>Birthday outfits for women</span>
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="7" y1="17" x2="17" y2="7"></line>
+                  <polyline points="7 7 17 7 17 17"></polyline>
+                </svg>
+              </div>
+            </div>
+            
+            <div className="action-buttons">
+              <div className="photo-upload-wrapper">
+                <button 
+                  className="photo-upload-button"
+                  onClick={() => fileInputRef.current.click()}
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                    <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                    <polyline points="21 15 16 10 5 21"></polyline>
+                  </svg>
+                  Use a photo
+                </button>
+                <input 
+                  type="file" 
+                  ref={fileInputRef} 
+                  style={{ display: 'none' }} 
+                  accept="image/*"
+                  onChange={handlePhotoUpload}
+                />
+              </div>
+              
+              <button 
+                className="virtual-tryon-button"
+                onClick={() => setShowTryOn(true)}
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
+                  <polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>
+                  <line x1="12" y1="22.08" x2="12" y2="12"></line>
+                </svg>
+                Virtual Try-On
+              </button>
+              
+              <button 
+                className="generate-button"
+                onClick={handleGenerateOutfit}
+                disabled={generating}
+              >
+                {generating ? (
+                  <>
+                    <span className="spinner"></span>
+                    Generating...
+                  </>
+                ) : (
+                  <>Generate</>
+                )}
+              </button>
+            </div>
+            
+            {error && <div className="error-message">{error}</div>}
+          </div>
+        </div>
+      </section>
+      
       {/* Hero Section */}
       <section className="hero-section">
         <div className="hero-content">
@@ -552,242 +663,6 @@ const HomePage = () => {
           </div>
           <div className="gallery-item">
             <img src="https://images.unsplash.com/photo-1618522285348-559a4f369c3e?q=80&w=1972&auto=format&fit=crop" alt="Fashion model closeup" />
-          </div>
-        </div>
-      </section>
-      
-      {/* Style Generator Section - simplified to focus on generation */}
-      <section className="style-generator" id="generate">
-        <div className="container">
-          <div className="ai-badge">
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
-              <path d="M12 7v10"></path>
-              <path d="M8 15l4 4 4-4"></path>
-            </svg>
-            Powered by AI
-          </div>
-          <h2 className="section-title">Generate Your Outfit</h2>
-          
-          <div className="style-prompt-container">
-            <div className="prompt-input-wrapper">
-              <input
-                type="text"
-                value={prompt}
-                onChange={(e) => setPrompt(e.target.value)}
-                placeholder="Describe what you want to generate..."
-                className="prompt-input"
-              />
-              <button 
-                className="close-button"
-                onClick={() => setPrompt('')}
-              >×</button>
-            </div>
-            
-            <div className="suggestion-chips">
-              <div 
-                className="suggestion-chip"
-                onClick={() => setPrompt('Gardening gifts for a retiree with a green thumb')}
-                data-tooltip="Use this suggestion"
-              >
-                <span>Gardening gifts for a retiree with a green thumb</span>
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <line x1="7" y1="17" x2="17" y2="7"></line>
-                  <polyline points="7 7 17 7 17 17"></polyline>
-                </svg>
-              </div>
-              <div 
-                className="suggestion-chip"
-                onClick={() => setPrompt('Birthday outfits for women')}
-                data-tooltip="Use this suggestion"
-              >
-                <span>Birthday outfits for women</span>
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <line x1="7" y1="17" x2="17" y2="7"></line>
-                  <polyline points="7 7 17 7 17 17"></polyline>
-                </svg>
-              </div>
-            </div>
-            
-            <div className="action-buttons">
-              <input
-                type="file"
-                ref={fileInputRef}
-                onChange={handlePhotoUpload}
-                accept="image/*"
-                style={{ display: 'none' }}
-              />
-              <button 
-                className="photo-upload-button"
-                onClick={() => fileInputRef.current.click()}
-                data-tooltip="Upload your photo for personalized styling"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
-                  <circle cx="8.5" cy="8.5" r="1.5"></circle>
-                  <polyline points="21 15 16 10 5 21"></polyline>
-                </svg>
-                Use a photo
-              </button>
-              <button 
-                className="try-on-button"
-                onClick={() => setShowTryOn(true)}
-                data-tooltip="Try clothes on your avatar"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M6 2v20l12-10z"></path>
-                </svg>
-                Virtual Try-On
-              </button>
-              <button 
-                className="generate-button"
-                onClick={handleGenerateOutfit}
-                disabled={generating}
-                data-tooltip="Generate AI fashion outfits"
-              >
-                {generating ? (
-                  <div className="loading-dots">
-                    <span></span>
-                    <span></span>
-                    <span></span>
-                    Generating
-                  </div>
-                ) : 'Generate'}
-              </button>
-            </div>
-            
-            {selectedPhoto && (
-              <div className="photo-preview">
-                <div className="photo-preview-wrapper">
-                  <img src={selectedPhoto} alt="User uploaded" />
-                  <button 
-                    className="remove-photo"
-                    onClick={() => setSelectedPhoto(null)}
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <circle cx="12" cy="12" r="10"></circle>
-                      <line x1="15" y1="9" x2="9" y2="15"></line>
-                      <line x1="9" y1="9" x2="15" y2="15"></line>
-                    </svg>
-                  </button>
-                </div>
-                <p className="photo-note">We'll generate outfits that would look great on you</p>
-              </div>
-            )}
-          </div>
-          
-          <div className="style-categories">
-            <h3>Choose a style</h3>
-            <div className="style-grid">
-              <div 
-                className={`style-tile ${selectedStyle === 'Classic' ? 'active' : ''}`}
-                onClick={() => handleStyleClick('Classic')}
-                data-tooltip="Timeless and elegant classic style"
-              >
-                <div className="style-image classic-style"></div>
-                <span className="style-name">Classic</span>
-              </div>
-              <div 
-                className={`style-tile ${selectedStyle === 'Coastal' ? 'active' : ''}`}
-                onClick={() => handleStyleClick('Coastal')}
-                data-tooltip="Beach-inspired relaxed coastal look"
-              >
-                <div className="style-image coastal-style"></div>
-                <span className="style-name">Coastal</span>
-              </div>
-              <div 
-                className={`style-tile ${selectedStyle === 'Goth' ? 'active' : ''}`}
-                onClick={() => handleStyleClick('Goth')}
-                data-tooltip="Dark and edgy gothic fashion"
-              >
-                <div className="style-image goth-style"></div>
-                <span className="style-name">Goth</span>
-              </div>
-              <div 
-                className={`style-tile ${selectedStyle === 'Chic' ? 'active' : ''}`}
-                onClick={() => handleStyleClick('Chic')}
-                data-tooltip="Sophisticated and trendy chic looks"
-              >
-                <div className="style-image chic-style"></div>
-                <span className="style-name">Chic</span>
-              </div>
-              <div 
-                className={`style-tile ${selectedStyle === 'Preppy' ? 'active' : ''}`}
-                onClick={() => handleStyleClick('Preppy')}
-                data-tooltip="Clean and polished preppy outfits"
-              >
-                <div className="style-image preppy-style"></div>
-                <span className="style-name">Preppy</span>
-              </div>
-              <div 
-                className={`style-tile ${selectedStyle === 'Rustic' ? 'active' : ''}`}
-                onClick={() => handleStyleClick('Rustic')}
-                data-tooltip="Natural and earthy rustic style"
-              >
-                <div className="style-image rustic-style"></div>
-                <span className="style-name">Rustic</span>
-              </div>
-              <div 
-                className={`style-tile ${selectedStyle === 'Androgynous' ? 'active' : ''}`}
-                onClick={() => handleStyleClick('Androgynous')}
-                data-tooltip="Gender-neutral modern styling"
-              >
-                <div className="style-image androgynous-style"></div>
-                <span className="style-name">Androgynous</span>
-              </div>
-              <div 
-                className={`style-tile ${selectedStyle === 'Romantic' ? 'active' : ''}`}
-                onClick={() => handleStyleClick('Romantic')}
-                data-tooltip="Soft and feminine romantic fashion"
-              >
-                <div className="style-image romantic-style"></div>
-                <span className="style-name">Romantic</span>
-              </div>
-            </div>
-          </div>
-          
-          <div className="gender-preference">
-            <div className="radio-group">
-              <label 
-                className={selectedGender === 'women' ? 'active' : ''}
-                data-tooltip="Show women's fashion styles"
-              >
-                <input
-                  type="radio"
-                  name="gender"
-                  value="women"
-                  checked={selectedGender === 'women'}
-                  onChange={(e) => setSelectedGender(e.target.value)}
-                />
-                Women
-              </label>
-              <label 
-                className={selectedGender === 'men' ? 'active' : ''}
-                data-tooltip="Show men's fashion styles"
-              >
-                <input
-                  type="radio"
-                  name="gender"
-                  value="men"
-                  checked={selectedGender === 'men'}
-                  onChange={(e) => setSelectedGender(e.target.value)}
-                />
-                Men
-              </label>
-              <label 
-                className={selectedGender === 'unisex' ? 'active' : ''}
-                data-tooltip="Show gender-neutral fashion styles"
-              >
-                <input
-                  type="radio"
-                  name="gender"
-                  value="unisex"
-                  checked={selectedGender === 'unisex'}
-                  onChange={(e) => setSelectedGender(e.target.value)}
-                />
-                Unisex
-              </label>
-            </div>
           </div>
         </div>
       </section>
