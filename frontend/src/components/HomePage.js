@@ -529,7 +529,7 @@ const HomePage = () => {
                 type="text"
                 value={prompt}
                 onChange={(e) => setPrompt(e.target.value)}
-                placeholder="Describe what you want to generate..."
+                placeholder="What look are you going for?"
                 className="prompt-input"
               />
               <button 
