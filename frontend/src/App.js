@@ -72,8 +72,8 @@ function App() {
               <div className="footer-section">
                 <h3>Connect</h3>
                 <div className="social-links">
-                  <a href="/#" className="social-link">Instagram</a>
-                  <a href="/#" className="social-link">TikTok</a>
+                  <a href="https://instagram.com/dripzyapp" target="_blank" rel="noopener noreferrer" className="social-link">Instagram</a>
+                  <a href="https://tiktok.com/@dripzyapp" target="_blank" rel="noopener noreferrer" className="social-link">TikTok</a>
                   <a href="mailto:hello@dripzy.app" className="social-link">Contact</a>
                 </div>
               </div>
