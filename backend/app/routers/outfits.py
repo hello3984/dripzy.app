@@ -4,12 +4,13 @@ from typing import List, Optional, Dict, Any
 import os
 import json
 import random
+import logging # Added logging
 
 # --- Added Imports ---
 import anthropic
 from dotenv import load_dotenv
-from app.services.product_scraper import ProductScraper  # Import the product scraper
-from app.services.image_service import get_google_images, create_outfit_collage, get_images_from_web  # Import image service
+from app.services.image_service import create_outfit_collage # Keep collage function
+from app.services.product_finder import find_real_product_nordstrom # Import the new product finder
 # ---------------------
 
 router = APIRouter(
@@ -182,8 +183,12 @@ def get_mock_outfits():
         
     return outfits
 
-# Initialize product scraper
-product_scraper = ProductScraper()
+# Initialize product scraper (Can be removed if ProductScraper class isn't used elsewhere)
+# product_scraper = ProductScraper() # Comment out/remove if only finder is used
+
+# Configure basic logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # Routes
 @router.post("/generate", response_model=OutfitGenerateResponse)
@@ -222,11 +227,9 @@ async def generate_outfit(request: OutfitGenerateRequest):
                     if "outfits" in outfit_data and isinstance(outfit_data["outfits"], list):
                         llm_outfits = outfit_data["outfits"]
                         
-                        # Convert to Outfit models with real product data
                         formatted_outfits = []
                         outfit_index = 0
                         for llm_outfit in llm_outfits:
-                            # Add dummy data for required fields if LLM didn't provide them perfectly
                             items_list = []
                             total_price = 0
                             occasion_keywords = ["formal", "casual", "work", "business", "party", "everyday", "weekend"]
@@ -242,8 +245,7 @@ async def generate_outfit(request: OutfitGenerateRequest):
                             if "festival" in request.prompt.lower() or "coachella" in request.prompt.lower():
                                 outfit_occasion = "Festival"
                             
-                            # Process each item in the outfit
-                            item_categories = {}  # To group items by category for display
+                            item_categories = {}
                             
                             if "items" in llm_outfit and isinstance(llm_outfit["items"], list):
                                 for item in llm_outfit["items"]:
@@ -295,76 +297,42 @@ async def generate_outfit(request: OutfitGenerateRequest):
                                     
                                     print(f"Searching for products: {search_keywords} in category {category}")
                                     
-                                    # Get image directly first
-                                    image_results = get_images_from_web(search_keywords, num_images=1, category=category)
+                                    # Call the Nordstrom scraper
+                                    real_product = find_real_product_nordstrom(item) 
                                     
-                                    if image_results and len(image_results) > 0:
-                                        # Create realistic product details
-                                        image_result = image_results[0]
-                                        image_url = image_result['image_url']
-                                        source_url = image_result['source_url']
-                                        
-                                        # Generate appropriate price range based on category
-                                        price_ranges = {
-                                            "Top": (15, 60),
-                                            "Bottom": (25, 80),
-                                            "Dress": (45, 120),
-                                            "Shoes": (40, 150),
-                                            "Accessories": (10, 50),
-                                            "Outerwear": (60, 200),
-                                            "Unknown": (20, 100)
-                                        }
-                                        price_range = price_ranges.get(category, (20, 100))
-                                        
-                                        # Generate a brand based on category
-                                        brands = {
-                                            "Top": ["Free People", "Urban Outfitters", "Anthropologie"],
-                                            "Bottom": ["Levi's", "American Eagle", "Madewell"],
-                                            "Dress": ["Reformation", "ASOS", "Urban Outfitters"],
-                                            "Shoes": ["Steve Madden", "Free People", "Vans"],
-                                            "Accessories": ["Madewell", "Urban Outfitters", "Free People"],
-                                            "Outerwear": ["Anthropologie", "Free People", "Zara"],
-                                            "Unknown": ["ASOS", "H&M", "Zara"]
-                                        }
-                                        brand = random.choice(brands.get(category, brands["Unknown"]))
-                                        
-                                        # Create the product
-                                        matched_product = {
-                                            "id": f"custom-{len(items_list)}",
-                                            "name": f"{brand} {color.title()} {description.title()}",
-                                            "brand": brand,
-                                            "price": random.randint(price_range[0], price_range[1]),
-                                            "category": category,
-                                            "url": source_url,
-                                            "image_url": image_url,
-                                            "description": description,
-                                            "source_url": source_url
-                                        }
+                                    if real_product:
+                                        logger.info(f"Found product on {real_product.get('source', 'Unknown')}: {real_product.get('name')}")
                                         
                                         # Update total price
-                                        total_price += matched_product["price"]
+                                        total_price += real_product.get('price', 0)
                                         
-                                        # Create OutfitItem
+                                        # Get category from real product if available, else keep LLM's category
+                                        category = real_product.get('category', item.get("category", "Unknown")) 
+                                        
+                                        # Create OutfitItem using real data
                                         outfit_item = {
-                                            "product_id": matched_product["id"],
-                                            "product_name": matched_product["name"],
-                                            "brand": matched_product["brand"],
-                                            "category": matched_product["category"],
-                                            "price": matched_product["price"],
-                                            "url": matched_product["url"],
-                                            "image_url": matched_product["image_url"],
-                                            "description": matched_product["description"]
+                                            "product_id": f"{real_product.get('source', 'prod')}-{len(items_list)}", # Simple ID
+                                            "product_name": real_product.get('name', 'N/A'),
+                                            "brand": real_product.get('brand', 'N/A'),
+                                            "category": category,
+                                            "price": real_product.get('price', 0.0),
+                                            "url": real_product.get('product_url', '#'),
+                                            "image_url": real_product.get('image_url', ''), # Need placeholder image?
+                                            "description": item.get("description", "") # Use LLM description maybe? Or real one?
                                         }
                                         
-                                        # Add to items list
                                         items_list.append(outfit_item)
                                         
-                                        # Group by category for display
+                                        # Group by category for brand display
+                                        brand = real_product.get('brand', 'Unknown Brand')
                                         if category not in item_categories:
                                             item_categories[category] = []
-                                        item_categories[category].append(matched_product["brand"])
+                                        if brand not in item_categories[category]: # Avoid duplicate brands per category
+                                             item_categories[category].append(brand)
                                     else:
-                                        print(f"No images found for {description}")
+                                        # Product not found by scraper
+                                        logger.warning(f"Could not find real product via scraping for: {item.get('description')}")
+                                        # Decide action: skip item, use placeholder, fallback? -> Currently skips.
                                     
                             # Create brand display format (e.g. "Tops: Brand1, Brand2")
                             brand_display = {}
@@ -373,40 +341,49 @@ async def generate_outfit(request: OutfitGenerateRequest):
                                 category_plural = f"{category}s" if not category.endswith('s') else category
                                 brand_display[category_plural] = ", ".join(brands)
                             
-                            # Create formatted outfit with real products
+                            # Create formatted outfit object
                             outfit_name = llm_outfit.get("outfit_name", f"Outfit {len(formatted_outfits) + 1}")
                             outfit_style = next((s for s in ["casual", "formal", "bohemian", "streetwear", "classic", "trendy"] 
                                                if s in outfit_name.lower() or s in request.prompt.lower()), "trendy")
                             
-                            formatted_outfit = {
-                                "id": f"outfit-{len(formatted_outfits) + 1}",
-                                "name": outfit_name,
-                                "description": llm_outfit.get("stylist_rationale", "A curated outfit based on your request"),
-                                "style": outfit_style,
-                                "total_price": round(total_price, 2),
-                                "items": items_list,
-                                "occasion": outfit_occasion,
-                                "brand_display": brand_display
-                            }
-                            
-                            # Generate collage for the outfit
-                            collage_items = []
-                            for item in items_list:
-                                if item["image_url"]:
-                                    collage_items.append({
-                                        "image_url": item["image_url"],
-                                        "category": item["category"],
-                                        "source_url": item.get("source_url", item["url"])  # Use source_url if available, otherwise the product URL
-                                    })
-                            
-                            # Create and add collage image with clickable map
-                            if collage_items:
-                                collage_result = create_outfit_collage(collage_items)
-                                formatted_outfit["collage_image"] = collage_result["image"]
-                                formatted_outfit["image_map"] = collage_result["map"]
-                            
-                            formatted_outfits.append(formatted_outfit)
-                        
+                            # Only create outfit if there are successfully sourced items
+                            if items_list: 
+                                formatted_outfit = {
+                                    "id": f"outfit-{len(formatted_outfits) + 1}",
+                                    "name": outfit_name,
+                                    "description": llm_outfit.get("stylist_rationale", "A curated outfit based on your request"),
+                                    "style": outfit_style,
+                                    "total_price": round(total_price, 2),
+                                    "items": items_list, # Use the list populated with real items
+                                    "occasion": outfit_occasion,
+                                    "brand_display": brand_display
+                                }
+                                
+                                # Generate collage using the sourced item images
+                                collage_items = []
+                                for item_data in items_list: # Use items_list which now has real data
+                                    if item_data["image_url"]:
+                                        collage_items.append({
+                                            "image_url": item_data["image_url"],
+                                            "category": item_data["category"],
+                                            "source_url": item_data.get("url", '#') 
+                                        })
+                                
+                                # Create and add collage image if items were found
+                                if collage_items:
+                                    try:
+                                        collage_result = create_outfit_collage(collage_items)
+                                        formatted_outfit["collage_image"] = collage_result["image"]
+                                        formatted_outfit["image_map"] = collage_result["map"]
+                                    except Exception as collage_err:
+                                        logger.error(f"Error creating collage: {collage_err}")
+                                        formatted_outfit["collage_image"] = None # Handle collage error
+                                        formatted_outfit["image_map"] = None
+                                
+                                formatted_outfits.append(formatted_outfit)
+                            else:
+                                logger.warning(f"Skipping outfit '{llm_outfit.get('outfit_name')}' as no real products could be sourced.")
+
                         print(f"Successfully parsed {len(formatted_outfits)} outfits from Anthropic response.")
                         return {"outfits": formatted_outfits, "prompt": request.prompt}
                     else:
