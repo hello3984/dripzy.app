@@ -1,0 +1,10 @@
+Default Avatar Image
+
+This is a placeholder for a default avatar image.
+In a real implementation, this would be an actual .jpg, .png or .webp file.
+
+The application will need the following image files:
+1. avatar-example.jpg - An example of what an avatar might look like
+2. default-avatar.jpg - A default avatar to use when no photo is uploaded
+
+These should be professionally designed and appropriate for the application's audience. 
