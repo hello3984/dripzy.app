@@ -1,15 +1,15 @@
 {
   "files": {
-    "main.css": "/static/css/main.82f3e144.css",
-    "main.js": "/static/js/main.c0bde2cf.js",
-    "static/js/453.8ab44547.chunk.js": "/static/js/453.8ab44547.chunk.js",
-    "index.html": "/index.html",
-    "main.82f3e144.css.map": "/static/css/main.82f3e144.css.map",
-    "main.c0bde2cf.js.map": "/static/js/main.c0bde2cf.js.map",
-    "453.8ab44547.chunk.js.map": "/static/js/453.8ab44547.chunk.js.map"
+    "main.css": "/dripzy.app/static/css/main.82f3e144.css",
+    "main.js": "/dripzy.app/static/js/main.41ab5502.js",
+    "static/js/453.8ab44547.chunk.js": "/dripzy.app/static/js/453.8ab44547.chunk.js",
+    "index.html": "/dripzy.app/index.html",
+    "main.82f3e144.css.map": "/dripzy.app/static/css/main.82f3e144.css.map",
+    "main.41ab5502.js.map": "/dripzy.app/static/js/main.41ab5502.js.map",
+    "453.8ab44547.chunk.js.map": "/dripzy.app/static/js/453.8ab44547.chunk.js.map"
   },
   "entrypoints": [
     "static/css/main.82f3e144.css",
-    "static/js/main.c0bde2cf.js"
+    "static/js/main.41ab5502.js"
   ]
 }
