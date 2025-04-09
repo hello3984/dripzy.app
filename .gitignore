@@ -45,3 +45,7 @@ node_modules/
 *.swp
 *.swo 
 node_modules
+
+# Ignore specific project directories if they aren't part of the main source
+dripzy.app/
+fashion-ai-app/
