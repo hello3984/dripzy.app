@@ -41,12 +41,12 @@ def get_images_from_web(query, num_images=4, category=None):
         print(f"Enhanced image search query: {query}")
         
         # Try Bing images first (usually most relevant)
-        bing_results = get_bing_images(query, num_images * 2)  # Get extra to filter
+        bing_results = get_bing_images(query, num_images * 2) or [] # Ensure list
         
         # Try Unsplash as backup for high-quality images
         unsplash_results = []
         if len(bing_results) < num_images:
-            unsplash_results = get_unsplash_images(query, num_images * 2)
+            unsplash_results = get_unsplash_images(query, num_images * 2) or [] # Ensure list
             
         # Combine and filter results
         all_results = bing_results + unsplash_results
@@ -326,15 +326,42 @@ def download_image(url: str) -> Optional[Image.Image]:
     """
     Download an image from a URL
     """
+    if not url or not url.startswith('http'):
+        logger.error(f"Invalid URL provided for image download: {url}")
+        return None
+        
     try:
         headers = {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
         }
-        response = requests.get(url, stream=True, timeout=5, headers=headers)
-        response.raise_for_status()
-        return Image.open(io.BytesIO(response.content))
-    except Exception as e:
+        # Increased timeout slightly
+        response = requests.get(url, stream=True, timeout=10, headers=headers)
+        response.raise_for_status() # Raise HTTPError for bad responses (4xx or 5xx)
+        
+        # Check content type if possible
+        content_type = response.headers.get('content-type')
+        if content_type and not content_type.startswith('image/'):
+            logger.warning(f"URL did not return an image type (Content-Type: {content_type}): {url}")
+            return None
+            
+        # Try opening the image
+        try:
+            img = Image.open(io.BytesIO(response.content))
+            return img
+        except Exception as img_err:
+            logger.error(f"Error opening image content from {url}: {str(img_err)}")
+            return None
+            
+    except requests.exceptions.Timeout:
+        logger.error(f"Timeout error downloading image from {url}")
+        return None
+    except requests.exceptions.RequestException as e:
+        # Catch other request errors (ConnectionError, HTTPError, etc.)
         logger.error(f"Error downloading image from {url}: {str(e)}")
+        return None
+    except Exception as e:
+        # Catch any other unexpected errors
+        logger.error(f"Unexpected error during image download from {url}: {str(e)}", exc_info=True)
         return None
 
 def create_outfit_collage(items, width=800, height=800):
