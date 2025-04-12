@@ -681,22 +681,22 @@ const HomePage = () => {
         <div className="gallery-grid">
           <div className="gallery-item">
             <img 
-              src="https://images.unsplash.com/photo-1618932260643-eee4a2f652a6?q=80&w=2080&auto=format&fit=crop" 
-              alt="Fashion model in striped pants with red bag" 
+              src="https://images.unsplash.com/photo-1539008835657-9e8e9680c956?q=80&w=1974&auto=format&fit=crop"
+              alt="Fashion model in green outfit" 
               loading="lazy"
             />
           </div>
           <div className="gallery-item">
             <img 
-              src="https://images.unsplash.com/photo-1622495894648-42acf106ae9c?q=80&w=2787&auto=format&fit=crop" 
-              alt="Fashion model in pink dress on field" 
+              src="https://images.unsplash.com/photo-1581044777550-4cfa60707c03?q=80&w=1972&auto=format&fit=crop" 
+              alt="Fashion model in pink outfit" 
               loading="lazy"
             />
           </div>
           <div className="gallery-item">
             <img 
-              src="https://images.unsplash.com/photo-1576185083755-4f5be8767e54?q=80&w=1974&auto=format&fit=crop" 
-              alt="Fashion model in navy blue dress" 
+              src="https://images.unsplash.com/photo-1603189343302-e603f7add05a?q=80&w=1974&auto=format&fit=crop" 
+              alt="Fashion model in blue dress" 
               loading="lazy"
             />
           </div>
@@ -709,8 +709,8 @@ const HomePage = () => {
           </div>
           <div className="gallery-item">
             <img 
-              src="https://images.unsplash.com/photo-1539109136881-3be0616acf4b?q=80&w=1974&auto=format&fit=crop" 
-              alt="Fashion model closeup with jewelry" 
+              src="https://images.unsplash.com/photo-1529139574466-a303027c1d8b?q=80&w=1974&auto=format&fit=crop" 
+              alt="Fashion model in stylish outfit" 
               loading="lazy"
             />
           </div>
