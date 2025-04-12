@@ -652,9 +652,9 @@ const HomePage = () => {
       {/* Hero Section */}
       <section className="hero-section">
         <div className="hero-content">
-          <h1 className="hero-title">Showcase</h1>
+          <h1 className="hero-title">Discover Your Perfect Style</h1>
           <p className="hero-subtitle">
-            Generate personalized outfits in seconds using AI-driven fashion intelligence.
+            AI-powered outfit recommendations tailored to your preferences, budget, and occasions. Try on your looks virtually before you buy!
           </p>
           <div className="hero-cta">
             <button 
@@ -680,19 +680,39 @@ const HomePage = () => {
         </div>
         <div className="gallery-grid">
           <div className="gallery-item">
-            <img src="https://images.unsplash.com/photo-1509631179647-0177331693ae?q=80&w=1976&auto=format&fit=crop" alt="Fashion model in burgundy suit" />
+            <img 
+              src="https://images.unsplash.com/photo-1618932260643-eee4a2f652a6?q=80&w=2080&auto=format&fit=crop" 
+              alt="Fashion model in striped pants with red bag" 
+              loading="lazy"
+            />
           </div>
           <div className="gallery-item">
-            <img src="https://images.unsplash.com/photo-1581044777550-4cfa60707c03?q=80&w=1972&auto=format&fit=crop" alt="Fashion model in pink outfit" />
+            <img 
+              src="https://images.unsplash.com/photo-1622495894648-42acf106ae9c?q=80&w=2787&auto=format&fit=crop" 
+              alt="Fashion model in pink dress on field" 
+              loading="lazy"
+            />
           </div>
           <div className="gallery-item">
-            <img src="https://images.unsplash.com/photo-1551803091-e20673f15770?q=80&w=1975&auto=format&fit=crop" alt="Fashion model in red outfit" />
+            <img 
+              src="https://images.unsplash.com/photo-1576185083755-4f5be8767e54?q=80&w=1974&auto=format&fit=crop" 
+              alt="Fashion model in navy blue dress" 
+              loading="lazy"
+            />
           </div>
           <div className="gallery-item">
-            <img src="https://images.unsplash.com/photo-1550614000-4895a10e1bfd?q=80&w=1974&auto=format&fit=crop" alt="Male fashion model in coat" />
+            <img 
+              src="https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?q=80&w=2124&auto=format&fit=crop" 
+              alt="Fashion models in red outfits" 
+              loading="lazy"
+            />
           </div>
           <div className="gallery-item">
-            <img src="https://images.unsplash.com/photo-1618522285348-559a4f369c3e?q=80&w=1972&auto=format&fit=crop" alt="Fashion model closeup" />
+            <img 
+              src="https://images.unsplash.com/photo-1539109136881-3be0616acf4b?q=80&w=1974&auto=format&fit=crop" 
+              alt="Fashion model closeup with jewelry" 
+              loading="lazy"
+            />
           </div>
         </div>
       </section>

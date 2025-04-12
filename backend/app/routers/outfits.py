@@ -10,7 +10,8 @@ import logging # Added logging
 import anthropic
 from dotenv import load_dotenv
 from app.services.image_service import create_outfit_collage # Keep collage function
-from app.services.product_finder import find_real_product_nordstrom # Import the new product finder
+from app.services.product_finder import find_real_product_nordstrom # Import the old product finder
+from app.services.skimlinks_service import skimlinks_service # Add new Skimlinks service
 # ---------------------
 
 router = APIRouter(
@@ -297,28 +298,37 @@ async def generate_outfit(request: OutfitGenerateRequest):
                                     
                                     print(f"Searching for products: {search_keywords} in category {category}")
                                     
-                                    # Call the Nordstrom scraper
-                                    real_product = find_real_product_nordstrom(item) 
+                                    # Use Skimlinks service instead of scraping
+                                    budget_max = request.budget if request.budget else 1000
+                                    # Set a reasonable min price based on category
+                                    min_price = 10 if category in ["Accessories"] else 20
                                     
-                                    if real_product:
-                                        logger.info(f"Found product on {real_product.get('source', 'Unknown')}: {real_product.get('name')}")
+                                    # Search Skimlinks for the product
+                                    skimlinks_products = skimlinks_service.search_products(
+                                        query=search_keywords,
+                                        category=category,
+                                        min_price=min_price,
+                                        max_price=budget_max,
+                                        limit=1  # Just get the top match
+                                    )
+                                    
+                                    if skimlinks_products and len(skimlinks_products) > 0:
+                                        real_product = skimlinks_products[0]
+                                        logger.info(f"Found product via Skimlinks: {real_product.get('product_name', 'Unknown')}")
                                         
                                         # Update total price
                                         total_price += real_product.get('price', 0)
                                         
-                                        # Get category from real product if available, else keep LLM's category
-                                        category = real_product.get('category', item.get("category", "Unknown")) 
-                                        
                                         # Create OutfitItem using real data
                                         outfit_item = {
-                                            "product_id": f"{real_product.get('source', 'prod')}-{len(items_list)}", # Simple ID
-                                            "product_name": real_product.get('name', 'N/A'),
+                                            "product_id": real_product.get('product_id', f"skim-{len(items_list)}"),
+                                            "product_name": real_product.get('product_name', 'N/A'),
                                             "brand": real_product.get('brand', 'N/A'),
-                                            "category": category,
+                                            "category": real_product.get('category', category),
                                             "price": real_product.get('price', 0.0),
                                             "url": real_product.get('product_url', '#'),
-                                            "image_url": real_product.get('image_url', ''), # Need placeholder image?
-                                            "description": item.get("description", "") # Use LLM description maybe? Or real one?
+                                            "image_url": real_product.get('image_url', ''),
+                                            "description": real_product.get('description', item.get("description", ""))
                                         }
                                         
                                         items_list.append(outfit_item)
@@ -330,9 +340,20 @@ async def generate_outfit(request: OutfitGenerateRequest):
                                         if brand not in item_categories[category]: # Avoid duplicate brands per category
                                              item_categories[category].append(brand)
                                     else:
-                                        # Product not found by scraper
-                                        logger.warning(f"Could not find real product via scraping for: {item.get('description')}")
-                                        # Decide action: skip item, use placeholder, fallback? -> Currently skips.
+                                        # Fallback to old method if enabled (optional)
+                                        fallback_to_scraper = False  # Set to True to enable fallback
+                                        
+                                        if fallback_to_scraper:
+                                            # Try the old scraper as fallback (likely to fail based on logs)
+                                            real_product = find_real_product_nordstrom(item)
+                                            if real_product:
+                                                # Process product as before
+                                                logger.info(f"Found product via fallback scraper: {real_product.get('name')}")
+                                                # ...similar code as above...
+                                            else:
+                                                logger.warning(f"Could not find product via Skimlinks or scraping for: {description}")
+                                        else:
+                                            logger.warning(f"Could not find product via Skimlinks for: {description}")
                                     
                             # Create brand display format (e.g. "Tops: Brand1, Brand2")
                             brand_display = {}
@@ -455,4 +476,38 @@ async def get_outfit(outfit_id: str):
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to get outfit: {str(e)}") 
+        raise HTTPException(status_code=500, detail=f"Failed to get outfit: {str(e)}")
+
+# --- DEBUGGING ENDPOINT --- 
+@router.get("/debug-mock", response_model=List[Outfit]) # Return list of Outfit models
+async def debug_mock_outfits():
+    """Directly returns the output of get_mock_outfits for debugging."""
+    logger.info("Accessing /debug-mock endpoint.")
+    try:
+        mock_data = get_mock_outfits()
+        # Ensure the data matches the Outfit model (already done inside get_mock_outfits likely)
+        # Convert raw dicts to Pydantic models if necessary, though get_mock_outfits might already return them
+        # For simplicity, assume get_mock_outfits returns data suitable for direct return if response_model=List[Outfit]
+        logger.info(f"Returning {len(mock_data)} mock outfits from debug endpoint.")
+        return mock_data 
+    except Exception as e:
+        logger.error(f"Error in /debug-mock endpoint: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Error fetching debug mock data")
+# --- END DEBUGGING ENDPOINT --- 
+
+# --- SKIMLINKS TEST ENDPOINT ---
+@router.get("/test-skimlinks")
+async def test_skimlinks(query: str, category: Optional[str] = None):
+    """Test endpoint for Skimlinks product search"""
+    try:
+        logger.info(f"Testing Skimlinks search for: {query} in category {category}")
+        products = skimlinks_service.search_products(
+            query=query,
+            category=category,
+            limit=5
+        )
+        return {"products": products, "count": len(products)}
+    except Exception as e:
+        logger.error(f"Error testing Skimlinks: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Error testing Skimlinks: {str(e)}")
+# --- END SKIMLINKS TEST ENDPOINT ---
