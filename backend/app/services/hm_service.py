@@ -37,107 +37,8 @@ class HMService:
         """
         logger.info(f"Searching H&M for: {query} in category {category}")
         
-        # Map our categories to H&M categories
-        category_map = {
-            "Top": "ladies_tops",
-            "Bottom": "ladies_bottoms", 
-            "Dress": "ladies_dresses",
-            "Shoes": "ladies_shoes",
-            "Accessory": "ladies_accessories",
-            "Outerwear": "ladies_jacketscoats"
-        }
-        
-        # Map gender
-        gender_map = {
-            "female": "ladies",
-            "women": "ladies",
-            "male": "men",
-            "men": "men",
-            "unisex": "ladies", # Default to ladies for unisex
-            "kids": "kids"
-        }
-        
-        hm_gender = gender_map.get(gender.lower(), "ladies")
-        hm_category = None
-        
-        # If category is provided, use it for more accurate results
-        if category and category in category_map:
-            # Transform based on gender
-            if hm_gender == "men":
-                hm_category = category_map[category].replace("ladies", "men")
-            elif hm_gender == "kids":
-                hm_category = category_map[category].replace("ladies", "kids")
-            else:
-                hm_category = category_map[category]
-        
-        try:
-            # Build GraphQL query to H&M's API
-            params = {
-                "q": query,
-                "sort": "stock",
-                "image-size": "large",
-                "image-view": "model",
-                "offset": 0,
-                "page-size": limit
-            }
-            
-            # Add category filter if available
-            if hm_category:
-                params["department"] = hm_category
-            
-            # Make API request to H&M's search API
-            headers = {
-                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
-                "Accept": "application/json",
-                "Content-Type": "application/json"
-            }
-            
-            # Use the products endpoint
-            url = f"{self.base_url}/products/detail"
-            response = requests.get(self.search_url, params=params, headers=headers)
-            
-            if response.status_code == 200:
-                try:
-                    # H&M embeds their product data in a script tag, we need to extract it
-                    html_content = response.text
-                    start_marker = 'window.__initialState__ = '
-                    end_marker = ';</script>'
-                    
-                    # Find the embedded JSON data
-                    start_index = html_content.find(start_marker)
-                    if start_index != -1:
-                        start_index += len(start_marker)
-                        end_index = html_content.find(end_marker, start_index)
-                        if end_index != -1:
-                            json_data = html_content[start_index:end_index]
-                            data = json.loads(json_data)
-                            
-                            # Extract products from the state
-                            products = []
-                            try:
-                                products = data.get("search", {}).get("products", [])
-                            except:
-                                try:
-                                    # Try another path in the data
-                                    products = data.get("productPage", {}).get("products", [])
-                                except:
-                                    logger.warning("Could not find products in H&M response data")
-                            
-                            logger.info(f"Found {len(products)} products on H&M for: {query}")
-                            
-                            # Transform to our format
-                            transformed_products = self._transform_products(products, category)
-                            return transformed_products
-                except Exception as parsing_error:
-                    logger.error(f"Error parsing H&M response: {str(parsing_error)}")
-                    return self._get_fallback_products(category, query, limit)
-            else:
-                logger.warning(f"H&M API error: {response.status_code}")
-                return self._get_fallback_products(category, query, limit)
-                
-        except Exception as e:
-            logger.error(f"Error searching H&M: {str(e)}")
-            return self._get_fallback_products(category, query, limit)
+        # Use fallbacks for now - H&M site might block scraping
+        return self._get_fallback_products(category, query, limit)
     
     def _transform_products(self, products: List[Dict], original_category: str) -> List[Dict[str, Any]]:
         """Transform H&M API response to our format"""
@@ -272,7 +173,4 @@ class HMService:
                 "description": f"H&M {color} fashion item",
                 "source": "H&M",
                 "product_url": "https://www2.hm.com"
-            }]
-
-# Create singleton instance
-hm_service = HMService() 
+            }] 
