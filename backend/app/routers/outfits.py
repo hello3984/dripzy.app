@@ -11,7 +11,7 @@ import anthropic
 from dotenv import load_dotenv
 from app.services.image_service import create_outfit_collage # Keep collage function
 from app.services.product_finder import find_real_product_nordstrom # Import the old product finder
-from app.services.skimlinks_service import skimlinks_service # Add new Skimlinks service
+from app.services.farfetch_service import farfetch_service # Import the new Farfetch service
 # ---------------------
 
 router = APIRouter(
@@ -282,46 +282,55 @@ async def generate_outfit(request: OutfitGenerateRequest):
                                     
                                     # Create more targeted search terms based on category
                                     if category == "Top":
-                                        search_keywords = f"{description} {keyword_str} {color} top shirt blouse fashion festival"
+                                        search_keywords = f"{description} {keyword_str} {color} top shirt blouse fashion"
                                     elif category == "Bottom":
-                                        search_keywords = f"{description} {keyword_str} {color} bottom pants shorts skirt fashion festival"
+                                        search_keywords = f"{description} {keyword_str} {color} bottom pants shorts skirt fashion"
                                     elif category == "Dress":
-                                        search_keywords = f"{description} {keyword_str} {color} dress fashion festival"
+                                        search_keywords = f"{description} {keyword_str} {color} dress fashion"
                                     elif category == "Shoes":
-                                        search_keywords = f"{description} {keyword_str} {color} shoes boots sandals fashion festival"
-                                    elif category == "Accessories":
-                                        search_keywords = f"{description} {keyword_str} {color} accessories jewelry fashion festival"
+                                        search_keywords = f"{description} {keyword_str} {color} shoes boots sandals fashion"
+                                    elif category == "Accessory" or category == "Accessories":
+                                        search_keywords = f"{description} {keyword_str} {color} accessories jewelry fashion"
+                                        category = "Accessory"  # Normalize category name
                                     elif category == "Outerwear":
-                                        search_keywords = f"{description} {keyword_str} {color} jacket coat cardigan fashion festival"
+                                        search_keywords = f"{description} {keyword_str} {color} jacket coat cardigan fashion"
                                     else:
-                                        search_keywords = f"{description} {keyword_str} {color} fashion festival"
+                                        search_keywords = f"{description} {keyword_str} {color} fashion"
                                     
                                     print(f"Searching for products: {search_keywords} in category {category}")
                                     
-                                    # Use Skimlinks service instead of scraping
-                                    budget_max = request.budget if request.budget else 1000
-                                    # Set a reasonable min price based on category
-                                    min_price = 10 if category in ["Accessories"] else 20
+                                    # Use Farfetch service instead of scraping
+                                    budget_max = request.budget if request.budget else 5000
                                     
-                                    # Search Skimlinks for the product
-                                    skimlinks_products = skimlinks_service.search_products(
+                                    # Set a reasonable min price based on category
+                                    min_price = None
+                                    if category == "Accessory":
+                                        min_price = 50
+                                    elif category == "Shoes":
+                                        min_price = 100
+                                    elif category in ["Top", "Bottom", "Dress", "Outerwear"]:
+                                        min_price = 75
+                                    
+                                    # Search Farfetch for the product
+                                    farfetch_products = farfetch_service.search_products(
                                         query=search_keywords,
                                         category=category,
+                                        gender=request.gender,
                                         min_price=min_price,
                                         max_price=budget_max,
                                         limit=1  # Just get the top match
                                     )
                                     
-                                    if skimlinks_products and len(skimlinks_products) > 0:
-                                        real_product = skimlinks_products[0]
-                                        logger.info(f"Found product via Skimlinks: {real_product.get('product_name', 'Unknown')}")
+                                    if farfetch_products and len(farfetch_products) > 0:
+                                        real_product = farfetch_products[0]
+                                        logger.info(f"Found product via Farfetch: {real_product.get('product_name', 'Unknown')}")
                                         
                                         # Update total price
                                         total_price += real_product.get('price', 0)
                                         
                                         # Create OutfitItem using real data
                                         outfit_item = {
-                                            "product_id": real_product.get('product_id', f"skim-{len(items_list)}"),
+                                            "product_id": real_product.get('product_id', f"ff-{len(items_list)}"),
                                             "product_name": real_product.get('product_name', 'N/A'),
                                             "brand": real_product.get('brand', 'N/A'),
                                             "category": real_product.get('category', category),
@@ -340,20 +349,19 @@ async def generate_outfit(request: OutfitGenerateRequest):
                                         if brand not in item_categories[category]: # Avoid duplicate brands per category
                                              item_categories[category].append(brand)
                                     else:
-                                        # Fallback to old method if enabled (optional)
+                                        # Try the old scraper as fallback (though it's probably going to fail based on logs)
                                         fallback_to_scraper = False  # Set to True to enable fallback
                                         
                                         if fallback_to_scraper:
-                                            # Try the old scraper as fallback (likely to fail based on logs)
                                             real_product = find_real_product_nordstrom(item)
                                             if real_product:
                                                 # Process product as before
                                                 logger.info(f"Found product via fallback scraper: {real_product.get('name')}")
                                                 # ...similar code as above...
                                             else:
-                                                logger.warning(f"Could not find product via Skimlinks or scraping for: {description}")
+                                                logger.warning(f"Could not find product via Farfetch or scraping for: {description}")
                                         else:
-                                            logger.warning(f"Could not find product via Skimlinks for: {description}")
+                                            logger.warning(f"Could not find product via Farfetch for: {description}")
                                     
                             # Create brand display format (e.g. "Tops: Brand1, Brand2")
                             brand_display = {}
@@ -495,19 +503,20 @@ async def debug_mock_outfits():
         raise HTTPException(status_code=500, detail="Error fetching debug mock data")
 # --- END DEBUGGING ENDPOINT --- 
 
-# --- SKIMLINKS TEST ENDPOINT ---
-@router.get("/test-skimlinks")
-async def test_skimlinks(query: str, category: Optional[str] = None):
-    """Test endpoint for Skimlinks product search"""
+# --- FARFETCH TEST ENDPOINT ---
+@router.get("/test-farfetch")
+async def test_farfetch(query: str, category: Optional[str] = None, gender: str = "female"):
+    """Test endpoint for Farfetch product search"""
     try:
-        logger.info(f"Testing Skimlinks search for: {query} in category {category}")
-        products = skimlinks_service.search_products(
+        logger.info(f"Testing Farfetch search for: {query} in category {category}")
+        products = farfetch_service.search_products(
             query=query,
-            category=category,
+            category=category or "Top",
+            gender=gender,
             limit=5
         )
         return {"products": products, "count": len(products)}
     except Exception as e:
-        logger.error(f"Error testing Skimlinks: {str(e)}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Error testing Skimlinks: {str(e)}")
-# --- END SKIMLINKS TEST ENDPOINT ---
+        logger.error(f"Error testing Farfetch: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Error testing Farfetch: {str(e)}")
+# --- END FARFETCH TEST ENDPOINT ---
