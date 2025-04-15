@@ -11,7 +11,12 @@ import anthropic
 from dotenv import load_dotenv
 from app.services.image_service import create_outfit_collage # Keep collage function
 from app.services.farfetch_service import farfetch_service # Keep Farfetch service as fallback
-from app.services.hm_service import hm_service # Import the new H&M service
+try:
+    from app.services.hm_service import hm_service # Try to import the H&M service
+except ImportError:
+    # Fallback to importing just the class and creating the instance here
+    from app.services.hm_service import HMService
+    hm_service = HMService()
 # ---------------------
 
 router = APIRouter(
