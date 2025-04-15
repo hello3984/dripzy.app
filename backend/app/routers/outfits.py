@@ -11,10 +11,9 @@ import anthropic
 from dotenv import load_dotenv
 from app.services.image_service import create_outfit_collage # Keep collage function
 from app.services.farfetch_service import farfetch_service # Keep Farfetch service as fallback
-from app.services.hm_service import HMService # Import the H&M service class directly
+from app.services.hm_service import hm_service # Import the H&M service instance
 
-# Create service instances
-hm_service = HMService() # Create a local instance of the H&M service
+# No need to create instance as we're importing it
 # ---------------------
 
 router = APIRouter(
@@ -494,22 +493,37 @@ async def get_trending_styles():
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to get trending styles: {str(e)}")
 
-@router.get("/{outfit_id}", response_model=Outfit)
-async def get_outfit(outfit_id: str):
-    """Get outfit details by ID"""
+@router.get("/test-hm")
+async def test_hm(query: str, category: Optional[str] = None, gender: str = "female"):
+    """Test endpoint for H&M product search"""
     try:
-        outfits = get_mock_outfits()
-        outfit = next((o for o in outfits if o["id"] == outfit_id), None)
-        
-        if not outfit:
-            raise HTTPException(status_code=404, detail=f"Outfit with ID {outfit_id} not found")
-        
-        return Outfit(**outfit)
-        
-    except HTTPException:
-        raise
+        logger.info(f"Testing H&M search for: {query} in category {category}")
+        products = hm_service.search_products(
+            query=query,
+            category=category or "Top",
+            gender=gender,
+            limit=5
+        )
+        return {"products": products, "count": len(products)}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to get outfit: {str(e)}")
+        logger.error(f"Error testing H&M: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Error testing H&M: {str(e)}")
+
+@router.get("/test-farfetch")
+async def test_farfetch(query: str, category: Optional[str] = None, gender: str = "female"):
+    """Test endpoint for Farfetch product search"""
+    try:
+        logger.info(f"Testing Farfetch search for: {query} in category {category}")
+        products = farfetch_service.search_products(
+            query=query,
+            category=category or "Top",
+            gender=gender,
+            limit=5
+        )
+        return {"products": products, "count": len(products)}
+    except Exception as e:
+        logger.error(f"Error testing Farfetch: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Error testing Farfetch: {str(e)}")
 
 # --- DEBUGGING ENDPOINT --- 
 @router.get("/debug-mock", response_model=List[Outfit]) # Return list of Outfit models
@@ -528,38 +542,19 @@ async def debug_mock_outfits():
         raise HTTPException(status_code=500, detail="Error fetching debug mock data")
 # --- END DEBUGGING ENDPOINT --- 
 
-# --- FARFETCH TEST ENDPOINT ---
-@router.get("/test-farfetch")
-async def test_farfetch(query: str, category: Optional[str] = None, gender: str = "female"):
-    """Test endpoint for Farfetch product search"""
+@router.get("/{outfit_id}", response_model=Outfit)
+async def get_outfit(outfit_id: str):
+    """Get outfit details by ID"""
     try:
-        logger.info(f"Testing Farfetch search for: {query} in category {category}")
-        products = farfetch_service.search_products(
-            query=query,
-            category=category or "Top",
-            gender=gender,
-            limit=5
-        )
-        return {"products": products, "count": len(products)}
+        outfits = get_mock_outfits()
+        outfit = next((o for o in outfits if o["id"] == outfit_id), None)
+        
+        if not outfit:
+            raise HTTPException(status_code=404, detail=f"Outfit with ID {outfit_id} not found")
+        
+        return Outfit(**outfit)
+        
+    except HTTPException:
+        raise
     except Exception as e:
-        logger.error(f"Error testing Farfetch: {str(e)}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Error testing Farfetch: {str(e)}")
-# --- END FARFETCH TEST ENDPOINT ---
-
-# --- H&M TEST ENDPOINT ---
-@router.get("/test-hm")
-async def test_hm(query: str, category: Optional[str] = None, gender: str = "female"):
-    """Test endpoint for H&M product search"""
-    try:
-        logger.info(f"Testing H&M search for: {query} in category {category}")
-        products = hm_service.search_products(
-            query=query,
-            category=category or "Top",
-            gender=gender,
-            limit=5
-        )
-        return {"products": products, "count": len(products)}
-    except Exception as e:
-        logger.error(f"Error testing H&M: {str(e)}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Error testing H&M: {str(e)}")
-# --- END H&M TEST ENDPOINT ---
+        raise HTTPException(status_code=500, detail=f"Failed to get outfit: {str(e)}")
