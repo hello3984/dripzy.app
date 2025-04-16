@@ -33,10 +33,11 @@ app = FastAPI(
 # Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Allows all origins
+    allow_origins=["https://dripzy.app", "http://localhost:3000", "http://localhost:5173"],  # Only specific origins
     allow_credentials=True,
-    allow_methods=["*"],  # Allows all methods
-    allow_headers=["*"],  # Allows all headers
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],  # Only methods you use
+    allow_headers=["Authorization", "Content-Type", "DeviceID", "User-Agent"],  # Only headers you need
+    max_age=600  # Cache preflight requests for 10 minutes
 )
 
 # Add Logging Middleware
