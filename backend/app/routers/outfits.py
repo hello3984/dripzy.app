@@ -401,42 +401,42 @@ async def generate_outfit(request: OutfitGenerateRequest):
                             
                             # Only create outfit if there are successfully sourced items
                             if items_list: 
-                            formatted_outfit = {
-                                "id": f"outfit-{len(formatted_outfits) + 1}",
-                                "name": outfit_name,
-                                "description": llm_outfit.get("stylist_rationale", "A curated outfit based on your request"),
-                                "style": outfit_style,
-                                "total_price": round(total_price, 2),
+                                formatted_outfit = {
+                                    "id": f"outfit-{len(formatted_outfits) + 1}",
+                                    "name": outfit_name,
+                                    "description": llm_outfit.get("stylist_rationale", "A curated outfit based on your request"),
+                                    "style": outfit_style,
+                                    "total_price": round(total_price, 2),
                                     "items": items_list, # Use the list populated with real items
-                                "occasion": outfit_occasion,
-                                "brand_display": brand_display
-                            }
-                            
+                                    "occasion": outfit_occasion,
+                                    "brand_display": brand_display
+                                }
+                                
                                 # Generate collage using the sourced item images
-                            collage_items = []
+                                collage_items = []
                                 for item_data in items_list: # Use items_list which now has real data
                                     if item_data["image_url"]:
-                                    collage_items.append({
+                                        collage_items.append({
                                             "image_url": item_data["image_url"],
                                             "category": item_data["category"],
                                             "source_url": item_data.get("url", '#') 
                                         })
                                 
                                 # Create and add collage image if items were found
-                            if collage_items:
+                                if collage_items:
                                     try:
-                                collage_result = create_outfit_collage(collage_items)
-                                formatted_outfit["collage_image"] = collage_result["image"]
-                                formatted_outfit["image_map"] = collage_result["map"]
+                                        collage_result = create_outfit_collage(collage_items)
+                                        formatted_outfit["collage_image"] = collage_result["image"]
+                                        formatted_outfit["image_map"] = collage_result["map"]
                                     except Exception as collage_err:
                                         logger.error(f"Error creating collage: {collage_err}")
                                         formatted_outfit["collage_image"] = None # Handle collage error
                                         formatted_outfit["image_map"] = None
-                            
-                            formatted_outfits.append(formatted_outfit)
+                                
+                                formatted_outfits.append(formatted_outfit)
                             else:
                                 logger.warning(f"Skipping outfit '{llm_outfit.get('outfit_name')}' as no real products could be sourced.")
-                        
+
                         print(f"Successfully parsed {len(formatted_outfits)} outfits from Anthropic response.")
                         return {"outfits": formatted_outfits, "prompt": request.prompt}
                     else:
@@ -563,9 +563,4 @@ async def get_outfit(outfit_id: str):
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to get outfit: {str(e)}") 
-# Add alias route for AI-generate that calls the same function
-@router.post("/ai-generate", response_model=OutfitGenerateResponse)
-async def ai_generate_outfit(request: OutfitGenerateRequest):
-    """Alias for generate_outfit - used by frontend"""
-    return await generate_outfit(request)
+        raise HTTPException(status_code=500, detail=f"Failed to get outfit: {str(e)}")
