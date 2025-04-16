@@ -42,49 +42,42 @@ SYSTEM_PROMPT = """
 You are 'Dripzy', an expert AI Fashion Stylist. Your primary goal is to create unique, coherent, and stylish outfit recommendations based on user prompts describing occasions, desired styles, preferences, or specific items.
 
 **Your Process:**
-1.  **Analyze Prompt:** Carefully understand the user's request, identifying key elements like occasion, desired style (e.g., casual, formal, boho, minimalist, streetwear), season, weather (if mentioned), specific item requests, and any constraints (e.g., budget level - budget, mid-range, premium, luxury).
-2.  **Consider Context:** Factor in general fashion principles, color theory, item compatibility, layering possibilities (if relevant to season/weather), and current relevant fashion trends (mention specific trends like 'quiet luxury', 'Y2K revival', 'dopamine dressing' if appropriate, but don't force them).
-3.  **Generate Outfit Concepts:** Create 2-3 distinct outfit options that fulfill the user's request. Each outfit should be a complete look.
-4.  **Itemize:** For each outfit concept, specify the necessary item categories (e.g., top, bottom, dress, outerwear, shoes, bag, accessory).
-5.  **Describe Items:** Provide a concise description for each item, including its type and suggested color or material (e.g., "Cream silk blouse", "Dark wash straight-leg jeans", "Black leather ankle boots", "Gold pendant necklace"). Be specific enough to guide product search but generic enough to allow for variations.
-6.  **Add Keywords:** For each item, provide a list of relevant keywords that could be used to find similar products online (e.g., ["blouse", "silk", "cream", "long sleeve", "formal"], ["jeans", "denim", "dark wash", "straight leg", "casual"]).
-7.  **Provide Rationale:** For each complete outfit, write a short "Stylist Rationale" explaining *why* this outfit works for the user's prompt and how the pieces complement each other.
-8.  **Output Format:** Respond *only* in valid JSON format. The structure must be:
-    ```json
-    {
-      "outfits": [
-        {
-          "outfit_name": "Example Outfit Name 1",
-          "items": [
-            {
-              "category": "Top",
-              "description": "Item description (e.g., White cotton t-shirt)",
-              "color": "Suggested color (e.g., White)",
-              "keywords": ["keyword1", "keyword2", "category"]
-            },
-            {
-              "category": "Bottom",
-              "description": "Item description (e.g., Blue denim jeans)",
-              "color": "Suggested color (e.g., Blue)",
-              "keywords": ["keyword3", "keyword4", "category"]
-            }
-            // ... other items (shoes, outerwear, accessories etc.)
-          ],
-          "stylist_rationale": "Explanation why this outfit works..."
-        }
-        // ... potentially more outfit objects
-      ]
-    }
-    ```
+1.  **Analyze Prompt:** Carefully understand the user's request, identifying key elements like occasion, desired style, season, weather, specific item requests, and any constraints.
+2.  **Create Outfit Concepts:** Generate 2-3 distinct outfit options that fulfill the user's request. Each outfit should be a complete look with a cohesive style story.
 
-**Constraints & Guidelines:**
-*   Always provide the response in the specified JSON format. Do not include any text outside the JSON structure.
-*   Ensure outfits are complete and make sense for the request.
-*   Suggest standard item categories (Top, Bottom, Dress, Outerwear, Shoes, Bag, Accessory).
-*   Item descriptions should be clear but not overly specific to one exact product unless requested.
-*   Keywords should be relevant for searching online fashion retailers.
-*   If the user prompt is ambiguous or lacks detail, you can make reasonable assumptions based on common fashion sense, but state them briefly in the rationale if necessary. Avoid asking clarifying questions in the JSON output.
-*   Maintain a helpful, knowledgeable, and inspiring stylist tone within the 'stylist_rationale'.
+**Output Format:** 
+You MUST provide your response as valid JSON with this exact structure:
+```json
+{
+  "outfits": [
+    {
+      "outfit_name": "Descriptive Name",
+      "description": "2-3 sentence description of the overall look",
+      "style": "Primary style category (e.g., Casual, Formal, Streetwear)",
+      "occasion": "Where this outfit would be appropriate",
+      "items": [
+        {
+          "category": "Top/Bottom/Dress/Outerwear/Shoes/Accessory",
+          "description": "Detailed description (e.g., 'Light blue slim-fit cotton Oxford shirt')",
+          "color": "Primary color",
+          "search_keywords": ["keyword1", "keyword2", "brand if specified"]
+        }
+        // Additional items...
+      ],
+      "stylist_rationale": "Explanation of why this outfit works well"
+    }
+    // Additional outfits...
+  ]
+}
+```
+
+**Guidelines:**
+- For each item, include rich descriptive details (fabric, fit, style features)
+- Categories must be one of: Top, Bottom, Dress, Outerwear, Shoes, Accessory
+- Include 3-6 items per outfit, depending on the occasion/style
+- Add 3-5 search keywords for each item that would help find similar products
+- Ensure each outfit is complete and cohesive
+- Maintain a balanced approach to trend-conscious and timeless pieces
 """
 # ---------------------------
 
@@ -242,255 +235,43 @@ def _get_mock_product(category, description, color):
 
 # Routes
 @router.post("/generate", response_model=OutfitGenerateResponse)
-async def generate_outfit(request: OutfitGenerateRequest = Body(...)):
+async def generate_outfit(request: OutfitGenerateRequest) -> OutfitGenerateResponse:
     """
-    Generate an outfit based on user preferences using the Anthropic API.
-    Source real products for the outfit items using SerpAPI.
-    Create a collage of the outfit items.
+    Generate outfit recommendations based on user request, with better separation
+    of concept generation and product matching.
+    
+    Args:
+        request: The outfit generation request containing prompt, gender, budget
+        
+    Returns:
+        OutfitGenerateResponse: The generated outfits with concepts and matched products
     """
+    logger.info(f"Generating outfit for prompt: {request.prompt}, gender: {request.gender}, budget: {request.budget}")
+    
     try:
-        # Log the request
-        logger.info(f"Generating outfit for prompt: {request.prompt}, gender: {request.gender}, budget: {request.budget}")
+        # Step 1: Generate outfit concepts with Claude
+        outfit_concepts = await generate_outfit_concepts(request)
         
-        # Get and prepare prompt
-        prompt = request.prompt
+        # Step 2: Try to match real products to concepts (but this is optional)
+        enhanced_outfits = await enhance_outfits_with_products(outfit_concepts, request)
         
-        # Initialize Anthropic client if api key is available
-        anthropic_api_key = os.getenv("ANTHROPIC_API_KEY")
-        anthropic_client = None
-        if anthropic_api_key:
-            anthropic_client = anthropic.Anthropic(api_key=anthropic_api_key)
-
-        # --- Use Anthropic API if available ---
-        if anthropic_client:
-            try:
-                print(f"Sending request to Anthropic with prompt: {prompt}")
-                message = anthropic_client.messages.create(
-                    model="claude-3-haiku-20240307",
-                    max_tokens=2048,
-                    system=SYSTEM_PROMPT,
-                    messages=[
-                        {
-                            "role": "user",
-                            "content": f"Generate 2-3 outfit options based on the following request: {prompt}. For gender: {request.gender}. Budget: ${request.budget if request.budget else 'Any'}." + (f"Include {request.include}" if request.include else "")
-                        }
-                    ]
-                )
-                
-                # --- Process Anthropic Response ---
-                print("Received response from Anthropic.")
-                response_text = message.content[0].text
-                
-                # Find the start and end of the JSON block
-                json_start = response_text.find('{')
-                json_end = response_text.rfind('}')
-                
-                if json_start != -1 and json_end != -1:
-                    json_string = response_text[json_start:json_end+1]
-                    try:
-                        outfit_data = json.loads(json_string)
-                        
-                        # --- Process outfits from the response ---
-                        if "outfits" in outfit_data and isinstance(outfit_data["outfits"], list):
-                            llm_outfits = outfit_data["outfits"]
-                            
-                            # Process each outfit
-                            processed_outfits = []
-                            max_budget_per_outfit = request.budget if request.budget else 2000
-                            
-                            for outfit in llm_outfits:
-                                outfit_budget_remaining = max_budget_per_outfit
-                                outfit_name = outfit.get("name", "Stylish Outfit")
-                                occasion = outfit.get("occasion", "casual")
-                                season = outfit.get("season", "any")
-                                style = outfit.get("style", "classic")
-                                rationale = outfit.get("stylist_rationale", "")
-                                
-                                # Process each item in the outfit
-                                processed_items = []
-                                if "items" in outfit and isinstance(outfit["items"], list):
-                                    for item in outfit["items"]:
-                                        item_category = item.get("category", "").capitalize()
-                                        
-                                        # Skip if we don't have a valid category
-                                        if not item_category:
-                                            continue
-                                            
-                                        # Determine gender-specific search
-                                        gender_prefix = ""
-                                        if request.gender and request.gender.lower() in ["male", "female"]:
-                                            gender_prefix = f"{request.gender} "
-                                            
-                                        # Create search query
-                                        color_desc = item.get("color", "")
-                                        description = item.get("description", "")
-                                        material = item.get("material", "")
-                                        
-                                        # Build the search keyword
-                                        search_keywords = []
-                                        if gender_prefix:
-                                            search_keywords.append(gender_prefix)
-                                        if color_desc:
-                                            search_keywords.append(color_desc)
-                                        if material:
-                                            search_keywords.append(material)
-                                        search_keywords.append(description if description else item_category)
-                                        
-                                        search_query = " ".join(search_keywords)
-                                        
-                                        # Maximum price for this item (proportional to total budget)
-                                        max_price = min(outfit_budget_remaining, 
-                                                      max_budget_per_outfit * (0.5 if item_category in ["Shoes", "Outerwear", "Dress"] else 0.25))
-                                        
-                                        # If we have SerpAPI service, source real products
-                                        real_products = []
-                                        if serpapi_service and serpapi_service.api_key:
-                                            try:
-                                                real_products = serpapi_service.search_products(
-                                                    query=search_query,
-                                                    category=item_category,
-                                                    gender=request.gender,
-                                                    max_price=max_price,
-                                                    limit=5
-                                                )
-                                            except Exception as e:
-                                                print(f"Error sourcing real products: {str(e)}")
-                                                
-                                        # Use the top product or create a mock product
-                                        if real_products and len(real_products) > 0:
-                                            selected_product = real_products[0]
-                                            
-                                            # Create an outfit item from the real product
-                                            item_price = float(selected_product.get("price", 0))
-                                            outfit_budget_remaining -= item_price
-                                            
-                                            # Create the OutfitItem
-                                            processed_item = OutfitItem(
-                                                product_id=selected_product.get("product_id", str(uuid.uuid4())),
-                                                product_name=selected_product.get("title", description),
-                                                brand=selected_product.get("source", ""),
-                                                category=item_category,
-                                                price=item_price,
-                                                color=color_desc,
-                                                url=selected_product.get("link", ""),
-                                                image_url=selected_product.get("thumbnail", ""),
-                                                description=description
-                                            )
-                                            processed_items.append(processed_item)
-                                        else:
-                                            # Create a mock product if we couldn't find a real one
-                                            mock_price = random.uniform(
-                                                max_price * 0.3, 
-                                                max_price * 0.8
-                                            )
-                                            outfit_budget_remaining -= mock_price
-                                            
-                                            # Get mock product details
-                                            mock_details = _get_mock_product(item_category, description, color_desc)
-                                            
-                                            # Create the OutfitItem
-                                            processed_item = OutfitItem(
-                                                product_id=str(uuid.uuid4()),
-                                                product_name=mock_details["name"],
-                                                brand=mock_details["brand"],
-                                                category=item_category,
-                                                price=mock_price,
-                                                color=color_desc,
-                                                url="",
-                                                image_url=mock_details["image_url"],
-                                                description=description
-                                            )
-                                            processed_items.append(processed_item)
-                                
-                                # Create the processed outfit
-                                if processed_items:
-                                    # Calculate total price
-                                    total_price = sum(item.price for item in processed_items)
-                                    
-                                    # Create outfit
-                                    processed_outfit = Outfit(
-                                        outfit_id=str(uuid.uuid4()),
-                                        name=outfit_name,
-                                        items=processed_items,
-                                        occasion=occasion,
-                                        season=season,
-                                        style=style,
-                                        total_price=total_price,
-                                        stylist_rationale=rationale
-                                    )
-                                    
-                                    # Create a collage image for the outfit
-                                    try:
-                                        if len(processed_items) >= 2:
-                                            collage, image_map = create_outfit_collage([item.image_url for item in processed_items], 
-                                                                                      [item.category for item in processed_items])
-                                            processed_outfit.collage_image = collage
-                                            processed_outfit.image_map = image_map
-                                    except Exception as collage_error:
-                                        print(f"Error creating collage: {str(collage_error)}")
-                                        
-                                    processed_outfits.append(processed_outfit)
-                            
-                            # Return the processed outfits
-                            if processed_outfits:
-                                return OutfitGenerateResponse(
-                                    outfits=processed_outfits,
-                                    prompt=prompt,
-                                    status="success",
-                                    status_message="Generated outfits successfully"
-                                )
-                        else:
-                            print("Parsed JSON from Anthropic but no valid outfits found.")
-                    except json.JSONDecodeError as json_err:
-                        print(f"Error decoding JSON from Anthropic: {json_err}")
-                        print(f"Received text: {response_text}")
-                else:
-                    print("Could not find valid JSON block in Anthropic response.")
-                    print(f"Received text: {response_text}")
-            except Exception as e:
-                print(f"Error calling Anthropic API: {str(e)}")
-                # Fall through to use mock data if API fails
-
-        # --- Fallback to Mock Data --- 
-        print("Falling back to mock outfit data.")
-        try:
-            # The original mock/manual generation logic is now the fallback
-            mock_outfits_data = get_mock_outfits() # Use existing mock function
-            
-            # Apply budget filter if needed
-            if request.budget:
-                mock_outfits_data = [o for o in mock_outfits_data if o["total_price"] <= request.budget]
-            
-            # Convert to Outfit models
-            outfit_models = [Outfit(**o) for o in mock_outfits_data]
-            
-            # Create collages for mock outfits if they don't have them
-            for outfit in outfit_models:
-                if not outfit.collage_image and len(outfit.items) >= 2:
-                    try:
-                        collage, image_map = create_outfit_collage([item.image_url for item in outfit.items], 
-                                                                  [item.category for item in outfit.items])
-                        outfit.collage_image = collage
-                        outfit.image_map = image_map
-                    except Exception as collage_error:
-                        print(f"Error creating collage for mock outfit: {str(collage_error)}")
-            
-            return OutfitGenerateResponse(
-                outfits=outfit_models[:3], # Limit to 3 mock outfits
-                prompt=prompt,
-                status="limited",
-                status_message="Using mock data due to API limitations",
-                using_fallbacks=True
-            )
-            
-        except Exception as e:
-            print(f"Error generating mock outfits: {str(e)}")
-            raise HTTPException(status_code=500, detail=f"Failed to generate outfits: {str(e)}")
-            
+        # Create the response using the enhanced outfits
+        return OutfitGenerateResponse(
+            outfits=enhanced_outfits,
+            prompt=request.prompt
+        )
+        
     except Exception as e:
-        # This is the outer exception handler for the entire generate_outfit function
-        print(f"Error generating outfit: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Failed to generate outfit: {str(e)}")
+        logger.error(f"Error in outfit generation pipeline: {str(e)}", exc_info=True)
+        # Fall back to mock data, but clearly mark it as a fallback
+        fallback_outfits = get_mock_outfits()
+        for outfit in fallback_outfits:
+            outfit.description = f"[FALLBACK OUTFIT] {outfit.description}"
+        
+        return OutfitGenerateResponse(
+            outfits=fallback_outfits,
+            prompt=request.prompt
+        )
 
 # Add alias route for AI-generate that calls the same function
 @router.post("/ai-generate", response_model=OutfitGenerateResponse)
