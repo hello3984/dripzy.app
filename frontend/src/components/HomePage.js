@@ -520,7 +520,7 @@ const HomePage = () => {
               <path d="M12 7v10"></path>
               <path d="M8 15l4 4 4-4"></path>
             </svg>
-            Powered by AI
+            Powered by Dripzy AI
           </div>
           <h2 className="section-title">Generate Your Outfit</h2>
           
