@@ -12,6 +12,7 @@ import anthropic
 from dotenv import load_dotenv
 from app.services.image_service import create_outfit_collage # Keep collage function
 from app.services.serpapi_service import serpapi_service # Import the SerpAPI service
+from app.utils.image_processing import create_brand_display
 from app.models.outfit_models import OutfitItem, Outfit, OutfitGenerateRequest, OutfitGenerateResponse
 
 # No need to create instance as we're importing it
