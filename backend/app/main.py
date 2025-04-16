@@ -7,8 +7,8 @@ import os
 from dotenv import load_dotenv
 from datetime import datetime
 
-# Import AI router only
-from app.routers.ai import router as ai_router
+# Import AI router only - temporarily commented out until module path is fixed
+# from app.routers.ai import router as ai_router
 # Import debug router
 from app.routers.debug import router as debug_router
 # Import outfits router
@@ -49,8 +49,8 @@ async def log_requests(request: Request, call_next):
     logger.info(f"Finished request: {request.method} {request.url.path} - Status={response.status_code} - Time={process_time:.4f}s")
     return response
 
-# Include AI router for modular functionality
-app.include_router(ai_router)
+# Include AI router for modular functionality - temporarily commented out
+# app.include_router(ai_router)
 # Include debug router
 app.include_router(debug_router)
 # Include outfits router
