@@ -8,51 +8,56 @@ from pydantic import BaseModel, Field
 
 
 class OutfitItem(BaseModel):
-    """Model representing a single item in an outfit."""
-    product_id: Optional[str] = Field(None, description="Product identifier")
-    name: str = Field(..., description="Name of the item")
-    product_name: Optional[str] = Field(None, description="Product name (for compatibility)")
-    category: str = Field(..., description="Category of the item (Top, Bottom, Shoes, etc.)")
-    description: Optional[str] = Field(None, description="Description of the item")
-    color: Optional[str] = Field(None, description="Primary color of the item")
-    price: float = Field(..., description="Price of the item")
-    brand: Optional[str] = Field(None, description="Brand of the item")
-    image_url: Optional[str] = Field(None, description="URL to the image of the item")
-    url: Optional[str] = Field(None, description="URL to purchase the item")
+    """
+    A single item in an outfit, like a shirt, pants, or shoes.
+    """
+    product_id: str
+    product_name: str
+    brand: str
+    category: str
+    price: float
+    url: Optional[str] = None
+    image_url: str
+    description: Optional[str] = None
+    concept_description: Optional[str] = None  # The original AI-generated description
+    color: Optional[str] = None
+    alternatives: Optional[List[Dict[str, Any]]] = []  # List of alternative products
+    is_fallback: Optional[bool] = False  # Flag to indicate if this is a fallback item
 
 
 class Outfit(BaseModel):
-    """Model representing a complete outfit with multiple items."""
-    id: str = Field(..., description="Unique identifier for the outfit")
-    name: str = Field(..., description="Name of the outfit")
-    description: str = Field(..., description="Description of the outfit")
-    style: Optional[str] = Field("Contemporary", description="Style of the outfit")
-    occasion: Optional[str] = Field("Casual", description="Occasion the outfit is suitable for")
-    items: List[OutfitItem] = Field(..., description="List of items in the outfit")
-    total_price: float = Field(..., description="Total price of all items in the outfit")
-    style_tags: Optional[List[str]] = Field(default_factory=list, description="Style tags associated with the outfit")
-    collage_image: Optional[str] = Field(None, description="Base64 encoded collage image of the outfit")
-    image_map: Optional[Dict[str, Any]] = Field(None, description="Coordinates for clickable areas in the collage")
-    brand_display: Optional[Dict[str, str]] = Field(None, description="Brands displayed by category")
+    """
+    A complete outfit consisting of multiple items.
+    """
+    id: str
+    name: str
+    description: str
+    style: str
+    occasion: Optional[str] = "casual"
+    items: List[OutfitItem]
+    total_price: float = 0.0
+    image_url: Optional[str] = None
+    collage_url: Optional[str] = None
+    brand_display: Optional[Dict[str, str]] = {}
+    stylist_rationale: Optional[str] = None
 
 
 class OutfitGenerateRequest(BaseModel):
-    """Model for outfit generation request parameters."""
-    prompt: str = Field(..., description="User's outfit request prompt")
-    gender: Optional[str] = Field("unisex", description="Gender preference (male, female, unisex)")
-    budget: Optional[float] = Field(None, description="Maximum budget for the outfit")
-    preferred_brands: Optional[List[str]] = Field(None, description="Preferred brands")
-    preferred_categories: Optional[List[str]] = Field(None, description="Preferred categories")
-    style_keywords: Optional[List[str]] = Field(None, description="Style keywords")
-    include: Optional[str] = Field(None, description="Items to include in the outfit")
+    """
+    Request model for generating outfits.
+    """
+    prompt: str
+    gender: Optional[str] = "unisex"
+    budget: Optional[float] = None
+    preferred_brands: Optional[List[str]] = []
+    preferred_colors: Optional[List[str]] = []
+    excluded_categories: Optional[List[str]] = []
+    include_alternatives: Optional[bool] = True  # Flag to include alternatives
 
 
 class OutfitGenerateResponse(BaseModel):
-    """Model for outfit generation response."""
-    outfits: List[Outfit] = Field(..., description="Generated outfits")
-    prompt: str = Field(..., description="Original prompt that was processed")
-    collage_image: Optional[str] = Field(None, description="Base64 encoded image of the outfit collage")
-    image_map: Optional[Dict[str, Any]] = Field(None, description="Clickable areas for the collage")
-    status: Optional[str] = Field("success", description="Status of the response (success, limited)")
-    status_message: Optional[str] = Field(None, description="Message explaining the status")
-    using_fallbacks: Optional[bool] = Field(False, description="Whether fallback products are being used") 
+    """
+    Response model for generated outfits.
+    """
+    outfits: List[Outfit]
+    prompt: str 
