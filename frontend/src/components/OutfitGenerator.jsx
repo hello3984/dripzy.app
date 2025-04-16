@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import './OutfitGenerator.css';
+import MoodChart from '../../components/MoodChart';
+import LoadingIndicator from '../../components/LoadingIndicator';
 
 const OutfitGenerator = () => {
   const [prompt, setPrompt] = useState('');
@@ -8,6 +10,7 @@ const OutfitGenerator = () => {
   const [error, setError] = useState(null);
   const [gender, setGender] = useState('female'); // Default to female
   const [budget, setBudget] = useState(200); // Default budget as a number
+  const [selectedMood, setSelectedMood] = useState(null);
 
   // Define API base URL based on environment
   const API_BASE_URL = process.env.NODE_ENV === 'development' 
@@ -28,9 +31,28 @@ const OutfitGenerator = () => {
     setBudget(budgetValue);
   };
 
+  const handleMoodSelect = (moodId) => {
+    setSelectedMood(moodId);
+    // Update prompt based on selected mood
+    const moodMap = {
+      'boho': 'bohemian free-spirited outfit with natural elements',
+      'minimalist': 'clean minimal outfit with simple lines and monochromatic palette',
+      'glam': 'glamorous bold statement outfit with luxurious elements',
+      'preppy': 'preppy classic outfit with structured silhouettes',
+      'streetwear': 'urban streetwear outfit with contemporary elements',
+      'vintage': 'vintage-inspired outfit with timeless pieces',
+      'romantic': 'soft romantic outfit with feminine details and flowing fabrics',
+      'edgy': 'edgy bold outfit with unconventional details',
+      'athleisure': 'athletic-inspired comfortable yet stylish outfit',
+      'festival': 'vibrant festival outfit with eclectic elements'
+    };
+    
+    setPrompt(moodMap[moodId] || '');
+  };
+
   const generateOutfit = async () => {
     if (!prompt.trim()) {
-      setError('Please enter a style description');
+      setError('Please enter a style description or select a mood');
       return;
     }
 
@@ -95,7 +117,7 @@ const OutfitGenerator = () => {
   };
 
   return (
-    <div className="outfit-generator">
+    <div className={`outfit-generator ${selectedMood ? `mood-selected-${selectedMood}` : ''}`}>
       <div className="update-banner">
         🔥 NEW DESIGN DEPLOYED - APRIL 2024 🔥
         {process.env.NODE_ENV === 'development' && <span> (DEVELOPMENT MODE)</span>}
@@ -105,6 +127,8 @@ const OutfitGenerator = () => {
         <p className="description">
           Describe your style goal or occasion and our AI will create a personalized outfit for you.
         </p>
+        
+        <MoodChart onSelectMood={handleMoodSelect} selectedMood={selectedMood} />
         
         <div className="prompt-input">
           <input
@@ -150,7 +174,9 @@ const OutfitGenerator = () => {
         
         {error && <div className="error-message">{error}</div>}
         
-        {generatedOutfit && (
+        {loading && <LoadingIndicator message="Curating your fashion recommendations..." />}
+        
+        {!loading && generatedOutfit && (
           <div className="outfit-results">
             <h3>Your {prompt} Outfit</h3>
             

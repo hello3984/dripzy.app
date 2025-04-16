@@ -46,9 +46,14 @@
 
 .description {
   color: #444;
-  margin-bottom: 2rem;
+  margin-bottom: 1.5rem;
   font-size: 1.2rem;
   line-height: 1.5;
+}
+
+/* Mood Chart Styles */
+.mood-chart {
+  margin-bottom: 2rem;
 }
 
 .prompt-input {
@@ -124,6 +129,19 @@
   padding: 0.8rem 1rem;
   border-radius: 6px;
   margin-bottom: 1.5rem;
+}
+
+/* Loading Indicator Styles */
+.loading-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+  margin: 2rem 0;
+  text-align: center;
+  background-color: rgba(255, 255, 255, 0.8);
+  border-radius: 12px;
 }
 
 .outfit-results {
@@ -242,6 +260,42 @@
   background-color: #E03C3C;
 }
 
+/* Mood-specific styling */
+.mood-selected-boho .generate-button {
+  background-color: #d4a373;
+}
+.mood-selected-boho .generate-button:hover {
+  background-color: #b08b5e;
+}
+
+.mood-selected-minimalist .generate-button {
+  background-color: #adb5bd;
+}
+.mood-selected-minimalist .generate-button:hover {
+  background-color: #868e96;
+}
+
+.mood-selected-glam .generate-button {
+  background-color: #c9184a;
+}
+.mood-selected-glam .generate-button:hover {
+  background-color: #a61740;
+}
+
+.mood-selected-preppy .generate-button {
+  background-color: #4361ee;
+}
+.mood-selected-preppy .generate-button:hover {
+  background-color: #3851d1;
+}
+
+.mood-selected-streetwear .generate-button {
+  background-color: #2d3142;
+}
+.mood-selected-streetwear .generate-button:hover {
+  background-color: #1a1c27;
+}
+
 /* Responsive adjustments */
 @media (max-width: 768px) {
   .outfit-generator {
@@ -249,19 +303,18 @@
   }
   
   .prompt-input {
-    flex-direction: column;
+    gap: 0.8rem;
   }
   
   .filters {
     flex-direction: column;
-    gap: 0.5rem;
   }
   
   .prompt-field {
-    margin-bottom: 0.5rem;
+    padding: 0.8rem 1rem;
   }
   
   .outfit-items {
-    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    grid-template-columns: 1fr;
   }
 } 
