@@ -10,8 +10,10 @@ from typing import Dict, List, Any, Optional
 
 import httpx
 from fastapi import HTTPException
+import aiohttp
 
 from app.core.cache import cache_service
+from app.core.config import settings
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -21,7 +23,7 @@ class SerpAPIService:
     
     def __init__(self):
         """Initialize SerpAPI service with API key and cache."""
-        self.api_key = os.getenv("SERPAPI_API_KEY")
+        self.api_key = os.environ.get("SERPAPI_API_KEY")
         if not self.api_key:
             logger.warning("SERPAPI_API_KEY not found in environment variables. Using fallback data.")
         
@@ -37,344 +39,297 @@ class SerpAPIService:
         self.rate_limited = False
         self.rate_limit_reset = 0
         
-    async def search_products(self, query: str, category: Optional[str] = None, 
-                        gender: Optional[str] = None, limit: int = 10, 
-                        min_price: Optional[float] = None, 
-                        max_price: Optional[float] = None) -> List[Dict[str, Any]]:
+    async def test_api_key(self) -> bool:
         """
-        Search for products using SerpAPI with improved caching and error handling.
+        Test if the SerpAPI key is valid by making a simple test request.
+        Returns True if valid, False otherwise.
+        """
+        if not self.api_key:
+            logger.warning("No SerpAPI key configured")
+            return False
+        
+        try:
+            # Make a minimal request to test the API key
+            params = {
+                "engine": "google",
+                "q": "test query",
+                "api_key": self.api_key,
+                "num": "1"  # Request minimal results
+            }
+            
+            async with aiohttp.ClientSession() as session:
+                async with session.get(
+                    "https://serpapi.com/search", 
+                    params=params
+                ) as response:
+                    if response.status == 200:
+                        logger.info("SerpAPI key is valid")
+                        return True
+                    elif response.status == 429:
+                        logger.warning("SerpAPI rate limit reached during test")
+                        return True  # Key is valid but rate limited
+                    elif response.status == 401:
+                        logger.error("SerpAPI key is invalid")
+                        return False
+                    else:
+                        logger.warning(f"Unexpected response from SerpAPI: {response.status}")
+                        return False
+        except Exception as e:
+            logger.error(f"Error testing SerpAPI key: {str(e)}")
+            return False
+            
+    async def search_products(
+        self, 
+        query: str, 
+        category: Optional[str] = None,
+        num_products: int = 5,
+        budget: Optional[float] = None
+    ) -> List[Dict[str, Any]]:
+        """
+        Search for products using SerpAPI
         
         Args:
             query: Search query
             category: Product category
-            gender: Gender filter
-            limit: Maximum number of results
-            min_price: Minimum price
-            max_price: Maximum price
+            num_products: Number of products to return
+            budget: Maximum price for products
             
         Returns:
-            List of product data
+            List of product dictionaries
         """
-        # Create a cache key for this query
-        cache_key = f"products_{query}_{category}_{gender}_{min_price}_{max_price}_{limit}"
+        # Create a cache key based on the search parameters
+        cache_key = f"products:{query}:{category}:{num_products}:{budget}"
         
         # Check if we have cached results
-        cached_results = cache_service.get(cache_key, "medium")
+        cached_results = cache_service.get(cache_key)
         if cached_results:
-            logger.info(f"Using cached products for {query}")
+            logger.info(f"Using cached results for query: {query}")
             return cached_results
             
-        # Check for similar queries in cache
-        similar_products = self._find_similar_cached_query(query, category, gender)
-        if similar_products:
-            logger.info(f"Using similar cached products for {query}")
-            return similar_products
+        # If no API key, use fallback products
+        if not self.api_key:
+            logger.warning("No SerpAPI API key configured, using fallback products")
+            return self._get_fallback_products(query, category, num_products)
             
-        # If we're rate limited, wait before trying again
+        # Check if we're currently rate limited
         if self.rate_limited and time.time() < self.rate_limit_reset:
-            waiting_time = self.rate_limit_reset - time.time()
-            logger.warning(f"Rate limited. Waiting {waiting_time:.1f} seconds before retry.")
-            # Return cached products from any similar query if available
-            all_cached = self._get_any_cached_product(category)
-            if all_cached:
-                return all_cached
+            wait_time = int(self.rate_limit_reset - time.time())
+            logger.warning(f"Rate limited by SerpAPI, waiting {wait_time} seconds")
+            
+            # Use similar cached products if available while rate limited
+            similar_products = self._get_similar_cached_products(query, category)
+            if similar_products:
+                logger.info(f"Using similar cached products for query: {query}")
+                return similar_products
                 
-        # Try multiple attempts with exponential backoff
-        max_attempts = 3
-        for attempt in range(max_attempts):
+            # Wait for rate limit to reset if needed
+            if wait_time < 30:  # Only wait if it's a short time
+                await asyncio.sleep(wait_time + 1)
+            else:
+                logger.warning(f"Rate limit wait time too long ({wait_time}s), using fallback products")
+                return self._get_fallback_products(query, category, num_products)
+        
+        # Construct the search query
+        search_query = query
+        if category:
+            search_query = f"{category} {search_query}"
+            
+        # Prepare SerpAPI parameters
+        params = {
+            "api_key": self.api_key,
+            "engine": "google_shopping",
+            "google_domain": "google.com",
+            "q": search_query,
+            "num": num_products * 2,  # Request more to filter out irrelevant results
+            "hl": "en",
+            "gl": "us",
+            "tbs": "mr:1",  # Merchant rated
+        }
+        
+        if budget:
+            params["tbs"] = f"{params.get('tbs', '')},pr:1,ppr_max:{int(budget)}"
+            
+        # Make the API request with retries
+        max_retries = 3
+        retry_delay = 1
+        
+        for attempt in range(max_retries):
             try:
-                # Build search query with gender if provided
-                search_term = query
-                if gender and gender != "unisex":
-                    search_term = f"{gender}'s {search_term}"
-                if category:
-                    search_term = f"{search_term} {category}"
+                logger.info(f"Searching products for query: {search_query}")
                 
-                # Additional parameters for search filtering
-                params = {
-                    "api_key": self.api_key,
-                    "engine": "google_shopping",
-                    "q": search_term,
-                    "num": limit,
-                    "google_domain": "google.com",
-                    "gl": "us",
-                    "hl": "en",
-                    "tbm": "shop",
-                    "tbs": "mr:1",  # Sort by relevance
-                }
-                
-                # Add price range if provided
-                if min_price:
-                    params["tbs"] += f",price:1,ppr_min:{min_price}"
-                if max_price:
-                    params["tbs"] += f",ppr_max:{max_price}"
-                
-                # Make request to SerpAPI
-                logger.info(f"Searching SerpAPI for: {search_term}")
                 async with httpx.AsyncClient(timeout=10.0) as client:
                     response = await client.get(self.search_url, params=params)
                 
-                # Handle different response codes
                 if response.status_code == 200:
-                    self.rate_limited = False
                     data = response.json()
+                    shopping_results = data.get("shopping_results", [])
                     
-                    # Extract shopping results
-                    if "shopping_results" in data and data["shopping_results"]:
-                        products = self._format_products(data["shopping_results"], category)
-                        # Cache the results
-                        cache_service.set(cache_key, products, "medium")
-                        # Also cache with simpler key for similarity matching
-                        simple_key = f"query_{query}_{category}"
-                        cache_service.set(simple_key, products, "medium")
-                        return products
-                    else:
-                        logger.warning(f"No shopping results found for '{search_term}'")
+                    if not shopping_results:
+                        logger.warning(f"No shopping results found for query: {search_query}")
+                        return self._get_fallback_products(query, category, num_products)
+                    
+                    # Transform results to a standard format
+                    products = []
+                    for item in shopping_results[:num_products]:
+                        product = {
+                            "product_id": item.get("product_id", f"product_{len(products)}"),
+                            "name": item.get("title", "Unknown Product"),
+                            "brand": item.get("source", "Unknown Brand"),
+                            "category": category or "Unknown Category",
+                            "description": "",
+                            "price": item.get("price", 0.0),
+                            "url": item.get("link", ""),
+                            "image_url": item.get("thumbnail", "")
+                        }
                         
-                elif response.status_code == 429:  # Rate limited
-                    # Set rate limiting info
+                        # Parse the price string to float
+                        if isinstance(product["price"], str):
+                            price_match = re.search(r'\$?([\d,]+(\.\d+)?)', product["price"])
+                            if price_match:
+                                product["price"] = float(price_match.group(1).replace(',', ''))
+                            else:
+                                product["price"] = 0.0
+                                
+                        products.append(product)
+                    
+                    # Cache the results
+                    cache_service.set(cache_key, products, ttl=3600)  # Cache for 1 hour
+                    
+                    # Reset rate limit status
+                    self.rate_limited = False
+                    self.rate_limit_reset = 0
+                    
+                    return products
+                    
+                elif response.status_code == 429:
+                    # Handle rate limiting
+                    logger.warning("SerpAPI rate limit reached")
                     self.rate_limited = True
-                    # Reset after 60 seconds or use header if available
-                    retry_after = response.headers.get("Retry-After", "60")
-                    self.rate_limit_reset = time.time() + int(retry_after)
-                    logger.error(f"Error searching products with SerpAPI: 429 Rate Limited. Retry after {retry_after}s")
                     
-                    # Exponential backoff
-                    if attempt < max_attempts - 1:
-                        wait_time = 2 ** attempt
-                        logger.info(f"Retrying in {wait_time} seconds (attempt {attempt+1}/{max_attempts})")
-                        await asyncio.sleep(wait_time)
+                    # Get reset time from headers or default to 1 minute
+                    retry_after = response.headers.get("Retry-After")
+                    if retry_after and retry_after.isdigit():
+                        self.rate_limit_reset = time.time() + int(retry_after)
                     else:
-                        # On last attempt, try to find any cached product for the category
-                        all_cached = self._get_any_cached_product(category)
-                        if all_cached:
-                            logger.info(f"Using alternate cached products for {category}")
-                            return all_cached
-                            
-                        # If no cached products, log and continue to fallback
-                        logger.warning(f"Using fallback products for {category}: {query}")
-                        products = self._get_fallback_products(category, query)
-                        # Mark them as fallbacks but still cache them
-                        for product in products:
-                            product["product_id"] = f"fallback_{product['product_id']}"
-                            product["fallback_reason"] = "Rate limited"
+                        self.rate_limit_reset = time.time() + 60
                         
-                        cache_service.set(cache_key, products, "short")  # Short cache for fallbacks
-                        return products
+                    if attempt < max_retries - 1:
+                        logger.info(f"Retrying after {retry_delay} seconds (attempt {attempt+1}/{max_retries})")
+                        await asyncio.sleep(retry_delay)
+                        retry_delay *= 2  # Exponential backoff
+                    else:
+                        logger.warning("Maximum retry attempts reached, using fallback products")
+                        similar_products = self._get_similar_cached_products(query, category)
+                        if similar_products:
+                            return similar_products
+                        return self._get_fallback_products(query, category, num_products)
+                        
                 else:
-                    # Other error
-                    logger.error(f"SerpAPI error: {response.status_code} - {response.text}")
-                    if attempt < max_attempts - 1:
-                        wait_time = 2 ** attempt
-                        logger.info(f"Retrying in {wait_time} seconds (attempt {attempt+1}/{max_attempts})")
-                        await asyncio.sleep(wait_time)
-                    
+                    logger.error(f"SerpAPI request failed with status code {response.status_code}")
+                    if attempt < max_retries - 1:
+                        logger.info(f"Retrying after {retry_delay} seconds (attempt {attempt+1}/{max_retries})")
+                        await asyncio.sleep(retry_delay)
+                        retry_delay *= 2
+                    else:
+                        logger.warning("Maximum retry attempts reached, using fallback products")
+                        return self._get_fallback_products(query, category, num_products)
+                        
             except Exception as e:
                 logger.error(f"Error searching products with SerpAPI: {str(e)}")
-                if attempt < max_attempts - 1:
-                    wait_time = 2 ** attempt
-                    logger.info(f"Retrying in {wait_time} seconds (attempt {attempt+1}/{max_attempts})")
-                    await asyncio.sleep(wait_time)
+                if attempt < max_retries - 1:
+                    logger.info(f"Retrying after {retry_delay} seconds (attempt {attempt+1}/{max_retries})")
+                    await asyncio.sleep(retry_delay)
+                    retry_delay *= 2
+                else:
+                    logger.warning("Maximum retry attempts reached, using fallback products")
+                    return self._get_fallback_products(query, category, num_products)
+                    
+        # If we get here, all retries failed
+        return self._get_fallback_products(query, category, num_products)
         
-        # If we reach here, all attempts failed - use fallback with clear marking
-        logger.warning(f"Using fallback products for {category}: {query}")
-        products = self._get_fallback_products(category, query)
-        # Mark them as fallbacks
-        for product in products:
-            product["product_id"] = f"fallback_{product['product_id']}"
-            product["fallback_reason"] = "All API attempts failed"
+    def _get_similar_cached_products(self, query: str, category: Optional[str] = None) -> List[Dict[str, Any]]:
+        """
+        Get cached products from similar queries
+        
+        Args:
+            query: Search query
+            category: Product category
             
-        cache_service.set(cache_key, products, "short")  # Short cache for fallbacks
-        return products
+        Returns:
+            List of similar cached products or empty list
+        """
+        # Look for similar cached queries
+        all_cached_keys = cache_service.get_keys("products:*")
         
-    def _format_products(self, results: List[Dict[str, Any]], category: Optional[str] = None) -> List[Dict[str, Any]]:
-        """Format raw API results into standardized product format."""
+        # Convert query to lowercase and split into words for matching
+        query_words = set(query.lower().split())
+        
+        for key in all_cached_keys:
+            try:
+                # Extract the query part from the cache key
+                key_parts = key.split(':')
+                if len(key_parts) >= 2:
+                    cached_query = key_parts[1].lower()
+                    cached_category = key_parts[2] if len(key_parts) > 2 else None
+                    
+                    # Check if category matches (if specified)
+                    if category and cached_category and category.lower() != cached_category.lower():
+                        continue
+                        
+                    # Check if at least half of the query words match
+                    cached_query_words = set(cached_query.split())
+                    common_words = query_words.intersection(cached_query_words)
+                    
+                    if (len(common_words) >= len(query_words) / 2 or 
+                        len(common_words) >= len(cached_query_words) / 2):
+                        # Get cached products for this similar query
+                        similar_products = cache_service.get(key)
+                        if similar_products:
+                            logger.info(f"Found similar cached products for '{query}' from '{cached_query}'")
+                            return similar_products
+            except Exception as e:
+                logger.error(f"Error processing cached key {key}: {str(e)}")
+                continue
+                
+        return []
+        
+    def _get_fallback_products(self, query: str, category: Optional[str] = None, num_products: int = 5) -> List[Dict[str, Any]]:
+        """
+        Generate fallback products when API fails
+        
+        Args:
+            query: Search query
+            category: Product category
+            num_products: Number of products to generate
+            
+        Returns:
+            List of generated fallback products
+        """
+        logger.info(f"Generating fallback products for query: {query}")
+        
+        # Create basic categories and brands for fallback generation
+        categories = ["Clothing", "Accessories", "Shoes", "Bags", "Jewelry"]
+        brands = ["Fashion Brand", "Trendy Co.", "Style House", "Chic Designs", "Modern Apparel"]
+        
+        if not category:
+            category = random.choice(categories)
+            
         products = []
-        
-        for item in results:
-            # Extract price as a float
-            price_str = item.get("price", "0")
-            price = 0.0
-            
-            # Parse price from string (remove currency symbol and commas)
-            if isinstance(price_str, str):
-                price_match = re.search(r'[\d,]+\.\d+', price_str)
-                if price_match:
-                    price = float(price_match.group().replace(',', ''))
-            
-            # Create product object
+        for i in range(num_products):
+            price = round(random.uniform(20, 200), 2)
             product = {
-                "product_id": str(item.get("product_id", item.get("position", ""))),
-                "product_name": item.get("title", "Product"),
-                "brand": item.get("merchant", "Various"),
-                "category": category or self._detect_category(item.get("title", "")),
+                "product_id": f"fallback_{int(time.time())}_{i}",
+                "name": f"{query.title()} {category}",
+                "brand": random.choice(brands),
+                "category": category,
+                "description": f"A stylish {query.lower()} {category.lower()} for your wardrobe.",
                 "price": price,
-                "url": item.get("link", ""),
-                "image_url": item.get("thumbnail", ""),
-                "source": "Google Shopping",
-                "description": item.get("snippet", "")
+                "url": "https://example.com/product",
+                "image_url": f"https://placehold.co/400x600?text={query.replace(' ', '+')}"
             }
-            
             products.append(product)
             
         return products
-    
-    def _detect_category(self, title: str) -> str:
-        """Detect product category from title."""
-        title_lower = title.lower()
-        
-        if any(word in title_lower for word in ["shirt", "top", "tee", "blouse", "sweater", "hoodie"]):
-            return "Top"
-        elif any(word in title_lower for word in ["pants", "jeans", "shorts", "skirt", "leggings", "trouser"]):
-            return "Bottom"
-        elif any(word in title_lower for word in ["dress", "gown"]):
-            return "Dress"
-        elif any(word in title_lower for word in ["shoes", "sneakers", "boots", "sandals"]):
-            return "Shoes"
-        elif any(word in title_lower for word in ["jacket", "coat", "blazer", "outerwear"]):
-            return "Outerwear"
-        elif any(word in title_lower for word in ["hat", "cap", "beanie", "scarf", "gloves", "accessory", 
-                                               "watch", "necklace", "earrings", "bracelet", "bag", "purse"]):
-            return "Accessory"
-        else:
-            return "Other"
-    
-    def _find_similar_cached_query(self, query: str, category: Optional[str], gender: Optional[str]) -> List[Dict[str, Any]]:
-        """Find similar cached queries to avoid repeating API calls."""
-        # Try a few variations of the query for cache hits
-        query_lower = query.lower()
-        variations = [
-            f"query_{query_lower}_{category}",
-            f"query_{query_lower}",
-        ]
-        
-        # If gender is specified, add gender-specific variants
-        if gender and gender != "unisex":
-            variations.append(f"query_{gender}'s {query_lower}_{category}")
-        
-        # Check if we have any of these in cache
-        for var in variations:
-            cached = cache_service.get(var, "medium")
-            if cached:
-                return cached
-                
-        return []
-    
-    def _get_any_cached_product(self, category: Optional[str]) -> List[Dict[str, Any]]:
-        """Find any cached products that match the category as a fallback."""
-        # Get all cached items
-        all_cache = cache_service._cache.items()
-        
-        # Filter for product caches that match category
-        for key, entry in all_cache:
-            if key.startswith("products_") and category and category.lower() in key.lower():
-                return entry["data"]
-                
-        return []
-        
-    def _get_fallback_products(self, category: Optional[str], query: str) -> List[Dict[str, Any]]:
-        """Generate fallback products when API fails."""
-        fallback_products = []
-        
-        # Base product template
-        base_product = {
-            "product_id": f"fallback_{random.randint(1000, 9999)}",
-            "brand": "Sample Brand",
-            "price": 49.99,
-            "url": "",
-            "source": "Fallback Data",
-            "description": f"This is a fallback product for when the API is unavailable. Search was for: {query}"
-        }
-        
-        # Create category-specific fallbacks
-        if category == "Top" or not category:
-            fallback_products.append({
-                **base_product,
-                "product_id": f"fallback_top_{random.randint(1000, 9999)}",
-                "product_name": f"Stylish {query} T-Shirt",
-                "category": "Top",
-                "image_url": "https://via.placeholder.com/300x400?text=T-Shirt",
-            })
-            fallback_products.append({
-                **base_product,
-                "product_id": f"fallback_top_{random.randint(1000, 9999)}",
-                "product_name": f"Casual {query} Sweater",
-                "category": "Top",
-                "price": 59.99,
-                "image_url": "https://via.placeholder.com/300x400?text=Sweater",
-            })
-        
-        if category == "Bottom" or not category:
-            fallback_products.append({
-                **base_product,
-                "product_id": f"fallback_bottom_{random.randint(1000, 9999)}",
-                "product_name": f"Classic {query} Jeans",
-                "category": "Bottom",
-                "price": 69.99,
-                "image_url": "https://via.placeholder.com/300x400?text=Jeans",
-            })
-            fallback_products.append({
-                **base_product,
-                "product_id": f"fallback_bottom_{random.randint(1000, 9999)}",
-                "product_name": f"Casual {query} Shorts",
-                "category": "Bottom",
-                "price": 39.99,
-                "image_url": "https://via.placeholder.com/300x400?text=Shorts",
-            })
-            
-        if category == "Shoes" or not category:
-            fallback_products.append({
-                **base_product,
-                "product_id": f"fallback_shoes_{random.randint(1000, 9999)}",
-                "product_name": f"Comfortable {query} Sneakers",
-                "category": "Shoes",
-                "price": 89.99,
-                "image_url": "https://via.placeholder.com/300x400?text=Sneakers",
-            })
-            
-        if category == "Accessory" or not category:
-            fallback_products.append({
-                **base_product,
-                "product_id": f"fallback_accessory_{random.randint(1000, 9999)}",
-                "product_name": f"Stylish {query} Watch",
-                "category": "Accessory",
-                "price": 129.99,
-                "image_url": "https://via.placeholder.com/300x400?text=Watch",
-            })
-            
-        if category == "Outerwear" or not category:
-            fallback_products.append({
-                **base_product,
-                "product_id": f"fallback_outerwear_{random.randint(1000, 9999)}",
-                "product_name": f"Winter {query} Jacket",
-                "category": "Outerwear",
-                "price": 149.99,
-                "image_url": "https://via.placeholder.com/300x400?text=Jacket",
-            })
-            
-        if category == "Dress" or not category:
-            fallback_products.append({
-                **base_product,
-                "product_id": f"fallback_dress_{random.randint(1000, 9999)}",
-                "product_name": f"Elegant {query} Dress",
-                "category": "Dress",
-                "price": 99.99,
-                "image_url": "https://via.placeholder.com/300x400?text=Dress",
-            })
-            
-        # If we still don't have products, add some generic ones
-        if not fallback_products:
-            for i in range(3):
-                fallback_products.append({
-                    **base_product,
-                    "product_id": f"fallback_generic_{random.randint(1000, 9999)}",
-                    "product_name": f"Generic {query} Item {i+1}",
-                    "category": category or "Other",
-                    "price": random.uniform(29.99, 199.99),
-                    "image_url": f"https://via.placeholder.com/300x400?text=Item+{i+1}",
-                })
-                
-        return fallback_products
 
 # Create a singleton instance
 serpapi_service = SerpAPIService() 

@@ -7,6 +7,7 @@ import random
 import logging # Added logging
 import re
 import uuid
+from datetime import datetime
 
 # --- Added Imports ---
 import anthropic
@@ -879,3 +880,20 @@ async def replace_item_with_alternative(
     except Exception as e:
         logger.error(f"Error replacing item: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to replace item: {str(e)}") 
+
+@router.get("/debug/check-serpapi", response_model=Dict[str, Any])
+async def debug_check_serpapi():
+    """
+    Debug endpoint to test if SerpAPI key is valid and working.
+    """
+    logger.info("Checking SerpAPI key validity")
+    
+    # Test if the SerpAPI key is valid
+    is_valid = await serpapi_service.test_api_key()
+    
+    return {
+        "status": "ok" if is_valid else "error",
+        "message": "SerpAPI key is valid" if is_valid else "SerpAPI key is invalid or not configured",
+        "api_key_configured": serpapi_service.api_key is not None,
+        "timestamp": datetime.now().isoformat()
+    } 

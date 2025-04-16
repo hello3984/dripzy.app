@@ -3,6 +3,12 @@ import httpx
 import json
 from typing import Dict, List, Optional, Any
 from pydantic import BaseModel
+import logging
+
+from app.services.serpapi_service import serpapi_service
+from app.services.skimlinks_service import SkimlinksService
+from app.core.cache import cache_service
+from app.core.config import settings
 
 class ProductService:
     """Service for fetching products from real external APIs"""
