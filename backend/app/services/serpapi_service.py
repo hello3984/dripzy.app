@@ -13,9 +13,28 @@ class SerpApiService:
     """Service to interact with SerpAPI for product search"""
     
     def __init__(self):
+        # Add debug logging for environment variables
+        logger.info("Initializing SerpAPI Service")
+        logger.info(f"Environment variables keys: {', '.join([k for k in os.environ.keys() if not k.startswith('_')])}")
+        
+        # Try multiple ways to get the key
         self.api_key = os.getenv("SERPAPI_KEY")
+        
+        # Try reading from secret file if environment variable is not found
+        if not self.api_key and os.path.exists("/etc/secrets/SERPAPI_KEY"):
+            try:
+                with open("/etc/secrets/SERPAPI_KEY", "r") as f:
+                    self.api_key = f.read().strip()
+                logger.info("Successfully loaded SERPAPI_KEY from secret file")
+            except Exception as e:
+                logger.error(f"Error reading secret file: {e}")
+        
         if not self.api_key:
-            logger.warning("SERPAPI_KEY not found in environment variables")
+            logger.warning("SERPAPI_KEY not found in environment variables or secret files")
+        else:
+            masked_key = self.api_key[:4] + "..." + self.api_key[-4:] if len(self.api_key) > 8 else "***"
+            logger.info(f"SERPAPI_KEY found (masked: {masked_key})")
+            
         self.base_url = "https://serpapi.com/search"
         
     def search_products(self, 
