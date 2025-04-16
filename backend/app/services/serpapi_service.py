@@ -4,29 +4,35 @@ import os
 import json
 import re
 import time
+import random
+import hashlib
 from typing import Dict, List, Optional, Any, Tuple
 from dotenv import load_dotenv
-from datetime import datetime
+from datetime import datetime, timedelta
 
-# Load environment variables
+# Load environment variables directly
 load_dotenv()
 
 logger = logging.getLogger(__name__)
 
-# In-memory cache with TTL
+# Increase cache TTL to reduce API calls
 _cache = {}
 _cache_timestamps = {}
-_CACHE_TTL = 3600  # Cache expiration in seconds (1 hour)
+_CACHE_TTL = 86400  # Cache expiration in seconds (24 hours instead of 1 hour)
+
+# Track API status to avoid multiple failed calls
+_api_status = {
+    "last_checked": 0,
+    "is_rate_limited": False,
+    "reset_after": 0  # Time when we should try API again
+}
 
 class SerpApiService:
     """Service to interact with SerpAPI for product search"""
     
     def __init__(self):
-        # Add debug logging for environment variables
-        logger.info("Initializing SerpAPI Service")
-        logger.info(f"Environment variables keys: {', '.join([k for k in os.environ.keys() if not k.startswith('_')])}")
-        
-        # Try multiple ways to get the key
+        """Initialize the SerpAPI service with API key from environment variables"""
+        # Get API key directly from environment, don't use settings
         self.api_key = os.getenv("SERPAPI_KEY")
         
         # Try reading from secret file if environment variable is not found
@@ -46,23 +52,6 @@ class SerpApiService:
             
         self.base_url = "https://serpapi.com/search"
         
-    def _add_to_cache(self, key: str, value: Any) -> None:
-        """Add a value to the cache with current timestamp."""
-        _cache[key] = value
-        _cache_timestamps[key] = time.time()
-
-    def _get_from_cache(self, key: str) -> Optional[Any]:
-        """Get a value from cache if it exists and hasn't expired."""
-        if key in _cache and key in _cache_timestamps:
-            if time.time() - _cache_timestamps[key] < _CACHE_TTL:
-                logger.info(f"Using cached result for {key}")
-                return _cache[key]
-            else:
-                # Clear expired cache entry
-                del _cache[key]
-                del _cache_timestamps[key]
-        return None
-
     def search_products(self, 
                        query: str, 
                        category: str,
@@ -87,7 +76,13 @@ class SerpApiService:
         try:
             if not self.api_key:
                 logger.error("No SERPAPI_KEY available, cannot perform search")
-                return self._get_fallback_products(category, query, limit)
+                return self._get_fallback_products(category, query, limit, reason="No API key")
+            
+            # If we know the API is rate limited, don't even try the search
+            current_time = time.time()
+            if _api_status["is_rate_limited"] and current_time < _api_status["reset_after"]:
+                logger.info("Skipping SerpAPI search - known rate limit")
+                return self._get_fallback_products(category, query, limit, reason="Rate limit known")
             
             # Create search query with category and gender
             if gender.lower() in ["female", "women", "woman", "ladies"]:
@@ -102,319 +97,195 @@ class SerpApiService:
             # Check cache before making a request
             cache_key = f"{search_query}_{min_price}_{max_price}_{limit}"
             cached_result = self._get_from_cache(cache_key)
-            if cached_result:
-                logger.info(f"Using cached results for query: {search_query}")
+            if cached_result is not None:
                 return cached_result
             
             logger.info(f"Searching SerpAPI for: {search_query}")
             
-            # Enhanced parameters based on Gensmo's implementation
-            params = {
-                "api_key": self.api_key,
-                "engine": "google_shopping",
-                "q": search_query,
-                "num": limit * 2,  # Request more results to account for filtering
-                "google_domain": "google.com",
-                "gl": "us",        # Set location to US for consistent results
-                "hl": "en",        # Set language to English
-                "tbm": "shop",     # Ensure we're using shopping results
-                "tbs": "mr:1"      # Include "in stock" items
-            }
-            
-            # Add price filters if provided
-            if min_price:
-                params["price_min"] = min_price
-            if max_price:
-                params["price_max"] = max_price
+            # Make API request with improved error handling
+            try:
+                params = {
+                    "api_key": self.api_key,
+                    "engine": "google_shopping",
+                    "q": search_query,
+                    "num": min(limit * 2, 20),  # Request more results than needed
+                    "google_domain": "google.com",
+                    "gl": "us",  # Set location to US
+                    "hl": "en",  # Set language to English
+                    "tbm": "shop"  # Use shopping results
+                }
                 
-            # Add quality filters based on category
-            if category.lower() in ["shoes", "footwear"]:
-                params["tbs"] += ",avg_rating:4"  # Higher rating threshold for shoes
+                # Add price filters if provided
+                if min_price:
+                    params["price_min"] = min_price
+                if max_price:
+                    params["price_max"] = max_price
+                
+                response = requests.get(self.base_url, params=params, timeout=10)
+                
+                # Explicitly handle rate limiting
+                if response.status_code == 429:
+                    logger.warning("SerpAPI rate limit exceeded (429 response)")
+                    _api_status["is_rate_limited"] = True
+                    _api_status["reset_after"] = current_time + 3600  # Try again in 1 hour
+                    return self._get_fallback_products(category, query, limit, reason="Rate limit exceeded (429)")
+                    
+                response.raise_for_status()
+                
+            except requests.exceptions.RequestException as req_error:
+                # Check if this is a rate limit error
+                if "429" in str(req_error):
+                    logger.warning(f"SerpAPI rate limit error: {req_error}")
+                    _api_status["is_rate_limited"] = True
+                    _api_status["reset_after"] = current_time + 3600  # Try again in 1 hour
+                    return self._get_fallback_products(category, query, limit, reason="Rate limit error")
+                else:
+                    logger.error(f"Request error: {req_error}")
+                    return self._get_fallback_products(category, query, limit, reason=f"Request error: {str(req_error)}")
             
-            # Make API request
-            response = requests.get(self.base_url, params=params)
-            response.raise_for_status()
-            
+            # Reset rate limiting on successful response
+            _api_status["is_rate_limited"] = False
             data = response.json()
             
-            # Extract shopping results - try both formats for compatibility
+            # Extract shopping results - check both formats
             shopping_results = data.get("shopping_results", [])
             if not shopping_results and "inline_shopping_results" in data:
                 shopping_results = data.get("inline_shopping_results", [])
             
             if not shopping_results:
                 logger.warning(f"No shopping results found for query: {search_query}")
-                return self._get_fallback_products(category, query, limit)
+                return self._get_fallback_products(category, query, limit, reason="No results found")
             
-            # Transform to our format with enhanced data extraction
-            products = self._process_shopping_results(shopping_results, category, limit)
+            # Process results
+            products = []
+            for i, item in enumerate(shopping_results[:limit*2]):
+                price = self._extract_price(item)
+                
+                # Get source as brand
+                brand = item.get("source", "")
+                
+                # Get thumbnail
+                image_url = item.get("thumbnail", "")
+                
+                # Create product entry
+                product = {
+                    "product_id": f"serpapi-{i}",
+                    "title": item.get("title", "Unknown Product"),
+                    "description": item.get("snippet", "") or item.get("title", ""),
+                    "category": category,
+                    "price": price,
+                    "brand": brand,
+                    "image_url": image_url,
+                    "thumbnail": image_url,
+                    "link": item.get("link", "")
+                }
+                
+                products.append(product)
+                
+                # Stop when we have enough products
+                if len(products) >= limit:
+                    break
             
-            # Cache the results
+            # Cache results for future use
             self._add_to_cache(cache_key, products)
             
             return products[:limit]
             
         except Exception as e:
             logger.error(f"Error searching products with SerpAPI: {e}")
-            return self._get_fallback_products(category, query, limit)
-    
-    def _process_shopping_results(self, shopping_results: List[Dict], category: str, limit: int) -> List[Dict[str, Any]]:
-        """Process and transform shopping results into our product format"""
-        products = []
-        
-        for i, item in enumerate(shopping_results[:limit*2]):
-            # Extract price with improved parsing
-            price = self._extract_price(item)
+            return self._get_fallback_products(category, query, limit, reason=f"Error: {str(e)}")
             
-            # Extract brand from source or title
-            brand = item.get("source", "")
-            if not brand and "title" in item:
-                # Try to extract brand from title (first word often)
-                title_parts = item.get("title", "").split()
-                if title_parts:
-                    brand = title_parts[0]
-            
-            # Use direct thumbnail URL as Gensmo does
-            image_url = item.get("thumbnail", "")
-            
-            # Get more detailed product info
-            product = {
-                "product_id": item.get("product_id", f"serpapi-{item.get('position', i)}"),
-                "product_name": item.get("title", "Unknown Product"),
-                "brand": brand,
-                "category": category,
-                "price": price,
-                "formatted_price": item.get("price", f"${price:.2f}"),
-                "image_url": image_url,
-                "description": item.get("snippet", ""),
-                "source": item.get("source", "SerpAPI"),
-                "source_icon": item.get("source_icon", ""),
-                "product_url": item.get("link", "#"),
-                "rating": item.get("rating", 0),
-                "reviews": item.get("reviews", 0),
-                "search_id": self._extract_search_id(image_url)
-            }
-            
-            # Add platform information (Amazon, etc.)
-            extensions = item.get("extensions", [])
-            if extensions:
-                for ext in extensions:
-                    if "amazon" in ext.lower():
-                        product["platform"] = "amazon"
-                        break
-                else:
-                    product["platform"] = "other"
-                    
-            products.append(product)
-        
-        # Filter out products with missing images and sort by relevance
-        products = [p for p in products if p["image_url"]]
-        
-        # Sort products by combination of price and rating
-        products.sort(key=lambda x: (x.get("rating", 0) * 0.7 + 100.0/(x.get("price", 100) + 1) * 0.3), reverse=True)
-        
-        return products[:limit]
-    
-    def _extract_price(self, item: Dict) -> float:
-        """Extract price from SerpAPI item with improved parsing"""
-        # First try the extracted_price field directly
-        if "extracted_price" in item:
-            try:
-                return float(item["extracted_price"])
-            except (ValueError, TypeError):
-                pass
-        
-        # Then try parsing from the price string
-        price_str = item.get("price", "0")
-        if isinstance(price_str, str):
-            # Remove currency symbol, commas, and other characters
-            price_str = re.sub(r'[^\d.]', '', price_str.replace(",", ""))
-            # Find the first valid number
-            price_match = re.search(r'([\d.]+)', price_str)
-            if price_match:
-                try:
-                    return float(price_match.group(1))
-                except (ValueError, TypeError):
-                    pass
-        
-        return 0.0
-    
-    def _extract_search_id(self, url: str) -> Optional[str]:
-        """Extract the SerpAPI search ID from a thumbnail URL"""
-        if not url:
-            return None
-            
-        # Pattern: serpapi.com/searches/[SEARCH_ID]/images/
-        match = re.search(r'searches/([^/]+)/images/', url)
-        if match:
-            return match.group(1)
+    def _add_to_cache(self, key: str, value: Any) -> None:
+        """Add a value to the cache with current timestamp."""
+        _cache[key] = value
+        _cache_timestamps[key] = time.time()
+
+    def _get_from_cache(self, key: str) -> Optional[Any]:
+        """Get a value from cache if it exists and hasn't expired."""
+        if key in _cache and key in _cache_timestamps:
+            if time.time() - _cache_timestamps[key] < _CACHE_TTL:
+                logger.info(f"Using cached result for {key}")
+                return _cache[key]
+            else:
+                # Clear expired cache entry
+                del _cache[key]
+                del _cache_timestamps[key]
         return None
     
-    def _get_fallback_products(self, category: str, query: str, limit: int = 5) -> List[Dict[str, Any]]:
-        """Generate fallback products when API fails"""
-        logger.warning(f"Using fallback products for {category}: {query}")
+    def _extract_price(self, item: Dict) -> float:
+        """Extract price from an item."""
+        try:
+            price_str = item.get("price", "")
+            if not price_str:
+                return 0.0
+                
+            # Clean up the price string
+            if isinstance(price_str, str):
+                # Remove currency symbols and commas
+                price_str = re.sub(r'[^\d.]', '', price_str)
+                return float(price_str) if price_str else 0.0
+            elif isinstance(price_str, (int, float)):
+                return float(price_str)
+                
+            return 0.0
+        except Exception as e:
+            logger.error(f"Error extracting price: {e}")
+            return 0.0
+            
+    def _get_fallback_products(self, category: str, query: str, limit: int = 5, reason: str = "Unknown") -> List[Dict[str, Any]]:
+        """Generate fallback products when real ones can't be fetched."""
+        logger.warning(f"Using fallback products for {category}: {query} (Reason: {reason})")
         
-        # Extract color from query
-        colors = ["black", "white", "blue", "red", "green", "yellow", "purple", 
-                 "pink", "brown", "gray", "beige", "navy"]
-        
-        color = next((c for c in colors if c in query.lower()), "blue")
-        
-        # More realistic product data for fallbacks
-        fallback_data = {
-            "Top": [
-                {"name": f"Light blue denim chambray shirt", "brand": "H&M", "price": 29.99, 
-                 "img": "https://images.unsplash.com/photo-1596755094514-f87e34085b2c?w=800"},
-                {"name": f"{color.capitalize()} cotton t-shirt", "brand": "Gap", "price": 24.99, 
-                 "img": "https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=800"},
-                {"name": f"{color.capitalize()} linen button-up", "brand": "Zara", "price": 39.99, 
-                 "img": "https://images.unsplash.com/photo-1589310243389-96a5483213a8?w=800"},
-            ],
-            "Bottom": [
-                {"name": f"Khaki cotton twill pants", "brand": "Dockers", "price": 49.99, 
-                 "img": "https://images.unsplash.com/photo-1473966968600-fa801b869a1a?w=800"},
-                {"name": f"Medium wash straight-leg jeans", "brand": "Lee", "price": 54.99, 
-                 "img": "https://images.unsplash.com/photo-1541099649105-f69ad21f3246?w=800"},
-                {"name": f"{color.capitalize()} high-rise leggings", "brand": "Athleta", "price": 59.99, 
-                 "img": "https://images.unsplash.com/photo-1556386734-7fad9342a257?w=800"},
-            ],
-            "Dress": [
-                {"name": f"{color.capitalize()} wrap midi dress", "brand": "Lulus", "price": 59.99, 
-                 "img": "https://images.unsplash.com/photo-1612336307429-8a898d10e223?w=800"},
-                {"name": f"Floral patterned maxi dress", "brand": "Reformation", "price": 89.99, 
-                 "img": "https://images.unsplash.com/photo-1595777457583-95e059d581b8?w=800"},
-                {"name": f"Black sleeveless sheath dress", "brand": "Express", "price": 69.99, 
-                 "img": "https://images.unsplash.com/photo-1539008835657-9e8e9680c956?w=800"},
-            ],
-            "Shoes": [
-                {"name": f"Low-top canvas sneakers", "brand": "FRACORA", "price": 79.99, 
-                 "img": "https://images.unsplash.com/photo-1560769629-975ec94e6a86?w=800"},
-                {"name": f"{color.capitalize()} leather ankle boots", "brand": "Steve Madden", "price": 99.99, 
-                 "img": "https://images.unsplash.com/photo-1542838132-92c53300491e?w=800"},
-                {"name": f"Open-toe block heel sandals", "brand": "Sam Edelman", "price": 69.99, 
-                 "img": "https://images.unsplash.com/photo-1543163521-1bf539c55dd2?w=800"},
-            ],
-            "Accessory": [
-                {"name": f"{color.capitalize()} leather crossbody bag", "brand": "Coach", "price": 149.99, 
-                 "img": "https://images.unsplash.com/photo-1584917865442-de89df76afd3?w=800"},
-                {"name": f"Gold-plated layered necklace", "brand": "Madewell", "price": 39.99, 
-                 "img": "https://images.unsplash.com/photo-1599643478518-a784e5dc4c8f?w=800"},
-                {"name": f"Oversized square sunglasses", "brand": "Ray-Ban", "price": 129.99, 
-                 "img": "https://images.unsplash.com/photo-1577803645773-f96470509666?w=800"},
-            ]
+        # Define fallback brands by category
+        brands = {
+            "Top": ["H&M", "Zara", "Uniqlo", "Gap", "J.Crew"],
+            "Bottom": ["Levi's", "H&M", "American Eagle", "Gap", "Uniqlo"],
+            "Dress": ["Zara", "H&M", "Mango", "ASOS", "Forever 21"],
+            "Shoes": ["Nike", "Adidas", "Vans", "Converse", "New Balance"],
+            "Accessory": ["Fossil", "Mango", "Zara", "H&M", "ASOS"],
+            "Outerwear": ["North Face", "Columbia", "Patagonia", "Uniqlo", "Gap"],
         }
         
-        # Default category if not found
-        if category not in fallback_data:
-            fallback_data[category] = [
-                {"name": f"{color.capitalize()} {category}", "brand": "Fashion Brand", "price": 39.99, 
-                 "img": "https://images.unsplash.com/photo-1551488831-00ddcb6c6bd3?w=800"}
-            ]
+        # Select a brand based on category
+        category_key = next((k for k in brands.keys() if k.lower() in category.lower()), "Top")
         
+        # Default fallback image URLs by category
+        default_images = {
+            "Top": "https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=600",
+            "Bottom": "https://images.unsplash.com/photo-1624378439575-d8705ad7ae80?w=600",
+            "Dress": "https://images.unsplash.com/photo-1496747611176-843222e1e57c?w=600",
+            "Shoes": "https://images.unsplash.com/photo-1560343090-f0409e92791a?w=600",
+            "Accessory": "https://images.unsplash.com/photo-1608042314453-ae338d80c427?w=600",
+            "Outerwear": "https://images.unsplash.com/photo-1539533113208-f6df8cc8b543?w=600",
+        }
+        
+        # Get appropriate image URL
+        image_key = next((k for k in default_images.keys() if k.lower() in category.lower()), "Top")
+        image_url = default_images.get(image_key)
+        
+        # Create fallback products
         products = []
-        items = fallback_data.get(category, fallback_data["Top"])
-        
-        for i in range(min(limit, len(items) * 2)):
-            # Cycle through the available items if needed
-            item = items[i % len(items)]
+        for i in range(limit):
+            brand = brands[category_key][i % len(brands[category_key])]
+            price = round(19.99 + (i * 10), 2)  # Vary prices
             
             product = {
-                "product_id": f"fallback-{category.lower()}-{i}",
-                "product_name": item["name"],
-                "brand": item["brand"],
+                "product_id": f"fallback-{category}-{i}",
+                "title": f"{brand} {category} Item {i+1}",
+                "description": f"Fallback {category} product (API call failed: {reason})",
                 "category": category,
-                "price": item["price"] + (i * 3),
-                "formatted_price": f"${item['price'] + (i * 3):.2f}",
-                "image_url": item["img"],
-                "description": f"Quality {category.lower()} from {item['brand']}",
-                "source": "Fallback",
-                "product_url": "#",
-                "rating": 4.0 + (i % 10) / 10,
-                "reviews": 10 + (i * 7),
+                "price": price,
+                "brand": brand,
+                "image_url": image_url,
+                "thumbnail": image_url,
+                "link": "",
+                "fallback": True,
+                "fallback_reason": reason
             }
+            
             products.append(product)
-        
-        return products[:limit]
+            
+        return products
 
-    def get_shopping_categories(self, query: str) -> List[Dict]:
-        """
-        Get shopping categories for a query to help refine searches.
-        This provides category filters like material, brand, or style.
-        
-        Args:
-            query: Search query string
-            
-        Returns:
-            List of category dictionaries with their filters
-        """
-        # Create cache key for categories
-        cache_key = f"categories_{query}"
-        cached_result = self._get_from_cache(cache_key)
-        if cached_result:
-            return cached_result
-        
-        # Set up parameters for categories request
-        params = {
-            "api_key": self.api_key,
-            "engine": "google_shopping",
-            "q": query,
-            "google_domain": "google.com",
-            "gl": "us",
-            "hl": "en"
-        }
-        
-        try:
-            if not self.api_key:
-                logger.warning("No SerpAPI key available for category search")
-                return []
-                
-            logger.info(f"Fetching shopping categories for: {query}")
-            response = requests.get(self.base_url, params=params)
-            data = response.json()
-            
-            if "error" in data:
-                logger.error(f"SerpAPI error in categories: {data['error']}")
-                return []
-                
-            # Extract categories from response
-            categories = data.get("categories", [])
-            
-            # Cache the results
-            self._add_to_cache(cache_key, categories)
-            
-            return categories
-            
-        except Exception as e:
-            logger.error(f"Error fetching categories from SerpAPI: {str(e)}")
-            return []
-            
-    def get_category_filters(self, query: str, category_title: str = None) -> List[Dict]:
-        """
-        Get filters for a specific category or all categories.
-        Useful for refining product searches with specific attributes.
-        
-        Args:
-            query: Search query string
-            category_title: Specific category title to get filters for (e.g., "Filter by material")
-            
-        Returns:
-            List of filter dictionaries or empty list if category not found
-        """
-        categories = self.get_shopping_categories(query)
-        
-        if not category_title:
-            # Return all filters from all categories
-            all_filters = []
-            for category in categories:
-                all_filters.extend(category.get("filters", []))
-            return all_filters
-        
-        # Find the specific category and return its filters
-        for category in categories:
-            if category.get("title") == category_title:
-                return category.get("filters", [])
-                
-        return []
-
-# Create an instance to export
+# Create a singleton instance
 serpapi_service = SerpApiService() 
