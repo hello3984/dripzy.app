@@ -1,16 +1,19 @@
-from fastapi import APIRouter, HTTPException, Depends, Query
-from pydantic import BaseModel
+from fastapi import APIRouter, HTTPException, Depends, Query, Body
+from pydantic import BaseModel, Field
 from typing import List, Optional, Dict, Any
 import os
 import json
 import random
 import logging # Added logging
+import re
 
 # --- Added Imports ---
 import anthropic
 from dotenv import load_dotenv
 from app.services.image_service import create_outfit_collage # Keep collage function
 from app.services.serpapi_service import serpapi_service # Import the SerpAPI service
+from app.utils.image_processing import create_brand_display
+from app.models.outfit_models import OutfitItem, Outfit, OutfitGenerateRequest, OutfitGenerateResponse
 
 # No need to create instance as we're importing it
 # ---------------------
@@ -194,245 +197,307 @@ logger = logging.getLogger(__name__)
 
 # Routes
 @router.post("/generate", response_model=OutfitGenerateResponse)
-async def generate_outfit(request: OutfitGenerateRequest):
-    """Generate outfit recommendations based on user preferences using Anthropic API"""
-    # --- Use Anthropic API if available ---
-    if anthropic_client:
+async def generate_outfit(request: OutfitGenerateRequest = Body(...)):
+    """
+    Generate an outfit based on user preferences using the Anthropic API.
+    Source real products for the outfit items using SerpAPI.
+    Create a collage of the outfit items.
+    """
+    try:
+        # Log the request
+        logger.info(f"Generating outfit for prompt: {request.prompt}, gender: {request.gender}, budget: {request.budget}")
+        
+        # Get category suggestions to enhance the prompt
+        category_filters = []
         try:
-            print(f"Sending request to Anthropic with prompt: {request.prompt}")
-            message = anthropic_client.messages.create(
-                model="claude-3-haiku-20240307",  # Or use sonnet/opus if needed
-                max_tokens=2048,
-                system=SYSTEM_PROMPT, # Use the detailed system prompt defined above
-                messages=[
-                    {
-                        "role": "user",
-                        "content": f"Generate 2-3 outfit options based on the following request: {request.prompt}"
-                    }
-                ]
+            # Only run this if we have enough budget for the API call
+            if serpapi_service.api_key:
+                # Get shopping categories for the prompt to enhance search
+                logger.info(f"Fetching shopping categories for: {request.prompt}")
+                category_filters = serpapi_service.get_category_filters(request.prompt)
+                logger.info(f"Found {len(category_filters)} category filters")
+        except Exception as e:
+            logger.warning(f"Error fetching category filters: {str(e)}")
+        
+        # Extract any style or brand preferences from category filters
+        style_preferences = []
+        brand_preferences = []
+        material_preferences = []
+        
+        for filter_item in category_filters:
+            title = filter_item.get("title", "")
+            # Check for brands in the "You might like" category
+            if title and len(title) < 20:  # Typical brand names are short
+                if title not in ["T-shirt", "Dress", "Jeans", "Shoes"]:  # Skip generic product types
+                    brand_preferences.append(title)
+            
+            # Check for materials
+            for material in ["Cotton", "Linen", "Wool", "Polyester", "Denim", "Leather", "Silk"]:
+                if material.lower() in title.lower():
+                    material_preferences.append(material)
+                    
+            # Check for styles
+            for style in ["Casual", "Formal", "Business", "Sporty", "Vintage", "Modern", "Classic"]:
+                if style.lower() in title.lower():
+                    style_preferences.append(style)
+        
+        # Enhance the prompt with the preferences if we found any
+        enhanced_prompt = request.prompt
+        if brand_preferences and len(brand_preferences) <= 3:
+            enhanced_prompt += f". Consider including items from these brands: {', '.join(brand_preferences[:3])}"
+        
+        if material_preferences and len(material_preferences) <= 3:
+            enhanced_prompt += f". Use these materials if suitable: {', '.join(material_preferences[:3])}"
+            
+        if style_preferences and len(style_preferences) <= 2:
+            enhanced_prompt += f". The style should be {' or '.join(style_preferences[:2])}"
+            
+        logger.info(f"Enhanced prompt: {enhanced_prompt}")
+        
+        # Use the original prompt as fallback
+        prompt = enhanced_prompt if len(enhanced_prompt) <= 500 else request.prompt
+
+        # --- Use Anthropic API if available ---
+        if anthropic_client:
+            try:
+                print(f"Sending request to Anthropic with prompt: {prompt}")
+                message = anthropic_client.messages.create(
+                    model="claude-3-haiku-20240307",  # Or use sonnet/opus if needed
+                    max_tokens=2048,
+                    system=SYSTEM_PROMPT, # Use the detailed system prompt defined above
+                    messages=[
+                        {
+                            "role": "user",
+                            "content": f"Generate 2-3 outfit options based on the following request: {prompt}"
+                        }
+                    ]
+                )
+                
+                # --- Process Anthropic Response ---
+                print("Received response from Anthropic.")
+                response_text = message.content[0].text
+                
+                # Find the start and end of the JSON block
+                json_start = response_text.find('{')
+                json_end = response_text.rfind('}')
+                
+                if json_start != -1 and json_end != -1:
+                    json_string = response_text[json_start:json_end+1]
+                    try:
+                        outfit_data = json.loads(json_string)
+                        
+                        # --- Ground LLM suggestions in real products ---
+                        if "outfits" in outfit_data and isinstance(outfit_data["outfits"], list):
+                            llm_outfits = outfit_data["outfits"]
+                            
+                            formatted_outfits = []
+                            outfit_index = 0
+                            for llm_outfit in llm_outfits:
+                                items_list = []
+                                total_price = 0
+                                occasion_keywords = ["formal", "casual", "work", "business", "party", "everyday", "weekend"]
+                                
+                                # Default occasion is "everyday" unless specified
+                                outfit_occasion = "Weekend"  # Default
+                                for keyword in occasion_keywords:
+                                    if keyword.lower() in llm_outfit.get("outfit_name", "").lower() or keyword.lower() in prompt.lower():
+                                        outfit_occasion = keyword.title()
+                                        break
+                                
+                                # Special case for festival
+                                if "festival" in prompt.lower() or "coachella" in prompt.lower():
+                                    outfit_occasion = "Festival"
+                                
+                                item_categories = {}
+                                
+                                if "items" in llm_outfit and isinstance(llm_outfit["items"], list):
+                                    for item in llm_outfit["items"]:
+                                        # Define category here (outside any conditionals) to solve the scope issue
+                                        category = item.get("category", "Unknown")
+                                        
+                                        # Create search keywords from item description and keywords
+                                        description = item.get("description", "")
+                                        
+                                        # Handle keywords properly
+                                        keywords = item.get("keywords", [])
+                                        if isinstance(keywords, str):
+                                            try:
+                                                # Try to parse as JSON if it looks like a list
+                                                if keywords.startswith('[') and keywords.endswith(']'):
+                                                    keywords = json.loads(keywords)
+                                                else:
+                                                    # Otherwise split by commas or spaces
+                                                    keywords = [k.strip() for k in keywords.replace(',', ' ').split()]
+                                            except:
+                                                # Fallback to empty list if parsing fails
+                                                keywords = []
+                                        
+                                        # Ensure keywords is a list
+                                        if not isinstance(keywords, list):
+                                            keywords = []
+                                        
+                                        # Safe handling of keyword string
+                                        keyword_str = ' '.join(keywords) if keywords else ""
+                                        
+                                        # Get color with fallback
+                                        color = item.get("color", "")
+                                        
+                                        # Create more targeted search terms based on category
+                                        if category == "Top":
+                                            search_keywords = f"{description} {keyword_str} {color} top shirt blouse fashion"
+                                        elif category == "Bottom":
+                                            search_keywords = f"{description} {keyword_str} {color} bottom pants shorts skirt fashion"
+                                        elif category == "Dress":
+                                            search_keywords = f"{description} {keyword_str} {color} dress fashion"
+                                        elif category == "Shoes":
+                                            search_keywords = f"{description} {keyword_str} {color} shoes boots sandals fashion"
+                                        elif category == "Accessory" or category == "Accessories":
+                                            search_keywords = f"{description} {keyword_str} {color} accessories jewelry fashion"
+                                            category = "Accessory"  # Normalize category name
+                                        elif category == "Outerwear":
+                                            search_keywords = f"{description} {keyword_str} {color} jacket coat cardigan fashion"
+                                        else:
+                                            search_keywords = f"{description} {keyword_str} {color} fashion"
+                                        
+                                        print(f"Searching for products: {search_keywords} in category {category}")
+                                        
+                                        # Use H&M service for real products
+                                        budget_max = request.budget if request.budget else 500
+                                        
+                                        # Set a reasonable min price based on category
+                                        min_price = None
+                                        
+                                        # Use SerpAPI for real products
+                                        serpapi_products = serpapi_service.search_products(
+                                            query=search_keywords,
+                                            category=category,
+                                            gender=request.gender,
+                                            min_price=min_price,
+                                            max_price=budget_max,
+                                            limit=1  # Just get the top match
+                                        )
+                                        
+                                        if serpapi_products and len(serpapi_products) > 0:
+                                            real_product = serpapi_products[0]
+                                            logger.info(f"Found product via SerpAPI: {real_product.get('product_name', 'Unknown')}")
+                                            
+                                            # Update total price
+                                            total_price += real_product.get('price', 0)
+                                            
+                                            # Create OutfitItem using real data
+                                            outfit_item = {
+                                                "product_id": real_product.get('product_id', f"serpapi-{len(items_list)}"),
+                                                "product_name": real_product.get('product_name', 'N/A'),
+                                                "brand": real_product.get('brand', 'SerpAPI'),
+                                                "category": real_product.get('category', category),
+                                                "price": real_product.get('price', 0.0),
+                                                "url": real_product.get('product_url', '#'),
+                                                "image_url": real_product.get('image_url', ''),
+                                                "description": real_product.get('description', item.get("description", ""))
+                                            }
+                                            
+                                            items_list.append(outfit_item)
+                                            
+                                            # Group by category for brand display
+                                            brand = real_product.get('brand', 'SerpAPI')
+                                            if category not in item_categories:
+                                                item_categories[category] = []
+                                            if brand not in item_categories[category]: # Avoid duplicate brands per category
+                                                 item_categories[category].append(brand)
+                                        else:
+                                            logger.warning(f"Could not find product via SerpAPI for: {description}")
+                                        
+                                # Create brand display format (e.g. "Tops: Brand1, Brand2")
+                                brand_display = {}
+                                for category, brands in item_categories.items():
+                                    # Format as plural if needed
+                                    category_plural = f"{category}s" if not category.endswith('s') else category
+                                    brand_display[category_plural] = ", ".join(brands)
+                                
+                                # Create formatted outfit object
+                                outfit_name = llm_outfit.get("outfit_name", f"Outfit {len(formatted_outfits) + 1}")
+                                outfit_style = next((s for s in ["casual", "formal", "bohemian", "streetwear", "classic", "trendy"] 
+                                                   if s in outfit_name.lower() or s in prompt.lower()), "trendy")
+                                
+                                # Only create outfit if there are successfully sourced items
+                                if items_list: 
+                                    formatted_outfit = {
+                                        "id": f"outfit-{len(formatted_outfits) + 1}",
+                                        "name": outfit_name,
+                                        "description": llm_outfit.get("stylist_rationale", "A curated outfit based on your request"),
+                                        "style": outfit_style,
+                                        "total_price": round(total_price, 2),
+                                        "items": items_list, # Use the list populated with real items
+                                        "occasion": outfit_occasion,
+                                        "brand_display": brand_display
+                                    }
+                                    
+                                    # Generate collage using the sourced item images
+                                    collage_items = []
+                                    for item_data in items_list: # Use items_list which now has real data
+                                        if item_data["image_url"]:
+                                            collage_items.append({
+                                                "image_url": item_data["image_url"],
+                                                "category": item_data["category"],
+                                                "source_url": item_data.get("url", '#') 
+                                            })
+                                    
+                                    # Create and add collage image if items were found
+                                    if collage_items:
+                                        try:
+                                            collage_result = create_outfit_collage(collage_items)
+                                            formatted_outfit["collage_image"] = collage_result["image"]
+                                            formatted_outfit["image_map"] = collage_result["map"]
+                                        except Exception as collage_err:
+                                            logger.error(f"Error creating collage: {collage_err}")
+                                            formatted_outfit["collage_image"] = None # Handle collage error
+                                            formatted_outfit["image_map"] = None
+                                    
+                                    formatted_outfits.append(formatted_outfit)
+                                else:
+                                    logger.warning(f"Skipping outfit '{llm_outfit.get('outfit_name')}' as no real products could be sourced.")
+
+                            print(f"Successfully parsed {len(formatted_outfits)} outfits from Anthropic response.")
+                            return {"outfits": formatted_outfits, "prompt": prompt}
+                        else:
+                            print("Parsed JSON from Anthropic but no valid outfits found.")
+
+                    except json.JSONDecodeError as json_err:
+                        print(f"Error decoding JSON from Anthropic: {json_err}")
+                        print(f"Received text: {response_text}")
+                else:
+                     print("Could not find valid JSON block in Anthropic response.")
+                     print(f"Received text: {response_text}")
+
+            except Exception as e:
+                print(f"Error calling Anthropic API: {str(e)}")
+                # Fall through to use mock data if API fails
+
+        # --- Fallback to Mock Data --- 
+        print("Falling back to mock outfit data.")
+        try:
+            # The original mock/manual generation logic is now the fallback
+            mock_outfits_data = get_mock_outfits() # Use existing mock function
+            
+            # Apply budget filter if needed
+            if request.budget:
+                mock_outfits_data = [o for o in mock_outfits_data if o["total_price"] <= request.budget]
+            
+            # Convert to Outfit models
+            outfit_models = [Outfit(**o) for o in mock_outfits_data]
+            
+            return OutfitGenerateResponse(
+                outfits=outfit_models[:3], # Limit to 3 mock outfits
+                prompt=prompt
             )
             
-            # --- Process Anthropic Response ---
-            print("Received response from Anthropic.")
-            response_text = message.content[0].text
-            
-            # Find the start and end of the JSON block
-            json_start = response_text.find('{')
-            json_end = response_text.rfind('}')
-            
-            if json_start != -1 and json_end != -1:
-                json_string = response_text[json_start:json_end+1]
-                try:
-                    outfit_data = json.loads(json_string)
-                    
-                    # --- Ground LLM suggestions in real products ---
-                    if "outfits" in outfit_data and isinstance(outfit_data["outfits"], list):
-                        llm_outfits = outfit_data["outfits"]
-                        
-                        formatted_outfits = []
-                        outfit_index = 0
-                        for llm_outfit in llm_outfits:
-                            items_list = []
-                            total_price = 0
-                            occasion_keywords = ["formal", "casual", "work", "business", "party", "everyday", "weekend"]
-                            
-                            # Default occasion is "everyday" unless specified
-                            outfit_occasion = "Weekend"  # Default
-                            for keyword in occasion_keywords:
-                                if keyword.lower() in llm_outfit.get("outfit_name", "").lower() or keyword.lower() in request.prompt.lower():
-                                    outfit_occasion = keyword.title()
-                                    break
-                            
-                            # Special case for festival
-                            if "festival" in request.prompt.lower() or "coachella" in request.prompt.lower():
-                                outfit_occasion = "Festival"
-                            
-                            item_categories = {}
-                            
-                            if "items" in llm_outfit and isinstance(llm_outfit["items"], list):
-                                for item in llm_outfit["items"]:
-                                    # Define category here (outside any conditionals) to solve the scope issue
-                                    category = item.get("category", "Unknown")
-                                    
-                                    # Create search keywords from item description and keywords
-                                    description = item.get("description", "")
-                                    
-                                    # Handle keywords properly
-                                    keywords = item.get("keywords", [])
-                                    if isinstance(keywords, str):
-                                        try:
-                                            # Try to parse as JSON if it looks like a list
-                                            if keywords.startswith('[') and keywords.endswith(']'):
-                                                keywords = json.loads(keywords)
-                                            else:
-                                                # Otherwise split by commas or spaces
-                                                keywords = [k.strip() for k in keywords.replace(',', ' ').split()]
-                                        except:
-                                            # Fallback to empty list if parsing fails
-                                            keywords = []
-                                    
-                                    # Ensure keywords is a list
-                                    if not isinstance(keywords, list):
-                                        keywords = []
-                                    
-                                    # Safe handling of keyword string
-                                    keyword_str = ' '.join(keywords) if keywords else ""
-                                    
-                                    # Get color with fallback
-                                    color = item.get("color", "")
-                                    
-                                    # Create more targeted search terms based on category
-                                    if category == "Top":
-                                        search_keywords = f"{description} {keyword_str} {color} top shirt blouse fashion"
-                                    elif category == "Bottom":
-                                        search_keywords = f"{description} {keyword_str} {color} bottom pants shorts skirt fashion"
-                                    elif category == "Dress":
-                                        search_keywords = f"{description} {keyword_str} {color} dress fashion"
-                                    elif category == "Shoes":
-                                        search_keywords = f"{description} {keyword_str} {color} shoes boots sandals fashion"
-                                    elif category == "Accessory" or category == "Accessories":
-                                        search_keywords = f"{description} {keyword_str} {color} accessories jewelry fashion"
-                                        category = "Accessory"  # Normalize category name
-                                    elif category == "Outerwear":
-                                        search_keywords = f"{description} {keyword_str} {color} jacket coat cardigan fashion"
-                                    else:
-                                        search_keywords = f"{description} {keyword_str} {color} fashion"
-                                    
-                                    print(f"Searching for products: {search_keywords} in category {category}")
-                                    
-                                    # Use H&M service for real products
-                                    budget_max = request.budget if request.budget else 500
-                                    
-                                    # Set a reasonable min price based on category
-                                    min_price = None
-                                    
-                                    # Use SerpAPI for real products
-                                    serpapi_products = serpapi_service.search_products(
-                                        query=search_keywords,
-                                        category=category,
-                                        gender=request.gender,
-                                        min_price=min_price,
-                                        max_price=budget_max,
-                                        limit=1  # Just get the top match
-                                    )
-                                    
-                                    if serpapi_products and len(serpapi_products) > 0:
-                                        real_product = serpapi_products[0]
-                                        logger.info(f"Found product via SerpAPI: {real_product.get('product_name', 'Unknown')}")
-                                        
-                                        # Update total price
-                                        total_price += real_product.get('price', 0)
-                                        
-                                        # Create OutfitItem using real data
-                                        outfit_item = {
-                                            "product_id": real_product.get('product_id', f"serpapi-{len(items_list)}"),
-                                            "product_name": real_product.get('product_name', 'N/A'),
-                                            "brand": real_product.get('brand', 'SerpAPI'),
-                                            "category": real_product.get('category', category),
-                                            "price": real_product.get('price', 0.0),
-                                            "url": real_product.get('product_url', '#'),
-                                            "image_url": real_product.get('image_url', ''),
-                                            "description": real_product.get('description', item.get("description", ""))
-                                        }
-                                        
-                                        items_list.append(outfit_item)
-                                        
-                                        # Group by category for brand display
-                                        brand = real_product.get('brand', 'SerpAPI')
-                                        if category not in item_categories:
-                                            item_categories[category] = []
-                                        if brand not in item_categories[category]: # Avoid duplicate brands per category
-                                             item_categories[category].append(brand)
-                                    else:
-                                        logger.warning(f"Could not find product via SerpAPI for: {description}")
-                                    
-                            # Create brand display format (e.g. "Tops: Brand1, Brand2")
-                            brand_display = {}
-                            for category, brands in item_categories.items():
-                                # Format as plural if needed
-                                category_plural = f"{category}s" if not category.endswith('s') else category
-                                brand_display[category_plural] = ", ".join(brands)
-                            
-                            # Create formatted outfit object
-                            outfit_name = llm_outfit.get("outfit_name", f"Outfit {len(formatted_outfits) + 1}")
-                            outfit_style = next((s for s in ["casual", "formal", "bohemian", "streetwear", "classic", "trendy"] 
-                                               if s in outfit_name.lower() or s in request.prompt.lower()), "trendy")
-                            
-                            # Only create outfit if there are successfully sourced items
-                            if items_list: 
-                                formatted_outfit = {
-                                    "id": f"outfit-{len(formatted_outfits) + 1}",
-                                    "name": outfit_name,
-                                    "description": llm_outfit.get("stylist_rationale", "A curated outfit based on your request"),
-                                    "style": outfit_style,
-                                    "total_price": round(total_price, 2),
-                                    "items": items_list, # Use the list populated with real items
-                                    "occasion": outfit_occasion,
-                                    "brand_display": brand_display
-                                }
-                                
-                                # Generate collage using the sourced item images
-                                collage_items = []
-                                for item_data in items_list: # Use items_list which now has real data
-                                    if item_data["image_url"]:
-                                        collage_items.append({
-                                            "image_url": item_data["image_url"],
-                                            "category": item_data["category"],
-                                            "source_url": item_data.get("url", '#') 
-                                        })
-                                
-                                # Create and add collage image if items were found
-                                if collage_items:
-                                    try:
-                                        collage_result = create_outfit_collage(collage_items)
-                                        formatted_outfit["collage_image"] = collage_result["image"]
-                                        formatted_outfit["image_map"] = collage_result["map"]
-                                    except Exception as collage_err:
-                                        logger.error(f"Error creating collage: {collage_err}")
-                                        formatted_outfit["collage_image"] = None # Handle collage error
-                                        formatted_outfit["image_map"] = None
-                                
-                                formatted_outfits.append(formatted_outfit)
-                            else:
-                                logger.warning(f"Skipping outfit '{llm_outfit.get('outfit_name')}' as no real products could be sourced.")
-
-                        print(f"Successfully parsed {len(formatted_outfits)} outfits from Anthropic response.")
-                        return {"outfits": formatted_outfits, "prompt": request.prompt}
-                    else:
-                        print("Parsed JSON from Anthropic but no valid outfits found.")
-
-                except json.JSONDecodeError as json_err:
-                    print(f"Error decoding JSON from Anthropic: {json_err}")
-                    print(f"Received text: {response_text}")
-            else:
-                 print("Could not find valid JSON block in Anthropic response.")
-                 print(f"Received text: {response_text}")
-
         except Exception as e:
-            print(f"Error calling Anthropic API: {str(e)}")
-            # Fall through to use mock data if API fails
+            print(f"Error generating mock outfits: {str(e)}")
+            raise HTTPException(status_code=500, detail=f"Failed to generate outfits: {str(e)}")
 
-    # --- Fallback to Mock Data --- 
-    print("Falling back to mock outfit data.")
-    try:
-        # The original mock/manual generation logic is now the fallback
-        mock_outfits_data = get_mock_outfits() # Use existing mock function
-        
-        # Apply budget filter if needed
-        if request.budget:
-            mock_outfits_data = [o for o in mock_outfits_data if o["total_price"] <= request.budget]
-        
-        # Convert to Outfit models
-        outfit_models = [Outfit(**o) for o in mock_outfits_data]
-        
-        return OutfitGenerateResponse(
-            outfits=outfit_models[:3], # Limit to 3 mock outfits
-            prompt=request.prompt
-        )
-        
     except Exception as e:
-        print(f"Error generating mock outfits: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Failed to generate outfits: {str(e)}")
+        print(f"Error generating outfit: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to generate outfit: {str(e)}")
 
 # Add alias route for AI-generate that calls the same function
 @router.post("/ai-generate", response_model=OutfitGenerateResponse)

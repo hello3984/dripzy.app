@@ -6,11 +6,17 @@ import re
 import time
 from typing import Dict, List, Optional, Any, Tuple
 from dotenv import load_dotenv
+from datetime import datetime
 
 # Load environment variables
 load_dotenv()
 
 logger = logging.getLogger(__name__)
+
+# In-memory cache with TTL
+_cache = {}
+_cache_timestamps = {}
+_CACHE_TTL = 3600  # Cache expiration in seconds (1 hour)
 
 class SerpApiService:
     """Service to interact with SerpAPI for product search"""
@@ -40,11 +46,23 @@ class SerpApiService:
             
         self.base_url = "https://serpapi.com/search"
         
-        # Initialize in-memory cache
-        # Using format {cache_key: {"data": results, "timestamp": time.time()}}
-        self.cache = {}
-        self.cache_ttl = 3600  # Cache results for 1 hour
-        
+    def _add_to_cache(self, key: str, value: Any) -> None:
+        """Add a value to the cache with current timestamp."""
+        _cache[key] = value
+        _cache_timestamps[key] = time.time()
+
+    def _get_from_cache(self, key: str) -> Optional[Any]:
+        """Get a value from cache if it exists and hasn't expired."""
+        if key in _cache and key in _cache_timestamps:
+            if time.time() - _cache_timestamps[key] < _CACHE_TTL:
+                logger.info(f"Using cached result for {key}")
+                return _cache[key]
+            else:
+                # Clear expired cache entry
+                del _cache[key]
+                del _cache_timestamps[key]
+        return None
+
     def search_products(self, 
                        query: str, 
                        category: str,
@@ -232,25 +250,6 @@ class SerpApiService:
             return match.group(1)
         return None
     
-    def _get_from_cache(self, cache_key: str) -> Optional[List[Dict]]:
-        """Get results from cache if available and not expired"""
-        if cache_key in self.cache:
-            cache_entry = self.cache[cache_key]
-            # Check if cache is still valid
-            if time.time() - cache_entry["timestamp"] < self.cache_ttl:
-                return cache_entry["data"]
-            else:
-                # Remove expired cache
-                del self.cache[cache_key]
-        return None
-    
-    def _add_to_cache(self, cache_key: str, data: List[Dict]):
-        """Add results to cache with timestamp"""
-        self.cache[cache_key] = {
-            "data": data,
-            "timestamp": time.time()
-        }
-    
     def _get_fallback_products(self, category: str, query: str, limit: int = 5) -> List[Dict[str, Any]]:
         """Generate fallback products when API fails"""
         logger.warning(f"Using fallback products for {category}: {query}")
@@ -336,6 +335,86 @@ class SerpApiService:
             products.append(product)
         
         return products[:limit]
+
+    def get_shopping_categories(self, query: str) -> List[Dict]:
+        """
+        Get shopping categories for a query to help refine searches.
+        This provides category filters like material, brand, or style.
+        
+        Args:
+            query: Search query string
+            
+        Returns:
+            List of category dictionaries with their filters
+        """
+        # Create cache key for categories
+        cache_key = f"categories_{query}"
+        cached_result = self._get_from_cache(cache_key)
+        if cached_result:
+            return cached_result
+        
+        # Set up parameters for categories request
+        params = {
+            "api_key": self.api_key,
+            "engine": "google_shopping",
+            "q": query,
+            "google_domain": "google.com",
+            "gl": "us",
+            "hl": "en"
+        }
+        
+        try:
+            if not self.api_key:
+                logger.warning("No SerpAPI key available for category search")
+                return []
+                
+            logger.info(f"Fetching shopping categories for: {query}")
+            response = requests.get(self.base_url, params=params)
+            data = response.json()
+            
+            if "error" in data:
+                logger.error(f"SerpAPI error in categories: {data['error']}")
+                return []
+                
+            # Extract categories from response
+            categories = data.get("categories", [])
+            
+            # Cache the results
+            self._add_to_cache(cache_key, categories)
+            
+            return categories
+            
+        except Exception as e:
+            logger.error(f"Error fetching categories from SerpAPI: {str(e)}")
+            return []
+            
+    def get_category_filters(self, query: str, category_title: str = None) -> List[Dict]:
+        """
+        Get filters for a specific category or all categories.
+        Useful for refining product searches with specific attributes.
+        
+        Args:
+            query: Search query string
+            category_title: Specific category title to get filters for (e.g., "Filter by material")
+            
+        Returns:
+            List of filter dictionaries or empty list if category not found
+        """
+        categories = self.get_shopping_categories(query)
+        
+        if not category_title:
+            # Return all filters from all categories
+            all_filters = []
+            for category in categories:
+                all_filters.extend(category.get("filters", []))
+            return all_filters
+        
+        # Find the specific category and return its filters
+        for category in categories:
+            if category.get("title") == category_title:
+                return category.get("filters", [])
+                
+        return []
 
 # Create an instance to export
 serpapi_service = SerpApiService() 
