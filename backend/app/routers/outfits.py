@@ -10,8 +10,6 @@ import logging # Added logging
 import anthropic
 from dotenv import load_dotenv
 from app.services.image_service import create_outfit_collage # Keep collage function
-from app.services.farfetch_service import farfetch_service # Keep Farfetch service as fallback
-from app.services.hm_service import hm_service # Import the H&M service instance
 from app.services.serpapi_service import serpapi_service # Import the SerpAPI service
 
 # No need to create instance as we're importing it
@@ -308,7 +306,7 @@ async def generate_outfit(request: OutfitGenerateRequest):
                                     # Set a reasonable min price based on category
                                     min_price = None
                                     
-                                    # First try SerpAPI for real products (better than H&M)
+                                    # Use SerpAPI for real products
                                     serpapi_products = serpapi_service.search_products(
                                         query=search_keywords,
                                         category=category,
@@ -346,45 +344,8 @@ async def generate_outfit(request: OutfitGenerateRequest):
                                         if brand not in item_categories[category]: # Avoid duplicate brands per category
                                              item_categories[category].append(brand)
                                     else:
-                                        # Try H&M as first fallback
-                                        logger.warning(f"Could not find product via SerpAPI for: {description}. Trying H&M...")
-                                        
-                                        hm_products = hm_service.search_products(
-                                            query=search_keywords,
-                                            category=category,
-                                            gender=request.gender,
-                                            min_price=min_price,
-                                            max_price=budget_max,
-                                            limit=1  # Just get the top match
-                                        )
-                                        
-                                        if hm_products and len(hm_products) > 0:
-                                            real_product = hm_products[0]
-                                            logger.info(f"Found product via H&M fallback: {real_product.get('product_name', 'Unknown')}")
-                                            
-                                            # Update total price
-                                            total_price += real_product.get('price', 0)
-                                            
-                                            # Create OutfitItem using real data
-                                            outfit_item = {
-                                                "product_id": real_product.get('product_id', f"hm-{len(items_list)}"),
-                                                "product_name": real_product.get('product_name', 'N/A'),
-                                                "brand": real_product.get('brand', 'H&M'),
-                                                "category": real_product.get('category', category),
-                                                "price": real_product.get('price', 0.0),
-                                                "url": real_product.get('product_url', '#'),
-                                                "image_url": real_product.get('image_url', ''),
-                                                "description": real_product.get('description', item.get("description", ""))
-                                            }
-                                            
-                                            items_list.append(outfit_item)
-                                            
-                                            # Group by category for brand display
-                                            brand = real_product.get('brand', 'H&M')
-                                            if category not in item_categories:
-                                                item_categories[category] = []
-                                            if brand not in item_categories[category]: # Avoid duplicate brands per category
-                                                 item_categories[category].append(brand)
+                                        logger.warning(f"Could not find product via SerpAPI for: {description}")
+                                    
                             # Create brand display format (e.g. "Tops: Brand1, Brand2")
                             brand_display = {}
                             for category, brands in item_categories.items():
@@ -496,38 +457,6 @@ async def get_trending_styles():
         
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to get trending styles: {str(e)}")
-
-@router.get("/test-hm")
-async def test_hm(query: str, category: Optional[str] = None, gender: str = "female"):
-    """Test endpoint for H&M product search"""
-    try:
-        logger.info(f"Testing H&M search for: {query} in category {category}")
-        products = hm_service.search_products(
-            query=query,
-            category=category or "Top",
-            gender=gender,
-            limit=5
-        )
-        return {"products": products, "count": len(products)}
-    except Exception as e:
-        logger.error(f"Error testing H&M: {str(e)}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Error testing H&M: {str(e)}")
-
-@router.get("/test-farfetch")
-async def test_farfetch(query: str, category: Optional[str] = None, gender: str = "female"):
-    """Test endpoint for Farfetch product search"""
-    try:
-        logger.info(f"Testing Farfetch search for: {query} in category {category}")
-        products = farfetch_service.search_products(
-            query=query,
-            category=category or "Top",
-            gender=gender,
-            limit=5
-        )
-        return {"products": products, "count": len(products)}
-    except Exception as e:
-        logger.error(f"Error testing Farfetch: {str(e)}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Error testing Farfetch: {str(e)}")
 
 @router.get("/test-serpapi")
 async def test_serpapi(query: str, category: Optional[str] = None, gender: str = "female"):

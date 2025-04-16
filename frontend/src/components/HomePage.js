@@ -466,8 +466,8 @@ const HomePage = () => {
   // Add this in the render function where outfit items are displayed
   const renderOutfitItem = (item) => {
     const affiliateUrl = getAffiliateUrl(item.url, item.source);
-    
-    return (
+
+  return (
       <div className="outfit-item" key={item.id}>
         <div className="outfit-item-image">
           <img src={item.image_url || 'https://via.placeholder.com/300x400'} alt={item.name} />
@@ -585,8 +585,8 @@ const HomePage = () => {
                   accept="image/*"
                   onChange={handlePhotoUpload}
                 />
-              </div>
-              
+          </div>
+          
               <button 
                 className="virtual-tryon-button"
                 onClick={() => setShowTryOn(true)}
@@ -599,11 +599,11 @@ const HomePage = () => {
                 Virtual Try-On
               </button>
               
-              <button 
+            <button 
                 className="generate-button"
                 onClick={handleGenerateOutfit}
-                disabled={generating}
-              >
+              disabled={generating}
+            >
                 {generating ? (
                   <>
                     <span className="spinner"></span>
@@ -612,41 +612,41 @@ const HomePage = () => {
                 ) : (
                   <>Generate</>
                 )}
-              </button>
+            </button>
             </div>
             
             {error && <div className="error-message">{error}</div>}
           </div>
-
+      
           {/* Display outfit results immediately below the Generate button */}
-          {showResults && (
+      {showResults && (
             <div className="outfit-results-container">
-              <h2>Your Curated Outfits</h2>
-              
-              {/* Category Filters */}
-              <div className="category-filters">
-                {categories.map((category) => (
-                  <button
-                    key={category}
-                    className={`category-filter ${activeCategory === category ? 'active' : ''}`}
-                    onClick={() => setActiveCategory(category)}
-                  >
-                    {category.charAt(0).toUpperCase() + category.slice(1)}
-                  </button>
-                ))}
-              </div>
-              
-              {getDisplayOutfits().map((outfit) => (
-                <div key={outfit.id} className="outfit-result">
+          <h2>Your Curated Outfits</h2>
+          
+          {/* Category Filters */}
+          <div className="category-filters">
+            {categories.map((category) => (
+              <button
+                key={category}
+                className={`category-filter ${activeCategory === category ? 'active' : ''}`}
+                onClick={() => setActiveCategory(category)}
+              >
+                {category.charAt(0).toUpperCase() + category.slice(1)}
+              </button>
+            ))}
+          </div>
+          
+          {getDisplayOutfits().map((outfit) => (
+            <div key={outfit.id} className="outfit-result">
                   <OutfitDisplay 
                     outfit={outfit} 
                     onTryOn={() => setShowTryOn(true)} 
                   />
                 </div>
               ))}
-            </div>
+                </div>
           )}
-        </div>
+              </div>
       </section>
       
       {/* Hero Section */}
@@ -669,7 +669,7 @@ const HomePage = () => {
               Try for Free
             </button>
           </div>
-        </div>
+              </div>
       </section>
       
       {/* Showcase Image Gallery */}
@@ -699,21 +699,21 @@ const HomePage = () => {
               alt="Fashion model in blue dress" 
               loading="lazy"
             />
-          </div>
+                      </div>
           <div className="gallery-item">
             <img 
               src="https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?q=80&w=2124&auto=format&fit=crop" 
               alt="Fashion models in red outfits" 
               loading="lazy"
             />
-          </div>
+                      </div>
           <div className="gallery-item">
             <img 
               src="https://images.unsplash.com/photo-1529139574466-a303027c1d8b?q=80&w=1974&auto=format&fit=crop" 
               alt="Fashion model in stylish outfit" 
               loading="lazy"
-            />
-          </div>
+                      />
+                    </div>
         </div>
       </section>
       
@@ -723,8 +723,8 @@ const HomePage = () => {
           <div className="modal-container">
             <button className="modal-close" onClick={() => setShowTryOn(false)}>×</button>
             <VirtualTryOn onComplete={handleAvatarComplete} />
-          </div>
-        </div>
+                    </div>
+                  </div>
       )}
 
       {/* Virtual Try-On Preview */}
@@ -734,8 +734,8 @@ const HomePage = () => {
           <div className="avatar-outfit-container">
             <img src={userAvatar} alt="Your avatar" className="user-avatar" />
             <p>Here's how the outfit would look on you!</p>
-          </div>
-        </div>
+              </div>
+            </div>
       )}
     </div>
   );
