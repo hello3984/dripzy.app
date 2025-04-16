@@ -7,6 +7,7 @@ import re
 import sys
 import time
 import ssl
+import uuid
 from typing import Dict, List, Any, Optional
 
 import httpx
@@ -350,43 +351,25 @@ class SerpAPIService:
                 
         return []
         
-    def _get_fallback_products(self, query: str, category: Optional[str] = None, num_products: int = 5) -> List[Dict[str, Any]]:
-        """
-        Generate fallback products when API fails
+    def _get_fallback_products(self, query: str, category: str = None, limit: int = 5) -> List[Dict[str, Any]]:
+        """Generate fallback products when the API is unavailable."""
+        # Log a stronger warning
+        logger.warning(f"USING FALLBACK PRODUCTS FOR: {query} - Real products unavailable. This is just a placeholder!")
         
-        Args:
-            query: Search query
-            category: Product category
-            num_products: Number of products to generate
-            
-        Returns:
-            List of generated fallback products
-        """
-        logger.info(f"Generating fallback products for query: {query}")
+        # Only generate a single fallback product to avoid cluttering UI
+        product = {
+            "product_id": f"fallback_{uuid.uuid4().hex[:8]}",
+            "product_name": f"{category if category else 'Item'}: {query}",
+            "brand": "API Unavailable",
+            "category": category or "Other",
+            "description": f"This is a placeholder. {query}",
+            "price": random.uniform(29.99, 39.99),
+            "url": "https://example.com/product",
+            "image_url": f"https://via.placeholder.com/300x400?text=No+Image",
+            "fallback_reason": "API unavailable"
+        }
         
-        # Create basic categories and brands for fallback generation
-        categories = ["Clothing", "Accessories", "Shoes", "Bags", "Jewelry"]
-        brands = ["Fashion Brand", "Trendy Co.", "Style House", "Chic Designs", "Modern Apparel"]
-        
-        if not category:
-            category = random.choice(categories)
-            
-        products = []
-        for i in range(num_products):
-            price = round(random.uniform(20, 200), 2)
-            product = {
-                "product_id": f"fallback_{int(time.time())}_{i}",
-                "name": f"{query.title()} {category}",
-                "brand": random.choice(brands),
-                "category": category,
-                "description": f"A stylish {query.lower()} {category.lower()} for your wardrobe.",
-                "price": price,
-                "url": "https://example.com/product",
-                "image_url": f"https://placehold.co/400x600?text={query.replace(' ', '+')}"
-            }
-            products.append(product)
-            
-        return products
+        return [product]
 
 # --- Removed global instance creation ---
 # No longer create the instance here

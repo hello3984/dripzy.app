@@ -86,69 +86,42 @@ You MUST provide your response as valid JSON with this exact structure:
 
 # Mock outfit data
 def get_mock_outfits():
-    """Get mock outfit data"""
-    from app.routers.products import get_mock_products
+    """Get mock outfits for demo purposes (simplified version)"""
+    import logging
+    logger = logging.getLogger(__name__)
+    logger.warning("Using minimal mock outfits instead of real data")
     
-    # Get mock products to use in outfits
-    products = get_mock_products()
-    
-    # Create mock outfits
-    outfits = [
+    # Return a minimal outfit to avoid cluttering the UI
+    return [
         {
-            "id": "outfit1",
-            "name": "Summer Festival Look",
-            "description": "A bohemian-inspired outfit perfect for summer festivals",
-            "style": "bohemian",
-            "total_price": 155.97,
+            "id": "mock-outfit",
+            "name": "Example Outfit",
+            "description": "This is a placeholder outfit. Real data will be shown when API connection is restored.",
+            "style": "simple",
+            "occasion": "casual",
+            "total_price": 99.99,
             "items": [
-                next(p for p in products if p["id"] == "p1"),  # Fringe Crop Top
-                next(p for p in products if p["id"] == "p2"),  # Denim Shorts
-                next(p for p in products if p["id"] == "p4"),  # Sunglasses
-            ]
-        },
-        {
-            "id": "outfit2",
-            "name": "Casual Everyday Outfit",
-            "description": "A comfortable and stylish everyday look",
-            "style": "casual",
-            "total_price": 174.97,
-            "items": [
-                next(p for p in products if p["id"] == "p5"),  # White T-Shirt
-                next(p for p in products if p["id"] == "p6"),  # Black Jeans
-                next(p for p in products if p["id"] == "p7"),  # White Sneakers
-            ]
-        },
-        {
-            "id": "outfit3",
-            "name": "Western Chic",
-            "description": "A modern western-inspired outfit",
-            "style": "western",
-            "total_price": 159.97,
-            "items": [
-                next(p for p in products if p["id"] == "p5"),  # White T-Shirt
-                next(p for p in products if p["id"] == "p2"),  # Denim Shorts
-                next(p for p in products if p["id"] == "p3"),  # Western Boots
-            ]
+                {
+                    "product_id": "mock-item",
+                    "product_name": "Example Item",
+                    "brand": "Example Brand",
+                    "category": "tops",
+                    "price": 29.99,
+                    "url": "",
+                    "image_url": "https://via.placeholder.com/300x400?text=No+Image",
+                    "description": "This is a placeholder item.",
+                    "concept_description": "Basic item",
+                    "color": "neutral",
+                    "alternatives": [],
+                    "is_fallback": True
+                }
+            ],
+            "image_url": None,
+            "collage_url": None,
+            "brand_display": {},
+            "stylist_rationale": "Placeholder outfit while API connection is being established."
         }
     ]
-    
-    # Convert product dictionaries to OutfitItem format
-    for outfit in outfits:
-        outfit_items = []
-        for item in outfit["items"]:
-            outfit_items.append({
-                "product_id": item["id"],
-                "product_name": item["name"],
-                "brand": item["brand"],
-                "category": item["category"],
-                "price": item["price"],
-                "url": item["url"],
-                "image_url": item["image_url"],
-                "description": item["description"]
-            })
-        outfit["items"] = outfit_items
-        
-    return outfits
 
 # Initialize product scraper (Can be removed if ProductScraper class isn't used elsewhere)
 # product_scraper = ProductScraper() # Comment out/remove if only finder is used

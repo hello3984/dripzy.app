@@ -6,6 +6,7 @@ import os
 import json
 import random
 from datetime import datetime
+import logging
 
 from app.services.product_service import ProductService
 
@@ -275,247 +276,25 @@ async def get_real_products(
 # Get mock products for fallback
 def get_mock_products():
     """Get mock products for demo purposes"""
-    # Core mock products with enhanced brand diversity based on budget categories
-    products = [
-        # Luxury Brands ($300+)
+    # Return a minimal set of products for fallback only
+    # This function is now simplified to avoid cluttering the UI
+    logger = logging.getLogger(__name__)
+    logger.warning("Using minimal mock products instead of real data")
+    
+    # Return a minimal set with just one item per category
+    return [
         {
-            "id": "p1",
-            "name": "Silk Blouse",
-            "brand": "Gucci",
+            "id": "mock-product",
+            "name": "Example Product",
+            "brand": "Example Brand",
             "category": "tops",
-            "price": 890.00,
-            "url": "https://www.gucci.com/us/en/pr/women/ready-to-wear/tops-shirts/blouses/silk-blouse-p-650284ZAF8F9381",
-            "image_url": "https://images.unsplash.com/photo-1559583109-3e7968136c99?q=80&w=1374&auto=format&fit=crop",
-            "description": "Elegant silk blouse with signature detailing",
-            "source": "mock"
-        },
-        {
-            "id": "p2",
-            "name": "Leather Shoulder Bag",
-            "brand": "Saint Laurent",
-            "category": "accessories",
-            "price": 2350.00,
-            "url": "https://www.ysl.com/en-us/shoulder-bags/le-5-a-7-hobo-bag-in-smooth-leather-6929091YQ071000.html",
-            "image_url": "https://images.unsplash.com/photo-1584917865442-de89df76afd3?q=80&w=1470&auto=format&fit=crop",
-            "description": "Structured leather shoulder bag with iconic YSL logo",
-            "source": "mock"
-        },
-        {
-            "id": "p3",
-            "name": "Gold Statement Earrings",
-            "brand": "Versace",
-            "category": "jewelry",
-            "price": 425.00,
-            "url": "https://www.versace.com/us/en-us/women/accessories/jewelry/earrings/",
-            "image_url": "https://images.unsplash.com/photo-1589128777073-53d2615c9821?q=80&w=1287&auto=format&fit=crop",
-            "description": "Bold gold-tone statement earrings with Medusa motif",
-            "source": "mock"
-        },
-        {
-            "id": "p4",
-            "name": "Designer Sunglasses",
-            "brand": "Prada",
-            "category": "accessories",
-            "price": 378.00,
-            "url": "https://www.prada.com/us/en/women/accessories/sunglasses.html",
-            "image_url": "https://images.unsplash.com/photo-1577803645773-f96470509666?q=80&w=1470&auto=format&fit=crop",
-            "description": "Geometric sunglasses with UV protection",
-            "source": "mock"
-        },
-        
-        # Premium Brands ($100-300)
-        {
-            "id": "p5",
-            "name": "Cotton Blend Sweater",
-            "brand": "AllSaints",
-            "category": "tops",
-            "price": 178.00,
-            "url": "https://www.allsaints.com/women/sweaters/allsaints-kay-cotton-blend-sweater/",
-            "image_url": "https://images.unsplash.com/photo-1576566588028-4147f3842f27?q=80&w=1064&auto=format&fit=crop",
-            "description": "Relaxed-fit cotton blend sweater with textured finish",
-            "source": "mock"
-        },
-        {
-            "id": "p6",
-            "name": "Slim Fit Jeans",
-            "brand": "Rag & Bone",
-            "category": "bottoms",
-            "price": 195.00,
-            "url": "https://www.ragandbone.com/collections/womens-denim",
-            "image_url": "https://images.unsplash.com/photo-1541099649105-f69ad21f3246?q=80&w=1374&auto=format&fit=crop",
-            "description": "Mid-rise slim fit jeans with slight stretch",
-            "source": "mock"
-        },
-        {
-            "id": "p7",
-            "name": "Leather Ankle Boots",
-            "brand": "Vince",
-            "category": "shoes",
-            "price": 295.00,
-            "url": "https://www.vince.com/leather-ankle-boots",
-            "image_url": "https://images.unsplash.com/photo-1543163521-1bf539c55dd2?q=80&w=1480&auto=format&fit=crop",
-            "description": "Minimalist leather ankle boots with stacked heel",
-            "source": "mock"
-        },
-        {
-            "id": "p8",
-            "name": "Silk Midi Dress",
-            "brand": "Reformation",
-            "category": "dresses",
-            "price": 248.00,
-            "url": "https://www.thereformation.com/categories/dresses",
-            "image_url": "https://images.unsplash.com/photo-1529171890772-88a536be1fda?q=80&w=1374&auto=format&fit=crop",
-            "description": "Sustainable silk midi dress with side slit",
-            "source": "mock"
-        },
-        
-        # Mid-range Brands ($50-100)
-        {
-            "id": "p9",
-            "name": "Fringe Crossbody Bag",
-            "brand": "Madewell",
-            "category": "accessories",
-            "price": 88.00,
-            "url": "https://www.madewell.com/the-sydney-crossbody-bag-LE488.html",
-            "image_url": "https://images.unsplash.com/photo-1575105341889-e90a9c5a4d4c?q=80&w=1212&auto=format&fit=crop",
-            "description": "Suede crossbody bag with fringe detail",
-            "source": "mock"
-        },
-        {
-            "id": "p10",
-            "name": "Layered Necklace Set",
-            "brand": "Banana Republic",
-            "category": "jewelry",
-            "price": 58.00,
-            "url": "https://bananarepublic.gap.com/browse/category.do?cid=40845",
-            "image_url": "https://images.unsplash.com/photo-1599643478518-a784e5dc4c8f?q=80&w=1287&auto=format&fit=crop",
-            "description": "Gold-toned layered necklace set with delicate chains",
-            "source": "mock"
-        },
-        {
-            "id": "p11",
-            "name": "Denim Jacket",
-            "brand": "Levi's",
-            "category": "outerwear",
-            "price": 98.00,
-            "url": "https://www.levi.com/US/en_US/clothing/women/outerwear/c/levi_clothing_women_outerwear",
-            "image_url": "https://images.unsplash.com/photo-1543076447-215ad9ba6923?q=80&w=1374&auto=format&fit=crop",
-            "description": "Classic denim trucker jacket with button closure",
-            "source": "mock"
-        },
-        {
-            "id": "p12",
-            "name": "Printed Midi Skirt",
-            "brand": "& Other Stories",
-            "category": "bottoms",
-            "price": 89.00,
-            "url": "https://www.stories.com/en_usd/clothing/skirts.html",
-            "image_url": "https://images.unsplash.com/photo-1583496661160-fb5886a0aaaa?q=80&w=1364&auto=format&fit=crop",
-            "description": "Flowy midi skirt with abstract print",
-            "source": "mock"
-        },
-        
-        # Budget Brands (Under $50)
-        {
-            "id": "p13",
-            "name": "Graphic T-shirt",
-            "brand": "H&M",
-            "category": "tops",
-            "price": 12.99,
-            "url": "https://www2.hm.com/en_us/women/products/tops.html",
-            "image_url": "https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?q=80&w=1480&auto=format&fit=crop",
-            "description": "Cotton t-shirt with printed graphic",
-            "source": "mock"
-        },
-        {
-            "id": "p14",
-            "name": "Wide-leg Trousers",
-            "brand": "Zara",
-            "category": "bottoms",
-            "price": 45.90,
-            "url": "https://www.zara.com/us/en/woman-pants-l1335.html",
-            "image_url": "https://images.unsplash.com/photo-1594633312681-425c7b97ccd1?q=80&w=1374&auto=format&fit=crop",
-            "description": "High-waisted wide-leg trousers with belt detail",
-            "source": "mock"
-        },
-        {
-            "id": "p15",
-            "name": "Canvas Sneakers",
-            "brand": "Uniqlo",
-            "category": "shoes",
-            "price": 29.90,
-            "url": "https://www.uniqlo.com/us/en/women/shoes-and-accessories",
-            "image_url": "https://images.unsplash.com/photo-1549298916-b41d501d3772?q=80&w=1412&auto=format&fit=crop",
-            "description": "Minimalist canvas sneakers with rubber sole",
-            "source": "mock"
-        },
-        {
-            "id": "p16",
-            "name": "Casual Sundress",
-            "brand": "Old Navy",
-            "category": "dresses",
-            "price": 34.99,
-            "url": "https://oldnavy.gap.com/browse/category.do?cid=15292",
-            "image_url": "https://images.unsplash.com/photo-1515372039744-b8f02a3ae446?q=80&w=1376&auto=format&fit=crop",
-            "description": "Lightweight cotton sundress with adjustable straps",
+            "price": 29.99,
+            "url": "",
+            "image_url": "https://via.placeholder.com/300x400?text=No+Image",
+            "description": "This is a placeholder product. Real data will be shown when API connection is restored.",
             "source": "mock"
         }
     ]
-    
-    # Festival-themed products from various price points
-    festival_products = [
-        # Luxury Festival
-        {
-            "id": "p17",
-            "name": "Embellished Festival Jacket",
-            "brand": "Chloé",
-            "category": "outerwear",
-            "price": 2550.00,
-            "url": "https://www.chloe.com/us/outerwear_cod41997982rr.html",
-            "image_url": "https://images.unsplash.com/photo-1551537482-f2075a1d41f2?q=80&w=1287&auto=format&fit=crop",
-            "description": "Hand-embroidered suede jacket with fringe details",
-            "source": "mock"
-        },
-        # Premium Festival
-        {
-            "id": "p18",
-            "name": "Beaded Body Chain",
-            "brand": "Free People",
-            "category": "accessories",
-            "price": 128.00,
-            "url": "https://www.freepeople.com/shop/delicate-chain-crossbody",
-            "image_url": "https://images.unsplash.com/photo-1611085583191-a3b181a88401?q=80&w=1374&auto=format&fit=crop",
-            "description": "Delicate beaded body chain for festival layering",
-            "source": "mock"
-        },
-        # Mid-range Festival
-        {
-            "id": "p19",
-            "name": "Fringe Kimono",
-            "brand": "Urban Outfitters",
-            "category": "outerwear",
-            "price": 89.00,
-            "url": "https://www.urbanoutfitters.com/shop/ecote-janelle-fringe-kimono",
-            "image_url": "https://images.unsplash.com/photo-1604093882750-3ed498f3178b?q=80&w=1287&auto=format&fit=crop",
-            "description": "Flowy kimono with fringe trim and bohemian print",
-            "source": "mock"
-        },
-        # Budget Festival
-        {
-            "id": "p20",
-            "name": "Festival Hat",
-            "brand": "Forever 21",
-            "category": "accessories",
-            "price": 24.99,
-            "url": "https://www.forever21.com/us/shop/catalog/category/f21/acc_hat",
-            "image_url": "https://images.unsplash.com/photo-1533055640609-24b498dfd74c?q=80&w=1374&auto=format&fit=crop",
-            "description": "Wide-brim festival hat with woven band detail",
-            "source": "mock"
-        }
-    ]
-    
-    products.extend(festival_products)
-    return products
 
 # Routes
 @router.get("/search", response_model=ProductSearchResult)
