@@ -663,4 +663,13 @@ async def get_product_categories():
         {"id": "outerwear", "name": "Outerwear", "subcategories": ["Jackets", "Coats", "Cardigans"]}
     ]
     
-    return {"categories": categories} 
+    return {"categories": categories}
+
+# Add simple debug endpoint
+@router.get("/debug-mock", response_model=List[Product])
+async def debug_mock_products():
+    """Directly returns mock products for debugging"""
+    return get_mock_products()
+
+# Export the function explicitly for other modules
+__all__ = ["get_mock_products"] 

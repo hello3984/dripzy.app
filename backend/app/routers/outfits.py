@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, Depends, Query, Body
+from fastapi import APIRouter, HTTPException, Depends, Query, Body, Response
 from pydantic import BaseModel, Field
 from typing import List, Optional, Dict, Any
 import os
@@ -13,9 +13,11 @@ from datetime import datetime
 import anthropic
 from dotenv import load_dotenv
 from app.services.image_service import create_outfit_collage # Keep collage function
-from app.services.serpapi_service import serpapi_service # Import the SerpAPI service
+from app.services.serpapi_service import SerpAPIService # Import the class instead
 from app.utils.image_processing import create_brand_display
 from app.models.outfit_models import OutfitItem, Outfit, OutfitGenerateRequest, OutfitGenerateResponse
+from app.core.cache import cache_service # Added import for cache_service
+from app.core.config import settings # Import settings for dependency
 
 # No need to create instance as we're importing it
 # ---------------------
@@ -48,16 +50,16 @@ You are 'Dripzy', an expert AI Fashion Stylist. Your primary goal is to create u
 
 **Output Format:** 
 You MUST provide your response as valid JSON with this exact structure:
-```json
-{
-  "outfits": [
+    ```json
     {
+      "outfits": [
+        {
       "outfit_name": "Descriptive Name",
       "description": "2-3 sentence description of the overall look",
       "style": "Primary style category (e.g., Casual, Formal, Streetwear)",
       "occasion": "Where this outfit would be appropriate",
-      "items": [
-        {
+          "items": [
+            {
           "category": "Top/Bottom/Dress/Outerwear/Shoes/Accessory",
           "description": "Detailed description (e.g., 'Light blue slim-fit cotton Oxford shirt')",
           "color": "Primary color",
@@ -68,9 +70,9 @@ You MUST provide your response as valid JSON with this exact structure:
       "stylist_rationale": "Explanation of why this outfit works well"
     }
     // Additional outfits...
-  ]
-}
-```
+      ]
+    }
+    ```
 
 **Guidelines:**
 - For each item, include rich descriptive details (fabric, fit, style features)
@@ -234,6 +236,103 @@ def _get_mock_product(category, description, color):
         "image_url": image_url
     }
 
+# --- Added Missing Functions ---
+
+async def generate_outfit_concepts(request: OutfitGenerateRequest) -> List[Dict[str, Any]]:
+    """Generate outfit concepts using Anthropic API."""
+    # Log the key being used by the client (or from settings)
+    key_to_log = anthropic_client.api_key if anthropic_client else settings.ANTHROPIC_API_KEY
+    logger.info(f"Anthropic client exists: {anthropic_client is not None}. Key available: {'Exists' if key_to_log else 'Not Found'}")
+    
+    if not anthropic_client:
+        logger.warning("Anthropic client not initialized. Cannot generate AI concepts.")
+        # Returning empty list to trigger fallback in main function
+        return [] 
+
+    try:
+        user_message = f"Generate outfit concepts based on this request: Prompt='{request.prompt}', Gender='{request.gender}', Budget='{request.budget}', Preferences='{request.preferences}'"
+        
+        # Log just before the call
+        logger.info(f"Attempting Anthropic API call with key: {'Exists' if anthropic_client.api_key else 'None'}") 
+        
+        message = anthropic_client.messages.create(
+            model="claude-3-opus-20240229", # Or your preferred Claude model
+            max_tokens=1500,
+            system=SYSTEM_PROMPT,
+            messages=[
+                {"role": "user", "content": user_message}
+            ]
+        )
+        
+        # Extract JSON content - Claude might wrap it in ```json ... ``` or have leading text
+        raw_response = message.content[0].text
+        json_content = None
+
+        # First, try to find JSON within markdown code blocks
+        match = re.search(r'```json\s*(\{.*?\})\s*```', raw_response, re.DOTALL)
+        if match:
+            json_content = match.group(1)
+        else:
+            # If no markdown block, find the first opening curly brace
+            first_brace_index = raw_response.find('{')
+            if first_brace_index != -1:
+                # Attempt to extract JSON from the first brace onwards
+                json_content = raw_response[first_brace_index:]
+                # Optional: Find the matching closing brace for robustness (more complex)
+            else:
+                # If no '{' found, cannot parse
+                logger.error(f"Could not find JSON object start ('{{') in Claude response.")
+                logger.error(f"Raw response content was: {raw_response}")
+                return [] # Return empty list if no JSON structure found
+        
+        # Ensure json_content is not None before trying to load
+        if json_content is None:
+             logger.error(f"Failed to extract any potential JSON content from Claude response.")
+             logger.error(f"Raw response content was: {raw_response}")
+             return []
+
+        try:
+            response_data = json.loads(json_content)
+            concepts = response_data.get("outfits", [])
+            logger.info(f"Successfully generated {len(concepts)} outfit concepts from Claude.")
+            return concepts
+        except json.JSONDecodeError as json_err:
+            logger.error(f"Failed to parse JSON response from Claude: {json_err}")
+            logger.error(f"Raw response content was: {raw_response}")
+            return [] # Return empty list on parse failure
+
+    except Exception as e:
+        logger.error(f"Error calling Anthropic API: {str(e)}", exc_info=True)
+        return [] # Return empty list on API failure
+
+def _determine_style(outfit_name: str, outfit_description: str, user_prompt: str) -> str:
+    """Determine outfit style based on keywords if not provided."""
+    text_content = f"{outfit_name} {outfit_description} {user_prompt}".lower()
+    # Simple heuristic, can be expanded
+    if "formal" in text_content or "business" in text_content or "evening" in text_content:
+        return "Formal"
+    if "streetwear" in text_content or "urban" in text_content:
+        return "Streetwear"
+    if "bohemian" in text_content or "festival" in text_content:
+        return "Bohemian"
+    # Add more style checks as needed
+    return "Casual" # Default
+
+def _add_collage_to_outfit(outfit: Outfit):
+    """Generate and add a collage URL to the outfit object."""
+    image_urls = [item.image_url for item in outfit.items if item.image_url]
+    if len(image_urls) >= 2: # Need at least 2 images for a collage
+        try:
+            collage_url = create_outfit_collage(image_urls, outfit.id)
+            outfit.collage_url = collage_url
+            logger.info(f"Collage created for outfit {outfit.id}: {collage_url}")
+        except Exception as e:
+            logger.error(f"Failed to create collage for outfit {outfit.id}: {str(e)}")
+    else:
+        logger.warning(f"Not enough images ({len(image_urls)}) to create collage for outfit {outfit.id}")
+
+# --- End Added Missing Functions ---
+
 # Routes
 @router.post("/generate", response_model=OutfitGenerateResponse)
 async def generate_outfit(request: OutfitGenerateRequest) -> OutfitGenerateResponse:
@@ -251,12 +350,22 @@ async def generate_outfit(request: OutfitGenerateRequest) -> OutfitGenerateRespo
     
     try:
         # Step 1: Generate outfit concepts with Claude
+        logger.info("--- CALLING generate_outfit_concepts ---")
         outfit_concepts = await generate_outfit_concepts(request)
+        logger.info(f"--- RETURNED from generate_outfit_concepts (found {len(outfit_concepts)} concepts) ---")
         
-        # Step 2: Try to match real products to concepts (but this is optional)
+        # Handle case where concept generation failed
+        if not outfit_concepts:
+             logger.warning("Outfit concept generation failed or returned empty. Using fallback mockups.")
+             return OutfitGenerateResponse(outfits=get_mock_outfits(), prompt=request.prompt)
+
+        # Step 2: Try to match real products to concepts
+        logger.info("--- CALLING enhance_outfits_with_products ---")
         enhanced_outfits = await enhance_outfits_with_products(outfit_concepts, request)
+        logger.info(f"--- RETURNED from enhance_outfits_with_products (created {len(enhanced_outfits)} outfits) ---")
         
         # Create the response using the enhanced outfits
+        logger.info("--- PREPARING final response ---")
         return OutfitGenerateResponse(
             outfits=enhanced_outfits,
             prompt=request.prompt
@@ -267,7 +376,7 @@ async def generate_outfit(request: OutfitGenerateRequest) -> OutfitGenerateRespo
         # Fall back to mock data, but clearly mark it as a fallback
         fallback_outfits = get_mock_outfits()
         for outfit in fallback_outfits:
-            outfit.description = f"[FALLBACK OUTFIT] {outfit.description}"
+            outfit['description'] = f"[FALLBACK OUTFIT] {outfit.get('description', 'Mock outfit')}" 
         
         return OutfitGenerateResponse(
             outfits=fallback_outfits,
@@ -299,15 +408,17 @@ async def get_trending_styles():
         raise HTTPException(status_code=500, detail=f"Failed to get trending styles: {str(e)}")
 
 @router.get("/test_serpapi", include_in_schema=False)
-async def test_serpapi(query: str, category: Optional[str] = None, gender: str = "female"):
+async def test_serpapi(query: str, category: Optional[str] = None):
     """Test endpoint for SerpAPI product search"""
     try:
         logger.info(f"Testing SerpAPI search for: {query} in category {category}")
-        products = serpapi_service.search_products(
+        # Get service instance correctly
+        serpapi_service_instance = get_serpapi_service()
+        # Call method on the instance, remove invalid args
+        products = await serpapi_service_instance.search_products(
             query=query,
-            category=category or "Top",
-            gender=gender,
-            limit=5
+            category=category or "Top"
+            # Removed gender and limit arguments
         )
         return {"products": products, "count": len(products)}
     except Exception as e:
@@ -355,18 +466,16 @@ async def debug_serpapi():
         except Exception as e:
             secret_file_content = f"Error reading: {str(e)}"
     
-    # Get the service's API key
-    from app.services.serpapi_service import serpapi_service
-    service_key = serpapi_service.api_key
+    # Get the service's API key using the correct method
+    serpapi_service_instance = get_serpapi_service() # Get instance
+    service_key = serpapi_service_instance.api_key
     masked_service_key = service_key[:4] + "..." + service_key[-4:] if service_key and len(service_key) > 8 else None
     
-    # Test a real API call
+    # Test a real API call using the instance
     try:
-        results = serpapi_service.search_products(
+        results = await serpapi_service_instance.search_products(
             query="blue jeans",
-            category="Bottom",
-            gender="unisex",
-            limit=1
+            category="Bottom"
         )
         api_working = not any("fallback" in result.get("product_id", "") for result in results)
         first_result = results[0] if results else None
@@ -414,18 +523,16 @@ async def debug_serpapi_config():
         except Exception as e:
             secret_file_content = f"Error reading: {str(e)}"
     
-    # Get the service's API key
-    from app.services.serpapi_service import serpapi_service
-    service_key = serpapi_service.api_key
+    # Get the service's API key using the correct method
+    serpapi_service_instance = get_serpapi_service() # Get instance
+    service_key = serpapi_service_instance.api_key
     masked_service_key = service_key[:4] + "..." + service_key[-4:] if service_key and len(service_key) > 8 else None
     
-    # Test a real API call
+    # Test a real API call using the instance
     try:
-        results = serpapi_service.search_products(
+        results = await serpapi_service_instance.search_products(
             query="blue jeans",
-            category="Bottom",
-            gender="unisex",
-            limit=1
+            category="Bottom"
         )
         api_working = not any("fallback" in result.get("product_id", "") for result in results)
         first_result = results[0] if results else None
@@ -463,7 +570,7 @@ async def get_outfit(outfit_id: str):
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to get outfit: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to get outfit: {str(e)}") 
 
 # New test endpoint with a simple response
 @router.get("/test/simple")
@@ -486,26 +593,38 @@ async def debug_test():
         }
     }
 
+# --- Dependency Function ---
+def get_serpapi_service() -> SerpAPIService:
+    # Ensure the service is created with the key from settings
+    # Pass the imported settings object to the constructor
+    return SerpAPIService(settings=settings) 
+# -------------------------
+
+# --- Updated Function Signatures to use Depends --- 
+
+# Removed dependency injection from signature
 async def _find_products_for_item(query: str, category: str, 
-                           gender: Optional[str] = None, 
                            budget: Optional[float] = None,
                            include_alternatives: bool = True,
-                           alternatives_count: int = 5) -> List[Dict[str, Any]]:
+                           alternatives_count: int = 5,
+                           gender: Optional[str] = None) -> List[Dict[str, Any]]:
     """
     Find products matching an item description, including alternatives.
     
     Args:
         query: Search query built from keywords/description
         category: Item category
-        gender: Gender preference
         budget: Budget constraint
         include_alternatives: Whether to include alternative products
         alternatives_count: Number of alternatives to include
+        gender: Optional gender filter (will be passed as kwargs)
         
     Returns:
         List of matching products (main result plus alternatives)
     """
     try:
+        serpapi_service_instance = get_serpapi_service() 
+
         # Calculate price range based on budget and category
         min_price, max_price = None, None
         if budget:
@@ -521,20 +640,23 @@ async def _find_products_for_item(query: str, category: str,
         # Request limit includes main product + alternatives
         search_limit = alternatives_count + 1 if include_alternatives else 1
         
-        # Search for products using SerpAPI service
-        products = await serpapi_service.search_products(
+        logger.info(f"--- CALLING serpapi_service.search_products for '{query}' ---")
+        # Pass gender as a kwarg which will be filtered out, ensuring no parameter errors
+        products = await serpapi_service_instance.search_products(
             query=query,
             category=category,
-            gender=gender,
-            limit=search_limit,
+            num_products=search_limit,
+            budget=budget,
             min_price=min_price,
-            max_price=max_price
+            max_price=max_price,
+            gender=gender  # This will be caught by **kwargs in the method
         )
+        logger.info(f"--- RETURNED from serpapi_service.search_products (found {len(products)} products) ---")
         
         return products
     except Exception as e:
         logger.error(f"Error finding products for {category} - {query}: {str(e)}")
-        return [] 
+        return []
 
 async def enhance_outfits_with_products(outfit_concepts: List[Dict[str, Any]], 
                                   request: OutfitGenerateRequest) -> List[Outfit]:
@@ -550,8 +672,9 @@ async def enhance_outfits_with_products(outfit_concepts: List[Dict[str, Any]],
         List of Outfit objects with products matched where possible
     """
     enhanced_outfits = []
-    
-    for concept in outfit_concepts:
+    logger.info(f"--- Starting enhance loop for {len(outfit_concepts)} concepts ---")
+    for idx, concept in enumerate(outfit_concepts):
+        logger.info(f"--- Processing concept {idx+1}/{len(outfit_concepts)}: {concept.get('outfit_name')}")
         try:
             # Create a unique ID for the outfit
             outfit_id = str(uuid.uuid4())
@@ -568,7 +691,8 @@ async def enhance_outfits_with_products(outfit_concepts: List[Dict[str, Any]],
             brand_display = {}
             
             # Process each conceptual item and try to match real products
-            for item_concept in concept.get("items", []):
+            logger.info(f"--- Starting item loop for concept {idx+1} ({len(concept.get('items', []))} items) ---")
+            for item_idx, item_concept in enumerate(concept.get("items", [])):
                 # Get search info
                 category = item_concept.get("category")
                 description = item_concept.get("description", "")
@@ -577,15 +701,19 @@ async def enhance_outfits_with_products(outfit_concepts: List[Dict[str, Any]],
                 # Build search query from keywords and description
                 search_query = " ".join(search_keywords) if search_keywords else description
                 
+                logger.info(f"--- Processing item {item_idx+1}: {category} - '{search_query}' ---")
                 try:
-                    # Try to find matching products, including alternatives if requested
+                    # Try to find matching products
+                    logger.info(f"--- CALLING _find_products_for_item for item {item_idx+1} ---")
                     products = await _find_products_for_item(
                         search_query, 
                         category, 
-                        request.gender, 
                         request.budget,
-                        include_alternatives=request.include_alternatives
+                        include_alternatives=request.include_alternatives,
+                        alternatives_count=item_concept.get("alternatives_count", 5), # Allow overriding count?
+                        gender=request.gender
                     )
+                    logger.info(f"--- RETURNED from _find_products_for_item for item {item_idx+1} (found {len(products)}) ---")
                     
                     if products:
                         # First product is the main match
@@ -671,12 +799,14 @@ async def enhance_outfits_with_products(outfit_concepts: List[Dict[str, Any]],
             # Generate collage if we have images
             if outfit_items:
                 try:
-                    await _add_collage_to_outfit(outfit)
+                    logger.info(f"--- CALLING _add_collage_to_outfit for concept {idx+1} ---")
+                    _add_collage_to_outfit(outfit) # Sync call
+                    logger.info(f"--- RETURNED from _add_collage_to_outfit for concept {idx+1} ---")
                 except Exception as collage_error:
                     logger.error(f"Error creating collage: {str(collage_error)}")
             
             enhanced_outfits.append(outfit)
-            
+            logger.info(f"--- Finished processing concept {idx+1} ---")
         except Exception as outfit_error:
             logger.error(f"Error enhancing outfit: {str(outfit_error)}")
     
@@ -744,7 +874,8 @@ async def get_item_alternatives(item_id: str):
                                 description,
                                 category,
                                 include_alternatives=True,
-                                alternatives_count=8  # Get more alternatives when explicitly requested
+                                alternatives_count=8,  # Get more alternatives when explicitly requested
+                                gender=item.get("gender")
                             )
                             
                             # Remove the original item from alternatives if present
@@ -866,7 +997,7 @@ async def replace_item_with_alternative(
                     total_price=outfit.get("total_price", 0.0),
                     brand_display=outfit.get("brand_display", {})
                 )
-                await _add_collage_to_outfit(outfit_obj)
+                _add_collage_to_outfit(outfit_obj)
                 
                 # Update outfit with new collage
                 outfit["collage_url"] = outfit_obj.collage_url
@@ -881,19 +1012,82 @@ async def replace_item_with_alternative(
         logger.error(f"Error replacing item: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to replace item: {str(e)}") 
 
+# Remove Depends from debug endpoint as well for consistency in testing
 @router.get("/debug/check-serpapi", response_model=Dict[str, Any])
-async def debug_check_serpapi():
+async def debug_check_serpapi(): 
     """
     Debug endpoint to test if SerpAPI key is valid and working.
     """
     logger.info("Checking SerpAPI key validity")
     
-    # Test if the SerpAPI key is valid
-    is_valid = await serpapi_service.test_api_key()
+    # Get service instance directly
+    serpapi_service_instance = get_serpapi_service()
+
+    # Test if the SerpAPI key is valid using the direct instance
+    is_valid = await serpapi_service_instance.test_api_key()
     
     return {
         "status": "ok" if is_valid else "error",
         "message": "SerpAPI key is valid" if is_valid else "SerpAPI key is invalid or not configured",
-        "api_key_configured": serpapi_service.api_key is not None,
+        "api_key_configured": serpapi_service_instance.api_key is not None,
         "timestamp": datetime.now().isoformat()
     } 
+
+# Test SerpAPI endpoint with SSL fixes
+@router.get("/test-serpapi-ssl", include_in_schema=False)
+async def test_serpapi_ssl():
+    """Test endpoint to verify SerpAPI works with SSL fix"""
+    import logging
+    
+    logger = logging.getLogger(__name__)
+    logger.info("Testing SerpAPI with SSL fix")
+    
+    try:
+        # Get SerpAPI service instance
+        serpapi_service_instance = get_serpapi_service()
+        
+        # Test if key is valid
+        is_valid = await serpapi_service_instance.test_api_key()
+        
+        if is_valid:
+            # Try a simple product search
+            products = await serpapi_service_instance.search_products(
+                query="blue jeans",
+                category="Bottom",
+                num_products=1
+            )
+            
+            if products:
+                first_product = products[0]
+                is_fallback = "fallback" in first_product.get("product_id", "")
+                
+                return {
+                    "status": "success",
+                    "key_valid": True,
+                    "got_products": True,
+                    "product_count": len(products),
+                    "is_fallback": is_fallback,
+                    "first_product": {
+                        k: v for k, v in first_product.items() 
+                        if k != "image_url"  # Exclude image URL to keep response small
+                    }
+                }
+            else:
+                return {
+                    "status": "partial_success",
+                    "key_valid": True,
+                    "got_products": False,
+                    "error": "No products returned"
+                }
+        else:
+            return {
+                "status": "error",
+                "key_valid": False,
+                "error": "SerpAPI key is invalid"
+            }
+    except Exception as e:
+        logger.error(f"Error testing SerpAPI: {str(e)}")
+        return {
+            "status": "error",
+            "message": f"Error testing SerpAPI: {str(e)}"
+        } 

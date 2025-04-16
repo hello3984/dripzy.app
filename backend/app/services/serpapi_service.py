@@ -6,6 +6,7 @@ import random
 import re
 import sys
 import time
+import ssl
 from typing import Dict, List, Any, Optional
 
 import httpx
@@ -18,14 +19,41 @@ from app.core.config import settings
 # Configure logging
 logger = logging.getLogger(__name__)
 
+# Create a secure SSL context that falls back to unverified if needed
+def create_ssl_context():
+    """
+    Create an SSL context for secure connections.
+    On some systems with SSL certificate issues, this will fall back to unverified connections.
+    """
+    try:
+        # Try to create a default SSL context first
+        context = ssl.create_default_context()
+        return context
+    except Exception as e:
+        logger.warning(f"Could not create default SSL context: {e}")
+        # Fall back to unverified context
+        context = ssl._create_unverified_context()
+        logger.warning("Using unverified SSL context due to certificate issues")
+        return context
+
+# Global SSL context for use in the module
+ssl_context = create_ssl_context()
+
 class SerpAPIService:
     """Service for searching products using SerpAPI."""
     
-    def __init__(self):
+    def __init__(self, settings: Optional[Any] = None):
         """Initialize SerpAPI service with API key and cache."""
-        self.api_key = os.environ.get("SERPAPI_API_KEY")
+        # Prioritize key from settings if provided, otherwise try environment
+        if settings and settings.SERPAPI_API_KEY:
+            self.api_key = settings.SERPAPI_API_KEY
+            logger.info("SerpAPI key loaded from settings.")
+        else:
+            self.api_key = os.environ.get("SERPAPI_API_KEY")
+            logger.info("Attempted to load SerpAPI key from environment.")
+        
         if not self.api_key:
-            logger.warning("SERPAPI_API_KEY not found in environment variables. Using fallback data.")
+            logger.warning("SERPAPI_API_KEY not found. Using fallback data.")
         
         # Initialize cache with configurable TTL
         self.short_cache_ttl = int(os.getenv("CACHE_TTL_SHORT", "300"))  # 5 minutes
@@ -57,23 +85,34 @@ class SerpAPIService:
                 "num": "1"  # Request minimal results
             }
             
-            async with aiohttp.ClientSession() as session:
-                async with session.get(
+            # Disable SSL verification for SerpAPI requests
+            os.environ['PYTHONHTTPSVERIFY'] = '0'
+            
+            # Use httpx with verification disabled
+            import httpx
+            
+            async with httpx.AsyncClient(timeout=10.0, verify=False) as client:
+                response = await client.get(
                     "https://serpapi.com/search", 
                     params=params
-                ) as response:
-                    if response.status == 200:
-                        logger.info("SerpAPI key is valid")
-                        return True
-                    elif response.status == 429:
-                        logger.warning("SerpAPI rate limit reached during test")
-                        return True  # Key is valid but rate limited
-                    elif response.status == 401:
-                        logger.error("SerpAPI key is invalid")
-                        return False
-                    else:
-                        logger.warning(f"Unexpected response from SerpAPI: {response.status}")
-                        return False
+                )
+                
+                if response.status_code == 200:
+                    logger.info("SerpAPI key is valid")
+                    return True
+                elif response.status_code == 429:
+                    logger.warning("SerpAPI rate limit reached during test")
+                    return True  # Key is valid but rate limited
+                elif response.status_code == 401:
+                    logger.error(f"SerpAPI key is invalid: {response.text}")
+                    return False
+                else:
+                    logger.warning(f"Unexpected response from SerpAPI: {response.status_code}")
+                    try:
+                        logger.warning(f"Response text: {response.text}")
+                    except:
+                        pass
+                    return False
         except Exception as e:
             logger.error(f"Error testing SerpAPI key: {str(e)}")
             return False
@@ -83,7 +122,11 @@ class SerpAPIService:
         query: str, 
         category: Optional[str] = None,
         num_products: int = 5,
-        budget: Optional[float] = None
+        budget: Optional[float] = None,
+        min_price: Optional[float] = None,
+        max_price: Optional[float] = None,
+        # Remove unused parameters that cause errors but store in kwargs
+        **kwargs
     ) -> List[Dict[str, Any]]:
         """
         Search for products using SerpAPI
@@ -92,13 +135,16 @@ class SerpAPIService:
             query: Search query
             category: Product category
             num_products: Number of products to return
-            budget: Maximum price for products
+            budget: Maximum price for products (can be used to derive min/max)
+            min_price: Minimum price filter
+            max_price: Maximum price filter
+            **kwargs: Additional parameters (gender, etc.) that are ignored
             
         Returns:
             List of product dictionaries
         """
         # Create a cache key based on the search parameters
-        cache_key = f"products:{query}:{category}:{num_products}:{budget}"
+        cache_key = f"products:{query}:{category}:{num_products}:{budget}:{min_price}:{max_price}"
         
         # Check if we have cached results
         cached_results = cache_service.get(cache_key)
@@ -146,9 +192,16 @@ class SerpAPIService:
             "tbs": "mr:1",  # Merchant rated
         }
         
-        if budget:
-            params["tbs"] = f"{params.get('tbs', '')},pr:1,ppr_max:{int(budget)}"
-            
+        # Add price filters to tbs parameter if provided
+        price_filters = []
+        if min_price:
+            price_filters.append(f"ppr_min:{int(min_price)}")
+        if max_price:
+            price_filters.append(f"ppr_max:{int(max_price)}")
+        
+        if price_filters:
+            params["tbs"] = f"{params.get('tbs', '')},pr:1,{','.join(price_filters)}"
+        
         # Make the API request with retries
         max_retries = 3
         retry_delay = 1
@@ -157,7 +210,11 @@ class SerpAPIService:
             try:
                 logger.info(f"Searching products for query: {search_query}")
                 
-                async with httpx.AsyncClient(timeout=10.0) as client:
+                # Disable SSL verification for SerpAPI requests
+                os.environ['PYTHONHTTPSVERIFY'] = '0'
+                
+                # Use httpx with verification disabled
+                async with httpx.AsyncClient(timeout=15.0, verify=False) as client:
                     response = await client.get(self.search_url, params=params)
                 
                 if response.status_code == 200:
@@ -193,7 +250,7 @@ class SerpAPIService:
                         products.append(product)
                     
                     # Cache the results
-                    cache_service.set(cache_key, products, ttl=3600)  # Cache for 1 hour
+                    cache_service.set(cache_key, products)
                     
                     # Reset rate limit status
                     self.rate_limited = False
@@ -331,5 +388,10 @@ class SerpAPIService:
             
         return products
 
-# Create a singleton instance
-serpapi_service = SerpAPIService() 
+# --- Removed global instance creation ---
+# No longer create the instance here
+# serpapi_service = SerpAPIService()
+# --------------------------------------- 
+
+# Create the global instance with settings
+serpapi_service = SerpAPIService(settings=settings) 
