@@ -491,23 +491,6 @@ async def debug_mock_outfits():
         raise HTTPException(status_code=500, detail="Error fetching debug mock data")
 # --- END DEBUGGING ENDPOINT --- 
 
-@router.get("/{outfit_id}", response_model=Outfit)
-async def get_outfit(outfit_id: str):
-    """Get outfit details by ID"""
-    try:
-        outfits = get_mock_outfits()
-        outfit = next((o for o in outfits if o["id"] == outfit_id), None)
-        
-        if not outfit:
-            raise HTTPException(status_code=404, detail=f"Outfit with ID {outfit_id} not found")
-        
-        return Outfit(**outfit)
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to get outfit: {str(e)}")
-
 @router.get("/debug-serpapi")
 async def debug_serpapi():
     """Debug endpoint to check SerpAPI configuration"""
@@ -565,3 +548,20 @@ async def debug_serpapi():
         "first_result_type": type(first_result).__name__,
         "first_result": {k: v for k, v in first_result.items()} if isinstance(first_result, dict) else str(first_result)
     }
+
+@router.get("/{outfit_id}", response_model=Outfit)
+async def get_outfit(outfit_id: str):
+    """Get outfit details by ID"""
+    try:
+        outfits = get_mock_outfits()
+        outfit = next((o for o in outfits if o["id"] == outfit_id), None)
+        
+        if not outfit:
+            raise HTTPException(status_code=404, detail=f"Outfit with ID {outfit_id} not found")
+        
+        return Outfit(**outfit)
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get outfit: {str(e)}")
