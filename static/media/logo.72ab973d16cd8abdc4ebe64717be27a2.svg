@@ -1,8 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 100">
-  <!-- Text-based logo for dripzy -->
-  <text x="10" y="65" font-family="Arial, sans-serif" font-size="48" font-weight="bold" fill="#000000">
-    <tspan>dripzy</tspan>
-  </text>
-  <!-- Stylish underline -->
-  <path d="M10 75 L155 75" stroke="#000000" stroke-width="3" />
-</svg>
