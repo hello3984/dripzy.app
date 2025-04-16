@@ -1,6 +1,5 @@
 import React from 'react';
 import OutfitCollage from './OutfitCollage';
-import { getAffiliateUrl } from '../services/amazon';
 import './OutfitDisplay.css';
 
 /**
@@ -9,12 +8,12 @@ import './OutfitDisplay.css';
 const OutfitDisplay = ({ outfit, onTryOn }) => {
   if (!outfit) return null;
 
-  // Format the price
-  const formattedPrice = new Intl.NumberFormat('en-US', {
+  // Format the price for display
+  const price = outfit.total_price ? new Intl.NumberFormat('en-US', {
     style: 'currency',
     currency: 'USD',
     minimumFractionDigits: 2
-  }).format(outfit.total_price);
+  }).format(outfit.total_price) : '$0.00';
 
   // Pass the entire outfit object to OutfitCollage for the new display style
   return (
@@ -25,6 +24,10 @@ const OutfitDisplay = ({ outfit, onTryOn }) => {
         outfitName={outfit.name}
         outfit={outfit}
       />
+      
+      <div className="ai-powered-badge">
+        <span className="download-icon">⬇️</span> Powered by Dripzy AI
+      </div>
       
       {onTryOn && (
         <div className="outfit-actions">

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { searchProducts } from '../services/api';
 import { getAffiliateUrl } from '../services/amazon';
 
@@ -40,9 +40,9 @@ const ProductsPage = () => {
   // Load products
   useEffect(() => {
     fetchProducts();
-  }, [currentPage]);
+  }, [currentPage, fetchProducts]);
 
-  const fetchProducts = async (filters = {}) => {
+  const fetchProducts = useCallback(async (filters = {}) => {
     try {
       setLoading(true);
       setError(null);
@@ -84,7 +84,7 @@ const ProductsPage = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [query, category, brand, minPrice, maxPrice, source, currentPage, pageSize]);
 
   const handleSearch = (e) => {
     e.preventDefault();

@@ -50,7 +50,7 @@ const Navbar = ({ user, onLogin, onLogout }) => {
                 <a href="#generate" data-tooltip="Create your AI-powered outfit">TRY IT</a>
               </li>
               <li className="menu-item dropdown">
-                <a href="#" data-tooltip="Learn more about Dripzy">MORE</a>
+                <a href="#more" data-tooltip="Learn more about Dripzy">MORE</a>
                 <div className="dropdown-menu">
                   <a href="#pricing">Pricing</a>
                   <a href="#how">How It Works</a>
