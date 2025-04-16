@@ -408,6 +408,10 @@ def create_outfit_collage(items, width=800, height=800):
             "Sunglasses": (width * 3 // 4, height // 3, width // 6, height // 8),  # Right top
         }
         
+        # Convert all floating point values to integers in category_positions
+        for category, (x, y, w, h) in category_positions.items():
+            category_positions[category] = (int(x), int(y), int(w), int(h))
+        
         # Fallback positions if specific category position isn't available
         default_positions = [
             (width // 4, height // 3, width // 3, height // 3),
@@ -416,6 +420,9 @@ def create_outfit_collage(items, width=800, height=800):
             (width * 3 // 4, height * 2 // 3, width // 3, height // 3),
             (width // 2, height // 2, width // 3, height // 3),
         ]
+        
+        # Convert all floating point values to integers in default_positions
+        default_positions = [(int(x), int(y), int(w), int(h)) for x, y, w, h in default_positions]
         
         # Map generic categories to our specific positions
         category_mapping = {
@@ -582,11 +589,11 @@ def create_outfit_collage(items, width=800, height=800):
                         new_height = int(new_width / aspect_ratio)
                 
                 # Resize the image
-                img = img.resize((new_width, new_height), Image.Resampling.LANCZOS)
+                img = img.resize((int(new_width), int(new_height)), Image.Resampling.LANCZOS)
                 
                 # Calculate position to paste the image (centered at the specified position)
-                x1 = x_center - new_width // 2
-                y1 = y_center - new_height // 2
+                x1 = int(x_center - new_width // 2)
+                y1 = int(y_center - new_height // 2)
                 
                 # Paste the image onto the collage
                 collage.paste(img, (x1, y1))
@@ -594,19 +601,28 @@ def create_outfit_collage(items, width=800, height=800):
                 # Add a subtle shadow (draw slight darker rectangle underneath)
                 shadow_offset = 6
                 shadow_color = (230, 230, 230, 255)
-                draw.rectangle([x1+shadow_offset, y1+shadow_offset, x1+new_width+shadow_offset-1, y1+new_height+shadow_offset-1], 
-                              fill=shadow_color, outline=None)
+                draw.rectangle([
+                    int(x1+shadow_offset), 
+                    int(y1+shadow_offset), 
+                    int(x1+new_width+shadow_offset-1), 
+                    int(y1+new_height+shadow_offset-1)
+                ], fill=shadow_color, outline=None)
                 
                 # Paste the image again over the shadow
                 collage.paste(img, (x1, y1))
                 
                 # Add a subtle border around the image
                 border_color = (220, 220, 220, 255)  # Light gray
-                draw.rectangle([x1, y1, x1 + new_width - 1, y1 + new_height - 1], outline=border_color, width=1)
+                draw.rectangle([
+                    x1, 
+                    y1, 
+                    int(x1 + new_width - 1), 
+                    int(y1 + new_height - 1)
+                ], outline=border_color, width=1)
                 
                 # Add to click map
                 click_map.append({
-                    "coords": [x1, y1, x1 + new_width, y1 + new_height],
+                    "coords": [x1, y1, int(x1 + new_width), int(y1 + new_height)],
                     "category": category,
                     "url": source_url
                 })

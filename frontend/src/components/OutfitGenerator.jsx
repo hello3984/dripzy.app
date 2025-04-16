@@ -6,9 +6,26 @@ const OutfitGenerator = () => {
   const [generatedOutfit, setGeneratedOutfit] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [gender, setGender] = useState('female'); // Default to female
+  const [budget, setBudget] = useState(200); // Default budget as a number
+
+  // Define API base URL based on environment
+  const API_BASE_URL = process.env.NODE_ENV === 'development' 
+    ? 'http://localhost:5000' // Local development backend
+    : 'https://dripzy-app.onrender.com'; // Production backend
 
   const handlePromptChange = (e) => {
     setPrompt(e.target.value);
+  };
+
+  const handleGenderChange = (e) => {
+    setGender(e.target.value);
+  };
+
+  const handleBudgetChange = (e) => {
+    // Ensure budget is a number
+    const budgetValue = parseInt(e.target.value, 10);
+    setBudget(budgetValue);
   };
 
   const generateOutfit = async () => {
@@ -21,16 +38,21 @@ const OutfitGenerator = () => {
     setError(null);
     
     console.log("Sending request to backend with prompt:", prompt);
+    console.log("Using API endpoint:", `${API_BASE_URL}/outfits/generate`);
+    console.log("Request params:", { prompt, gender, budget });
 
     try {
-      // Use the direct Render URL and add credentials
-      const response = await fetch('https://dripzy-app.onrender.com/outfits/generate', {
+      const response = await fetch(`${API_BASE_URL}/outfits/generate`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json'
         },
-        body: JSON.stringify({ prompt }),
+        body: JSON.stringify({ 
+          prompt, 
+          gender, 
+          budget 
+        }),
         mode: 'cors',
       });
 
@@ -43,58 +65,19 @@ const OutfitGenerator = () => {
       }
 
       const data = await response.json();
-      console.log("API response data:", data);
+      // Added detailed logging for debugging
+      console.log("API response data:", JSON.stringify(data, null, 2));
+      console.log("First outfit:", data.outfits && data.outfits[0] ? JSON.stringify(data.outfits[0], null, 2) : "No outfits returned");
+      
+      if (!data.outfits || !data.outfits.length) {
+        throw new Error("No outfits returned from API");
+      }
+      
       setGeneratedOutfit(data.outfits[0]); // Use the first outfit from the array
     } catch (err) {
       console.error('Failed to generate outfit:', err);
       setError(`Failed to generate outfit: ${err.message}`);
-      
-      // For demo purposes, create mock data if API fails
-      setGeneratedOutfit({
-        items: [
-          {
-            category: 'Top',
-            type: 'Crochet crop top',
-            brand: 'Free People',
-            image_url: 'https://images.unsplash.com/photo-1562157873-818bc0726f68?w=800&auto=format',
-            product_url: 'https://www.freepeople.com',
-            price: 68.00
-          },
-          {
-            category: 'Bottom',
-            type: 'High-waisted denim shorts',
-            brand: 'Levi\'s',
-            image_url: 'https://images.unsplash.com/photo-1541099649105-f69ad21f3246?w=800&auto=format',
-            product_url: 'https://www.levi.com',
-            price: 58.00
-          },
-          {
-            category: 'Shoes',
-            type: 'Western ankle boots',
-            brand: 'Steve Madden',
-            image_url: 'https://images.unsplash.com/photo-1560343090-f0409e92791a?w=800&auto=format',
-            product_url: 'https://www.stevemadden.com',
-            price: 89.95
-          },
-          {
-            category: 'Accessory',
-            type: 'Layered necklace',
-            brand: 'Madewell',
-            image_url: 'https://images.unsplash.com/photo-1583292650898-7298fa6cf342?w=800&auto=format',
-            product_url: 'https://www.madewell.com',
-            price: 48.00
-          },
-          {
-            category: 'Bag',
-            type: 'Fringe crossbody bag',
-            brand: 'Urban Outfitters',
-            image_url: 'https://images.unsplash.com/photo-1584917865442-de89df76afd3?w=800&auto=format',
-            product_url: 'https://www.urbanoutfitters.com',
-            price: 59.00
-          }
-        ],
-        prompt
-      });
+      // Remove the mock data generation to ensure we only show real data
     } finally {
       setLoading(false);
     }
@@ -115,6 +98,7 @@ const OutfitGenerator = () => {
     <div className="outfit-generator">
       <div className="update-banner">
         🔥 NEW DESIGN DEPLOYED - APRIL 2024 🔥
+        {process.env.NODE_ENV === 'development' && <span> (DEVELOPMENT MODE)</span>}
       </div>
       <div className="generator-container">
         <h2>AI Fashion Stylist</h2>
@@ -131,6 +115,30 @@ const OutfitGenerator = () => {
             placeholder="e.g., Coachella outfit, business casual, date night"
             className="prompt-field"
           />
+          
+          <div className="filters">
+            <select 
+              value={gender} 
+              onChange={handleGenderChange}
+              className="filter-select"
+            >
+              <option value="female">Women's</option>
+              <option value="male">Men's</option>
+              <option value="unisex">Unisex</option>
+            </select>
+            
+            <select 
+              value={budget} 
+              onChange={handleBudgetChange}
+              className="filter-select"
+            >
+              <option value="100">Budget ($100)</option>
+              <option value="200">Medium ($200)</option>
+              <option value="500">Premium ($500)</option>
+              <option value="1000">Luxury ($1000+)</option>
+            </select>
+          </div>
+          
           <button 
             onClick={generateOutfit} 
             disabled={loading}
