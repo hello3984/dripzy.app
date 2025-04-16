@@ -9,8 +9,8 @@ from datetime import datetime
 
 # Import AI router only - temporarily commented out until module path is fixed
 # from app.routers.ai import router as ai_router
-# Import debug router
-from app.routers.debug import router as debug_router
+# Import debug router - temporarily commented out until module path is fixed
+# from app.routers.debug import router as debug_router
 # Import outfits router
 from app.routers.outfits import router as outfits_router
 
@@ -51,8 +51,8 @@ async def log_requests(request: Request, call_next):
 
 # Include AI router for modular functionality - temporarily commented out
 # app.include_router(ai_router)
-# Include debug router
-app.include_router(debug_router)
+# Include debug router - temporarily commented out
+# app.include_router(debug_router)
 # Include outfits router
 app.include_router(outfits_router)
 
