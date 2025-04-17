@@ -155,7 +155,7 @@ def _match_categories(category):
         return "Shoes"
     elif any(term in category for term in ['hat', 'cap', 'beanie', 'scarf', 'accessory', 'accessories', 'jewelry', 'bag', 'watch', 'necklace', 'earrings', 'bracelet', 'handbag', 'purse', 'backpack']):
         return "Accessory"
-    else:
+else:
         return "Top"  # Default to Top if no match
 
 # Helper function to generate mock product details
@@ -245,7 +245,7 @@ async def generate_outfit_concepts(request: OutfitGenerateRequest) -> List[Dict[
         match = re.search(r'```json\s*(\{.*?\})\s*```', raw_response, re.DOTALL)
         if match:
             json_content = match.group(1)
-        else:
+else:
             # If no markdown block, find the first opening curly brace
             first_brace_index = raw_response.find('{')
             if first_brace_index != -1:
@@ -399,20 +399,27 @@ async def test_serpapi(query: str, category: Optional[str] = None):
         raise HTTPException(status_code=500, detail=f"Error testing SerpAPI: {str(e)}")
 
 # --- DEBUGGING ENDPOINT --- 
-@router.get("/debug-mock", response_model=List[Outfit], include_in_schema=False) # Return list of Outfit models
+@router.get("/debug-mock", response_model=List[Outfit])
 async def debug_mock_outfits():
     """Directly returns the output of get_mock_outfits for debugging."""
     logger.info("Accessing /debug-mock endpoint.")
     try:
+        # Get the mock outfits directly
         mock_data = get_mock_outfits()
-        # Ensure the data matches the Outfit model (already done inside get_mock_outfits likely)
-        # Convert raw dicts to Pydantic models if necessary, though get_mock_outfits might already return them
-        # For simplicity, assume get_mock_outfits returns data suitable for direct return if response_model=List[Outfit]
-        logger.info(f"Returning {len(mock_data)} mock outfits from debug endpoint.")
-        return mock_data 
+        
+        # Convert any dict items to Outfit models if needed
+        outfits = []
+        for outfit in mock_data:
+            if isinstance(outfit, dict):
+                outfits.append(Outfit(**outfit))
+            else:
+                outfits.append(outfit)
+                
+        logger.info(f"Returning {len(outfits)} mock outfits from debug endpoint.")
+        return outfits
     except Exception as e:
         logger.error(f"Error in /debug-mock endpoint: {str(e)}", exc_info=True)
-        raise HTTPException(status_code=500, detail="Error fetching debug mock data")
+        raise HTTPException(status_code=500, detail=f"Error fetching debug mock data: {str(e)}")
 # --- END DEBUGGING ENDPOINT --- 
 
 @router.get("/debug_serpapi", include_in_schema=False)  # Changed dash to underscore and added include_in_schema

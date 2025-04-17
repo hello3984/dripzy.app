@@ -126,8 +126,9 @@ class SerpAPIService:
         budget: Optional[float] = None,
         min_price: Optional[float] = None,
         max_price: Optional[float] = None,
-        # Remove unused parameters that cause errors but store in kwargs
-        **kwargs
+        gender: Optional[str] = None,  # We'll explicitly accept this but not use it
+        limit: Optional[int] = None,   # Accept but not use this parameter
+        **kwargs  # Accept any additional parameters
     ) -> List[Dict[str, Any]]:
         """
         Search for products using SerpAPI
@@ -139,14 +140,22 @@ class SerpAPIService:
             budget: Maximum price for products (can be used to derive min/max)
             min_price: Minimum price filter
             max_price: Maximum price filter
-            **kwargs: Additional parameters (gender, etc.) that are ignored
+            gender: Gender filter (accepted but not used in API call)
+            limit: Limit parameter (accepted but num_products is used instead)
+            **kwargs: Additional parameters that are ignored
             
         Returns:
             List of product dictionaries
         """
+        # If limit is provided, use it instead of num_products
+        if limit is not None:
+            num_products = limit
+            
         # Create a cache key based on the search parameters
         cache_key = f"products:{query}:{category}:{num_products}:{budget}:{min_price}:{max_price}"
-        
+        if gender:
+            cache_key += f":{gender}"
+            
         # Check if we have cached results
         cached_results = cache_service.get(cache_key)
         if cached_results:
