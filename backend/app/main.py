@@ -6,6 +6,10 @@ import time
 import os
 from dotenv import load_dotenv
 from datetime import datetime
+from contextlib import asynccontextmanager
+
+# Import connection pool manager
+from app.core.connection_pool import get_connection_pool
 
 # Import AI router only - temporarily commented out until module path is fixed
 # from app.routers.ai import router as ai_router
@@ -24,16 +28,34 @@ logger = logging.getLogger(__name__)
 # Load environment variables
 load_dotenv()
 
+# Define application lifespan for resource management
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup: initialize resources
+    logger.info("Starting application and initializing connection pools")
+    pool_manager = get_connection_pool()
+    
+    # Initialize any connection pools we'll need
+    await pool_manager.get_client("serpapi")
+    await pool_manager.get_client("anthropic", timeout=60.0)
+    
+    yield
+    
+    # Shutdown: cleanup resources
+    logger.info("Application shutting down, cleaning up resources")
+    await pool_manager.close_all()
+
 app = FastAPI(
     title="Dripzy Fashion AI API",
     description="API for the Dripzy fashion AI recommendation platform",
     version="0.1.0",
+    lifespan=lifespan,
 )
 
 # Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://dripzy.app", "http://localhost:3000", "http://localhost:5173"],  # Only specific origins
+    allow_origins=["https://dripzy.app", "http://localhost:3000", "http://localhost:5173", "http://localhost:3006"],  # Added localhost:3006
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],  # Only methods you use
     allow_headers=["Authorization", "Content-Type", "DeviceID", "User-Agent"],  # Only headers you need
@@ -57,6 +79,12 @@ async def log_requests(request: Request, call_next):
 # Include outfits router
 app.include_router(outfits_router)
 
+# Handle OPTIONS requests for CORS preflight
+@app.options("/{rest_of_path:path}")
+async def options_handler(rest_of_path: str):
+    return {}
+
+
 # Global exception handler
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
@@ -77,7 +105,7 @@ async def health_check():
         # Check environment variables
         api_keys = {
             "ANTHROPIC_API_KEY": os.getenv("ANTHROPIC_API_KEY") is not None,
-            "SERPAPI_KEY": os.getenv("SERPAPI_KEY") is not None,
+            "SERPAPI_API_KEY": os.getenv("SERPAPI_API_KEY") is not None,
         }
         
         # Return health status
@@ -104,8 +132,8 @@ async def debug_serpapi_direct():
     # Try to reload environment variables
     load_dotenv()
     
-    # Check if SERPAPI_KEY is in environment variables
-    serpapi_key = os.getenv("SERPAPI_KEY")
+    # Check if SERPAPI_API_KEY is in environment variables
+    serpapi_key = os.getenv("SERPAPI_API_KEY")
     masked_key = serpapi_key[:4] + "..." + serpapi_key[-4:] if serpapi_key and len(serpapi_key) > 8 else None
     
     # Get the service's API key
@@ -176,7 +204,7 @@ async def test_serpapi_direct(query: str = "winter jacket", category: str = "Top
     
     try:
         logger.info(f"Testing SerpAPI search for: {query} in category {category}")
-        products = serpapi_service.search_products(
+        products = await serpapi_service.search_products(
             query=query,
             category=category,
             gender=gender,

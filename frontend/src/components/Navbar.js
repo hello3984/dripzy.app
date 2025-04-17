@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import Logo from '../logo.svg';
+import './Navbar.css';
 
 const Navbar = ({ user, onLogin, onLogout }) => {
   const [menuOpen, setMenuOpen] = useState(false);
+  // eslint-disable-next-line no-unused-vars
   const [showAuthModal, setShowAuthModal] = useState(false);
   
   const toggleMenu = () => {
@@ -48,6 +50,9 @@ const Navbar = ({ user, onLogin, onLogout }) => {
               </li>
               <li className="menu-item">
                 <a href="#generate" data-tooltip="Create your AI-powered outfit">TRY IT</a>
+              </li>
+              <li className="menu-item">
+                <Link to="/theme-collage" data-tooltip="Create themed outfit collages">THEME COLLAGES</Link>
               </li>
               <li className="menu-item dropdown">
                 <a href="#more" data-tooltip="Learn more about Dripzy">MORE</a>

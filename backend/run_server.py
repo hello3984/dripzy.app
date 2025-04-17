@@ -44,6 +44,7 @@ def parse_args():
     parser.add_argument("--port", type=int, default=8000, help="Port to run the server on")
     parser.add_argument("--reload", dest="reload", action="store_true", help="Enable auto-reload")
     parser.add_argument("--no-reload", dest="reload", action="store_false", help="Disable auto-reload")
+    parser.add_argument("--stable", action="store_true", help="Run in stable mode (no reload, production-like)")
     parser.set_defaults(reload=True)
     return parser.parse_args()
 
@@ -56,12 +57,16 @@ if __name__ == "__main__":
     port = args.port
     
     # Set reload flag (default to False for stability)
-    reload_enabled = args.reload
+    reload_enabled = args.reload and not args.stable
     
     logger.info(f"Starting server on port {port} with reload={'enabled' if reload_enabled else 'disabled'}...")
     
     # Set OpenSSL environment variables to allow insecure connections
     os.environ["PYTHONHTTPSVERIFY"] = "0"  # Disable HTTPS verification
+    
+    # Check if .watchexclude file exists and use it
+    exclude_file = os.path.join(os.path.dirname(__file__), ".watchexclude")
+    reload_dirs = ["app"]  # Only watch the app directory by default
     
     # Run uvicorn
     uvicorn.run(
@@ -69,6 +74,8 @@ if __name__ == "__main__":
         host="0.0.0.0",
         port=port,
         reload=reload_enabled,
+        reload_dirs=reload_dirs if reload_enabled else None,
+        reload_excludes=["tests/*", "test_*", "__pycache__/*", "*.pyc"] if reload_enabled else None,
         ssl_keyfile=None,
         ssl_certfile=None,
         log_level="info"

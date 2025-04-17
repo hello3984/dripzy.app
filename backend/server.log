@@ -1,0 +1,273 @@
+2025-04-16 23:36:28,912 - __main__ - INFO - SERPAPI_API_KEY: Present
+2025-04-16 23:36:28,912 - __main__ - INFO - Key value: 86c3...f56b
+2025-04-16 23:36:28,916 - __main__ - INFO - Created default SSL context
+2025-04-16 23:36:28,916 - __main__ - INFO - Starting server on port 8000 with reload=enabled...
+INFO:     Will watch for changes in these directories: ['/Users/fatihbayraktar/fashion AI/backend']
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+INFO:     Started reloader process [35142] using StatReload
+2025-04-16 23:36:28,989 - __mp_main__ - INFO - SERPAPI_API_KEY: Present
+2025-04-16 23:36:28,989 - __mp_main__ - INFO - Key value: 86c3...f56b
+2025-04-16 23:36:28,990 - __mp_main__ - INFO - Created default SSL context
+2025-04-16 23:36:29,395 - app.core.cache - INFO - Cache service initialized
+2025-04-16 23:36:29,398 - app.core.config - INFO - Attempting to load .env file...
+2025-04-16 23:36:29,398 - app.core.config - INFO - .env file found at /Users/fatihbayraktar/fashion AI/backend/.env and loaded
+2025-04-16 23:36:29,398 - app.core.config - INFO - .env file found and loaded: True
+2025-04-16 23:36:29,399 - app.core.config - INFO - Creating settings instance...
+2025-04-16 23:36:29,399 - app.core.config - INFO - ANTHROPIC_API_KEY loaded: Exists
+2025-04-16 23:36:29,399 - app.core.config - INFO - SERPAPI_API_KEY loaded: Exists
+2025-04-16 23:36:29,400 - app.core.config - INFO - Settings instance created.
+2025-04-16 23:36:29,419 - app.services.serpapi_service - INFO - SerpAPI key loaded from settings.
+2025-04-16 23:36:29,423 - app.services.search_optimizer - INFO - Loaded search optimization data from analysis results
+INFO:     Started server process [35149]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+2025-04-16 23:37:01,205 - app.main - INFO - Incoming request: GET /outfits/trending
+2025-04-16 23:37:01,207 - app.main - INFO - Finished request: GET /outfits/trending - Status=200 - Time=0.0020s
+INFO:     127.0.0.1:63365 - "GET /outfits/trending HTTP/1.1" 200 OK
+2025-04-16 23:37:01,209 - app.main - INFO - Incoming request: GET /outfits/trending
+2025-04-16 23:37:01,210 - app.main - INFO - Finished request: GET /outfits/trending - Status=200 - Time=0.0006s
+INFO:     127.0.0.1:63365 - "GET /outfits/trending HTTP/1.1" 200 OK
+2025-04-16 23:37:19,875 - app.main - INFO - Incoming request: GET /
+2025-04-16 23:37:19,876 - app.main - INFO - Finished request: GET / - Status=200 - Time=0.0014s
+INFO:     127.0.0.1:63454 - "GET / HTTP/1.1" 200 OK
+WARNING:  StatReload detected changes in 'app/services/image_service.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [35149]
+2025-04-16 23:39:18,993 - __mp_main__ - INFO - SERPAPI_API_KEY: Present
+2025-04-16 23:39:18,993 - __mp_main__ - INFO - Key value: 86c3...f56b
+2025-04-16 23:39:18,997 - __mp_main__ - INFO - Created default SSL context
+2025-04-16 23:39:19,457 - app.core.cache - INFO - Cache service initialized
+2025-04-16 23:39:19,459 - app.core.config - INFO - Attempting to load .env file...
+2025-04-16 23:39:19,460 - app.core.config - INFO - .env file found at /Users/fatihbayraktar/fashion AI/backend/.env and loaded
+2025-04-16 23:39:19,461 - app.core.config - INFO - .env file found and loaded: True
+2025-04-16 23:39:19,462 - app.core.config - INFO - Creating settings instance...
+2025-04-16 23:39:19,462 - app.core.config - INFO - ANTHROPIC_API_KEY loaded: Exists
+2025-04-16 23:39:19,462 - app.core.config - INFO - SERPAPI_API_KEY loaded: Exists
+2025-04-16 23:39:19,463 - app.core.config - INFO - Settings instance created.
+2025-04-16 23:39:19,512 - app.services.serpapi_service - INFO - SerpAPI key loaded from settings.
+2025-04-16 23:39:19,518 - app.services.search_optimizer - INFO - Loaded search optimization data from analysis results
+INFO:     Started server process [35396]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+2025-04-16 23:39:28,597 - app.main - INFO - Incoming request: GET /outfits/generate-test
+2025-04-16 23:39:28,598 - app.routers.outfits - INFO - Generating outfit for prompt: casual summer outfit, gender: female, budget: 200.0
+2025-04-16 23:39:28,598 - app.routers.outfits - INFO - Generating outfit concepts with Claude
+2025-04-16 23:39:28,598 - app.routers.outfits - INFO - ANTHROPIC_API_KEY status: Found
+2025-04-16 23:39:28,628 - app.routers.outfits - INFO - Calling Claude API (attempt 1/3)
+2025-04-16 23:40:18,540 - httpx - INFO - HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+2025-04-16 23:40:18,545 - app.routers.outfits - INFO - Claude API response received in 49.92s
+2025-04-16 23:40:18,545 - app.routers.outfits - INFO - Successfully extracted 3 outfit concepts
+2025-04-16 23:40:18,545 - app.routers.outfits - INFO - Enhancing 3 outfit concepts with real products
+2025-04-16 23:40:18,545 - app.routers.outfits - INFO - Processing 3 outfit concepts
+2025-04-16 23:40:18,546 - app.routers.outfits - INFO - SerpAPI search attempt 1/2 for Dress - white with colorful floral print Floral print sleeveless maxi dress with side slits floral print sleeveless
+2025-04-16 23:40:18,546 - app.services.serpapi_service - INFO - SerpAPI key loaded from settings.
+2025-04-16 23:40:18,546 - app.services.serpapi_service - INFO - Searching products for query: Dress white with colorful floral print Floral print sleeveless maxi dress with side slits floral print sleeveless
+2025-04-16 23:40:20,583 - httpx - INFO - HTTP Request: GET https://serpapi.com/search?api_key=86c3982a012f22f96e888772c0b6c80ce4f927f7fa43886f32fc827b9bd6f56b&engine=google_shopping&google_domain=google.com&q=Dress%20white%20with%20colorful%20floral%20print%20Floral%20print%20sleeveless%20maxi%20dress%20with%20side%20slits%20floral%20print%20sleeveless&num=12&hl=en&gl=us&tbs=mr%3A1 "HTTP/1.1 200 OK"
+2025-04-16 23:40:20,586 - app.routers.outfits - INFO - Found 6 products for Dress
+2025-04-16 23:40:20,586 - app.routers.outfits - INFO - SerpAPI search attempt 1/2 for Shoes - tan Flat leather strappy sandals flat leather
+2025-04-16 23:40:20,586 - app.services.serpapi_service - INFO - SerpAPI key loaded from settings.
+2025-04-16 23:40:20,586 - app.services.serpapi_service - INFO - Searching products for query: Shoes tan Flat leather strappy sandals flat leather
+2025-04-16 23:40:25,195 - httpx - INFO - HTTP Request: GET https://serpapi.com/search?api_key=86c3982a012f22f96e888772c0b6c80ce4f927f7fa43886f32fc827b9bd6f56b&engine=google_shopping&google_domain=google.com&q=Shoes%20tan%20Flat%20leather%20strappy%20sandals%20flat%20leather&num=12&hl=en&gl=us&tbs=mr%3A1 "HTTP/1.1 200 OK"
+2025-04-16 23:40:25,200 - app.routers.outfits - INFO - Found 6 products for Shoes
+2025-04-16 23:40:25,200 - app.routers.outfits - INFO - SerpAPI search attempt 1/2 for Accessory - natural straw Woven straw tote bag with leather handles woven straw
+2025-04-16 23:40:25,200 - app.services.serpapi_service - INFO - SerpAPI key loaded from settings.
+2025-04-16 23:40:25,201 - app.services.serpapi_service - INFO - Searching products for query: Accessory natural straw Woven straw tote bag with leather handles woven straw
+2025-04-16 23:40:30,823 - httpx - INFO - HTTP Request: GET https://serpapi.com/search?api_key=86c3982a012f22f96e888772c0b6c80ce4f927f7fa43886f32fc827b9bd6f56b&engine=google_shopping&google_domain=google.com&q=Accessory%20natural%20straw%20Woven%20straw%20tote%20bag%20with%20leather%20handles%20woven%20straw&num=12&hl=en&gl=us&tbs=mr%3A1 "HTTP/1.1 200 OK"
+2025-04-16 23:40:30,825 - app.routers.outfits - INFO - Found 6 products for Accessory
+2025-04-16 23:40:30,826 - app.routers.outfits - INFO - SerpAPI search attempt 1/2 for Accessory - natural straw with black trim Wide brim straw sunhat with a black ribbon trim wide brim straw
+2025-04-16 23:40:30,826 - app.services.serpapi_service - INFO - SerpAPI key loaded from settings.
+2025-04-16 23:40:30,826 - app.services.serpapi_service - INFO - Searching products for query: Accessory natural straw with black trim Wide brim straw sunhat with a black ribbon trim wide brim straw
+2025-04-16 23:40:38,916 - httpx - INFO - HTTP Request: GET https://serpapi.com/search?api_key=86c3982a012f22f96e888772c0b6c80ce4f927f7fa43886f32fc827b9bd6f56b&engine=google_shopping&google_domain=google.com&q=Accessory%20natural%20straw%20with%20black%20trim%20Wide%20brim%20straw%20sunhat%20with%20a%20black%20ribbon%20trim%20wide%20brim%20straw&num=12&hl=en&gl=us&tbs=mr%3A1 "HTTP/1.1 200 OK"
+2025-04-16 23:40:38,919 - app.routers.outfits - INFO - Found 6 products for Accessory
+2025-04-16 23:40:38,919 - app.routers.outfits - INFO - SerpAPI search attempt 1/2 for Top - Round frame tortoiseshell sunglasses round frame tortoiseshell
+2025-04-16 23:40:38,919 - app.services.serpapi_service - INFO - SerpAPI key loaded from settings.
+2025-04-16 23:40:38,919 - app.services.serpapi_service - INFO - Searching products for query: Top Round frame tortoiseshell sunglasses round frame tortoiseshell
+2025-04-16 23:40:41,437 - httpx - INFO - HTTP Request: GET https://serpapi.com/search?api_key=86c3982a012f22f96e888772c0b6c80ce4f927f7fa43886f32fc827b9bd6f56b&engine=google_shopping&google_domain=google.com&q=Top%20Round%20frame%20tortoiseshell%20sunglasses%20round%20frame%20tortoiseshell&num=12&hl=en&gl=us&tbs=mr%3A1 "HTTP/1.1 200 OK"
+2025-04-16 23:40:41,444 - app.routers.outfits - INFO - Found 6 products for Top
+2025-04-16 23:40:41,445 - app.routers.outfits - INFO - Collage created for outfit ed6acab2-7d04-4429-af49-536124aa3869: https://example.com/collage/ed6acab2-7d04-4429-af49-536124aa3869.jpg
+2025-04-16 23:40:41,445 - app.routers.outfits - INFO - SerpAPI search attempt 1/2 for Top - white Loose-fitting racerback tank top loose-fitting racerback
+2025-04-16 23:40:41,445 - app.services.serpapi_service - INFO - SerpAPI key loaded from settings.
+2025-04-16 23:40:41,445 - app.services.serpapi_service - INFO - Searching products for query: Top white Loose-fitting racerback tank top loose-fitting racerback
+2025-04-16 23:40:42,583 - httpx - INFO - HTTP Request: GET https://serpapi.com/search?api_key=86c3982a012f22f96e888772c0b6c80ce4f927f7fa43886f32fc827b9bd6f56b&engine=google_shopping&google_domain=google.com&q=Top%20white%20Loose-fitting%20racerback%20tank%20top%20loose-fitting%20racerback&num=12&hl=en&gl=us&tbs=mr%3A1 "HTTP/1.1 200 OK"
+2025-04-16 23:40:42,589 - app.routers.outfits - INFO - Found 6 products for Top
+2025-04-16 23:40:42,589 - app.routers.outfits - INFO - SerpAPI search attempt 1/2 for Bottom - light blue High-waisted denim shorts with a rolled hem high-waisted denim
+2025-04-16 23:40:42,589 - app.services.serpapi_service - INFO - SerpAPI key loaded from settings.
+2025-04-16 23:40:42,589 - app.services.serpapi_service - INFO - Searching products for query: Bottom light blue High-waisted denim shorts with a rolled hem high-waisted denim
+2025-04-16 23:40:44,080 - httpx - INFO - HTTP Request: GET https://serpapi.com/search?api_key=86c3982a012f22f96e888772c0b6c80ce4f927f7fa43886f32fc827b9bd6f56b&engine=google_shopping&google_domain=google.com&q=Bottom%20light%20blue%20High-waisted%20denim%20shorts%20with%20a%20rolled%20hem%20high-waisted%20denim&num=12&hl=en&gl=us&tbs=mr%3A1 "HTTP/1.1 200 OK"
+2025-04-16 23:40:44,087 - app.routers.outfits - INFO - Found 6 products for Bottom
+2025-04-16 23:40:44,087 - app.routers.outfits - INFO - SerpAPI search attempt 1/2 for Shoes - bright red Low-top canvas sneakers low-top canvas
+2025-04-16 23:40:44,087 - app.services.serpapi_service - INFO - SerpAPI key loaded from settings.
+2025-04-16 23:40:44,087 - app.services.serpapi_service - INFO - Searching products for query: Shoes bright red Low-top canvas sneakers low-top canvas
+2025-04-16 23:40:46,799 - httpx - INFO - HTTP Request: GET https://serpapi.com/search?api_key=86c3982a012f22f96e888772c0b6c80ce4f927f7fa43886f32fc827b9bd6f56b&engine=google_shopping&google_domain=google.com&q=Shoes%20bright%20red%20Low-top%20canvas%20sneakers%20low-top%20canvas&num=12&hl=en&gl=us&tbs=mr%3A1 "HTTP/1.1 200 OK"
+2025-04-16 23:40:46,896 - app.routers.outfits - INFO - Found 6 products for Shoes
+2025-04-16 23:40:46,898 - app.routers.outfits - INFO - SerpAPI search attempt 1/2 for Accessory - black Small nylon crossbody bag small nylon
+2025-04-16 23:40:46,899 - app.services.serpapi_service - INFO - SerpAPI key loaded from settings.
+2025-04-16 23:40:46,900 - app.services.serpapi_service - INFO - Searching products for query: Accessory black Small nylon crossbody bag small nylon
+2025-04-16 23:40:49,706 - httpx - INFO - HTTP Request: GET https://serpapi.com/search?api_key=86c3982a012f22f96e888772c0b6c80ce4f927f7fa43886f32fc827b9bd6f56b&engine=google_shopping&google_domain=google.com&q=Accessory%20black%20Small%20nylon%20crossbody%20bag%20small%20nylon&num=12&hl=en&gl=us&tbs=mr%3A1 "HTTP/1.1 200 OK"
+2025-04-16 23:40:49,710 - app.routers.outfits - INFO - Found 6 products for Accessory
+2025-04-16 23:40:49,710 - app.routers.outfits - INFO - SerpAPI search attempt 1/2 for Accessory - white Adjustable cotton baseball cap adjustable cotton
+2025-04-16 23:40:49,711 - app.services.serpapi_service - INFO - SerpAPI key loaded from settings.
+2025-04-16 23:40:49,711 - app.services.serpapi_service - INFO - Searching products for query: Accessory white Adjustable cotton baseball cap adjustable cotton
+2025-04-16 23:40:51,917 - httpx - INFO - HTTP Request: GET https://serpapi.com/search?api_key=86c3982a012f22f96e888772c0b6c80ce4f927f7fa43886f32fc827b9bd6f56b&engine=google_shopping&google_domain=google.com&q=Accessory%20white%20Adjustable%20cotton%20baseball%20cap%20adjustable%20cotton&num=12&hl=en&gl=us&tbs=mr%3A1 "HTTP/1.1 200 OK"
+2025-04-16 23:40:51,921 - app.routers.outfits - INFO - Found 6 products for Accessory
+2025-04-16 23:40:51,921 - app.routers.outfits - INFO - Collage created for outfit 95e3da21-93f9-4cdb-a3a8-374c19eb6757: https://example.com/collage/95e3da21-93f9-4cdb-a3a8-374c19eb6757.jpg
+2025-04-16 23:40:51,921 - app.routers.outfits - INFO - SerpAPI search attempt 1/2 for Dress - blush pink Sleeveless A-line sundress with a sweetheart neckline sleeveless A-line
+2025-04-16 23:40:51,922 - app.services.serpapi_service - INFO - SerpAPI key loaded from settings.
+2025-04-16 23:40:51,922 - app.services.serpapi_service - INFO - Searching products for query: Dress blush pink Sleeveless A-line sundress with a sweetheart neckline sleeveless A-line
+2025-04-16 23:40:54,071 - httpx - INFO - HTTP Request: GET https://serpapi.com/search?api_key=86c3982a012f22f96e888772c0b6c80ce4f927f7fa43886f32fc827b9bd6f56b&engine=google_shopping&google_domain=google.com&q=Dress%20blush%20pink%20Sleeveless%20A-line%20sundress%20with%20a%20sweetheart%20neckline%20sleeveless%20A-line&num=12&hl=en&gl=us&tbs=mr%3A1 "HTTP/1.1 200 OK"
+2025-04-16 23:40:54,074 - app.routers.outfits - INFO - Found 6 products for Dress
+2025-04-16 23:40:54,075 - app.routers.outfits - INFO - SerpAPI search attempt 1/2 for Top - light pink Lightweight knit cardigan with 3/4 sleeves lightweight knit
+2025-04-16 23:40:54,075 - app.services.serpapi_service - INFO - SerpAPI key loaded from settings.
+2025-04-16 23:40:54,075 - app.services.serpapi_service - INFO - Searching products for query: Top light pink Lightweight knit cardigan with 3/4 sleeves lightweight knit
+2025-04-16 23:40:56,834 - httpx - INFO - HTTP Request: GET https://serpapi.com/search?api_key=86c3982a012f22f96e888772c0b6c80ce4f927f7fa43886f32fc827b9bd6f56b&engine=google_shopping&google_domain=google.com&q=Top%20light%20pink%20Lightweight%20knit%20cardigan%20with%203%2F4%20sleeves%20lightweight%20knit&num=12&hl=en&gl=us&tbs=mr%3A1 "HTTP/1.1 200 OK"
+2025-04-16 23:40:56,837 - app.routers.outfits - INFO - Found 6 products for Top
+2025-04-16 23:40:56,837 - app.routers.outfits - INFO - SerpAPI search attempt 1/2 for Shoes - natural canvas with a tan wedge Espadrille wedge sandals with ankle straps espadrille wedge
+2025-04-16 23:40:56,837 - app.services.serpapi_service - INFO - SerpAPI key loaded from settings.
+2025-04-16 23:40:56,837 - app.services.serpapi_service - INFO - Searching products for query: Shoes natural canvas with a tan wedge Espadrille wedge sandals with ankle straps espadrille wedge
+2025-04-16 23:41:01,238 - httpx - INFO - HTTP Request: GET https://serpapi.com/search?api_key=86c3982a012f22f96e888772c0b6c80ce4f927f7fa43886f32fc827b9bd6f56b&engine=google_shopping&google_domain=google.com&q=Shoes%20natural%20canvas%20with%20a%20tan%20wedge%20Espadrille%20wedge%20sandals%20with%20ankle%20straps%20espadrille%20wedge&num=12&hl=en&gl=us&tbs=mr%3A1 "HTTP/1.1 200 OK"
+2025-04-16 23:41:01,242 - app.routers.outfits - INFO - Found 6 products for Shoes
+2025-04-16 23:41:01,242 - app.routers.outfits - INFO - SerpAPI search attempt 1/2 for Accessory - pale pink Small leather shoulder bag with a gold chain strap small leather
+2025-04-16 23:41:01,242 - app.services.serpapi_service - INFO - SerpAPI key loaded from settings.
+2025-04-16 23:41:01,243 - app.services.serpapi_service - INFO - Searching products for query: Accessory pale pink Small leather shoulder bag with a gold chain strap small leather
+2025-04-16 23:41:03,237 - httpx - INFO - HTTP Request: GET https://serpapi.com/search?api_key=86c3982a012f22f96e888772c0b6c80ce4f927f7fa43886f32fc827b9bd6f56b&engine=google_shopping&google_domain=google.com&q=Accessory%20pale%20pink%20Small%20leather%20shoulder%20bag%20with%20a%20gold%20chain%20strap%20small%20leather&num=12&hl=en&gl=us&tbs=mr%3A1 "HTTP/1.1 200 OK"
+2025-04-16 23:41:03,241 - app.routers.outfits - INFO - Found 6 products for Accessory
+2025-04-16 23:41:03,241 - app.routers.outfits - INFO - SerpAPI search attempt 1/2 for Accessory - gold and pink Gold hoop earrings with a pink enamel inlay gold hoop
+2025-04-16 23:41:03,241 - app.services.serpapi_service - INFO - SerpAPI key loaded from settings.
+2025-04-16 23:41:03,241 - app.services.serpapi_service - INFO - Searching products for query: Accessory gold and pink Gold hoop earrings with a pink enamel inlay gold hoop
+2025-04-16 23:41:06,862 - httpx - INFO - HTTP Request: GET https://serpapi.com/search?api_key=86c3982a012f22f96e888772c0b6c80ce4f927f7fa43886f32fc827b9bd6f56b&engine=google_shopping&google_domain=google.com&q=Accessory%20gold%20and%20pink%20Gold%20hoop%20earrings%20with%20a%20pink%20enamel%20inlay%20gold%20hoop&num=12&hl=en&gl=us&tbs=mr%3A1 "HTTP/1.1 200 OK"
+2025-04-16 23:41:06,867 - app.routers.outfits - INFO - Found 6 products for Accessory
+2025-04-16 23:41:06,868 - app.routers.outfits - INFO - Collage created for outfit 52876bea-9110-4cda-8bd8-1966baa6ef7f: https://example.com/collage/52876bea-9110-4cda-8bd8-1966baa6ef7f.jpg
+2025-04-16 23:41:06,872 - app.main - INFO - Finished request: GET /outfits/generate-test - Status=200 - Time=98.2755s
+2025-04-16 23:41:58,567 - app.main - INFO - Incoming request: GET /outfits/generate-test
+2025-04-16 23:41:58,569 - app.routers.outfits - INFO - Generating outfit for prompt: casual summer outfit, gender: female, budget: 200.0
+2025-04-16 23:41:58,569 - app.routers.outfits - INFO - Using cached outfit response for: casual summer outfit
+2025-04-16 23:41:58,571 - app.main - INFO - Finished request: GET /outfits/generate-test - Status=200 - Time=0.0036s
+INFO:     127.0.0.1:64784 - "GET /outfits/generate-test HTTP/1.1" 200 OK
+WARNING:  StatReload detected changes in 'run_server.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [35396]
+2025-04-16 23:46:43,325 - __mp_main__ - INFO - SERPAPI_API_KEY: Present
+2025-04-16 23:46:43,325 - __mp_main__ - INFO - Key value: 86c3...f56b
+2025-04-16 23:46:43,326 - __mp_main__ - INFO - Created default SSL context
+2025-04-16 23:46:43,789 - app.core.cache - INFO - Cache service initialized
+2025-04-16 23:46:43,791 - app.core.config - INFO - Attempting to load .env file...
+2025-04-16 23:46:43,792 - app.core.config - INFO - .env file found at /Users/fatihbayraktar/fashion AI/backend/.env and loaded
+2025-04-16 23:46:43,792 - app.core.config - INFO - .env file found and loaded: True
+2025-04-16 23:46:43,793 - app.core.config - INFO - Creating settings instance...
+2025-04-16 23:46:43,793 - app.core.config - INFO - ANTHROPIC_API_KEY loaded: Exists
+2025-04-16 23:46:43,793 - app.core.config - INFO - SERPAPI_API_KEY loaded: Exists
+2025-04-16 23:46:43,796 - app.core.config - INFO - Settings instance created.
+2025-04-16 23:46:43,822 - app.services.serpapi_service - INFO - SerpAPI key loaded from settings.
+2025-04-16 23:46:43,825 - app.services.search_optimizer - INFO - Loaded search optimization data from analysis results
+INFO:     Started server process [36157]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  StatReload detected changes in 'app/services/image_service.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [36157]
+2025-04-16 23:50:04,928 - __mp_main__ - INFO - SERPAPI_API_KEY: Present
+2025-04-16 23:50:04,929 - __mp_main__ - INFO - Key value: 86c3...f56b
+2025-04-16 23:50:04,930 - __mp_main__ - INFO - Created default SSL context
+2025-04-16 23:50:05,482 - app.core.cache - INFO - Cache service initialized
+2025-04-16 23:50:05,484 - app.core.config - INFO - Attempting to load .env file...
+2025-04-16 23:50:05,485 - app.core.config - INFO - .env file found at /Users/fatihbayraktar/fashion AI/backend/.env and loaded
+2025-04-16 23:50:05,485 - app.core.config - INFO - .env file found and loaded: True
+2025-04-16 23:50:05,485 - app.core.config - INFO - Creating settings instance...
+2025-04-16 23:50:05,485 - app.core.config - INFO - ANTHROPIC_API_KEY loaded: Exists
+2025-04-16 23:50:05,485 - app.core.config - INFO - SERPAPI_API_KEY loaded: Exists
+2025-04-16 23:50:05,487 - app.core.config - INFO - Settings instance created.
+2025-04-16 23:50:05,511 - app.services.serpapi_service - INFO - SerpAPI key loaded from settings.
+2025-04-16 23:50:05,516 - app.services.search_optimizer - INFO - Loaded search optimization data from analysis results
+INFO:     Started server process [36455]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  StatReload detected changes in 'app/routers/outfits.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [36455]
+2025-04-16 23:50:20,477 - __mp_main__ - INFO - SERPAPI_API_KEY: Present
+2025-04-16 23:50:20,477 - __mp_main__ - INFO - Key value: 86c3...f56b
+2025-04-16 23:50:20,480 - __mp_main__ - INFO - Created default SSL context
+2025-04-16 23:50:20,930 - app.core.cache - INFO - Cache service initialized
+2025-04-16 23:50:20,932 - app.core.config - INFO - Attempting to load .env file...
+2025-04-16 23:50:20,933 - app.core.config - INFO - .env file found at /Users/fatihbayraktar/fashion AI/backend/.env and loaded
+2025-04-16 23:50:20,933 - app.core.config - INFO - .env file found and loaded: True
+2025-04-16 23:50:20,933 - app.core.config - INFO - Creating settings instance...
+2025-04-16 23:50:20,933 - app.core.config - INFO - ANTHROPIC_API_KEY loaded: Exists
+2025-04-16 23:50:20,933 - app.core.config - INFO - SERPAPI_API_KEY loaded: Exists
+2025-04-16 23:50:20,934 - app.core.config - INFO - Settings instance created.
+2025-04-16 23:50:20,956 - app.services.serpapi_service - INFO - SerpAPI key loaded from settings.
+2025-04-16 23:50:20,959 - app.services.search_optimizer - INFO - Loaded search optimization data from analysis results
+INFO:     Started server process [36482]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  StatReload detected changes in 'app/services/serpapi_service.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [36482]
+2025-04-16 23:51:43,739 - __mp_main__ - INFO - SERPAPI_API_KEY: Present
+2025-04-16 23:51:43,739 - __mp_main__ - INFO - Key value: 86c3...f56b
+2025-04-16 23:51:43,740 - __mp_main__ - INFO - Created default SSL context
+2025-04-16 23:51:44,321 - app.core.cache - INFO - Cache service initialized
+2025-04-16 23:51:44,322 - app.core.config - INFO - Attempting to load .env file...
+2025-04-16 23:51:44,323 - app.core.config - INFO - .env file found at /Users/fatihbayraktar/fashion AI/backend/.env and loaded
+2025-04-16 23:51:44,323 - app.core.config - INFO - .env file found and loaded: True
+2025-04-16 23:51:44,323 - app.core.config - INFO - Creating settings instance...
+2025-04-16 23:51:44,323 - app.core.config - INFO - ANTHROPIC_API_KEY loaded: Exists
+2025-04-16 23:51:44,324 - app.core.config - INFO - SERPAPI_API_KEY loaded: Exists
+2025-04-16 23:51:44,324 - app.core.config - INFO - Settings instance created.
+2025-04-16 23:51:44,343 - app.services.serpapi_service - INFO - SerpAPI key loaded from settings.
+2025-04-16 23:51:44,346 - app.services.search_optimizer - INFO - Loaded search optimization data from analysis results
+INFO:     Started server process [36537]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  StatReload detected changes in 'app/routers/outfits.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [36537]
+2025-04-16 23:52:00,729 - __mp_main__ - INFO - SERPAPI_API_KEY: Present
+2025-04-16 23:52:00,729 - __mp_main__ - INFO - Key value: 86c3...f56b
+2025-04-16 23:52:00,731 - __mp_main__ - INFO - Created default SSL context
+2025-04-16 23:52:01,140 - app.core.cache - INFO - Cache service initialized
+2025-04-16 23:52:01,142 - app.core.config - INFO - Attempting to load .env file...
+2025-04-16 23:52:01,142 - app.core.config - INFO - .env file found at /Users/fatihbayraktar/fashion AI/backend/.env and loaded
+2025-04-16 23:52:01,142 - app.core.config - INFO - .env file found and loaded: True
+2025-04-16 23:52:01,143 - app.core.config - INFO - Creating settings instance...
+2025-04-16 23:52:01,143 - app.core.config - INFO - ANTHROPIC_API_KEY loaded: Exists
+2025-04-16 23:52:01,143 - app.core.config - INFO - SERPAPI_API_KEY loaded: Exists
+2025-04-16 23:52:01,144 - app.core.config - INFO - Settings instance created.
+2025-04-16 23:52:01,165 - app.services.serpapi_service - INFO - SerpAPI key loaded from settings.
+2025-04-16 23:52:01,168 - app.services.search_optimizer - INFO - Loaded search optimization data from analysis results
+INFO:     Started server process [36566]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  StatReload detected changes in 'app/routers/outfits.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [36566]
+2025-04-16 23:52:51,579 - __mp_main__ - INFO - SERPAPI_API_KEY: Present
+2025-04-16 23:52:51,579 - __mp_main__ - INFO - Key value: 86c3...f56b
+2025-04-16 23:52:51,582 - __mp_main__ - INFO - Created default SSL context
+2025-04-16 23:52:52,032 - app.core.cache - INFO - Cache service initialized
+2025-04-16 23:52:52,034 - app.core.config - INFO - Attempting to load .env file...
+2025-04-16 23:52:52,035 - app.core.config - INFO - .env file found at /Users/fatihbayraktar/fashion AI/backend/.env and loaded
+2025-04-16 23:52:52,035 - app.core.config - INFO - .env file found and loaded: True
+2025-04-16 23:52:52,036 - app.core.config - INFO - Creating settings instance...
+2025-04-16 23:52:52,036 - app.core.config - INFO - ANTHROPIC_API_KEY loaded: Exists
+2025-04-16 23:52:52,036 - app.core.config - INFO - SERPAPI_API_KEY loaded: Exists
+2025-04-16 23:52:52,037 - app.core.config - INFO - Settings instance created.
+2025-04-16 23:52:52,070 - app.services.serpapi_service - INFO - SerpAPI key loaded from settings.
+2025-04-16 23:52:52,080 - app.services.search_optimizer - INFO - Loaded search optimization data from analysis results
+INFO:     Started server process [36667]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.

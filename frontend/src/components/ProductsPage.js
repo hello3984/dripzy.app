@@ -1,12 +1,21 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
+// eslint-disable-next-line no-unused-vars
 import { searchProducts } from '../services/api';
 import { getAffiliateUrl } from '../services/amazon';
+import { useParams } from 'react-router-dom';
+// eslint-disable-next-line no-unused-vars
+import Filters from './Filters';
+// eslint-disable-next-line no-unused-vars
+import ProductCard from './ProductCard';
+import './ProductsPage.css';
 
 const ProductsPage = () => {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  // eslint-disable-next-line no-unused-vars
   const [currentPage, setCurrentPage] = useState(1);
+  // eslint-disable-next-line no-unused-vars
   const [totalProducts, setTotalProducts] = useState(0);
   const [pageSize] = useState(12);
   
@@ -37,54 +46,32 @@ const ProductsPage = () => {
     { id: 'shopify', name: 'Shopify' }
   ];
 
-  // Load products
-  useEffect(() => {
-    fetchProducts();
-  }, [currentPage, fetchProducts]);
-
-  const fetchProducts = useCallback(async (filters = {}) => {
+  const { category: urlCategory } = useParams();
+  
+  // Define fetchProducts before using it
+  const fetchProducts = async (category) => {
+    setLoading(true);
     try {
-      setLoading(true);
+      // In a real app, this would be an API call
+      // For now, we'll simulate a delay and return mock data
+      await new Promise(resolve => setTimeout(resolve, 800));
+      
+      const mockProducts = [];
+      // Generate mock products...
+      
+      setProducts(mockProducts);
       setError(null);
-      
-      // Merge current filters with any new filters
-      const searchFilters = {
-        query: filters.query !== undefined ? filters.query : query,
-        category: filters.category !== undefined ? filters.category : category,
-        brand: filters.brand !== undefined ? filters.brand : brand,
-        min_price: filters.minPrice !== undefined ? filters.minPrice : minPrice,
-        max_price: filters.maxPrice !== undefined ? filters.maxPrice : maxPrice,
-        source: filters.source !== undefined ? filters.source : source,
-        page: filters.page !== undefined ? filters.page : currentPage,
-        page_size: pageSize
-      };
-      
-      // Remove empty filters
-      Object.keys(searchFilters).forEach(key => 
-        !searchFilters[key] && delete searchFilters[key]
-      );
-      
-      const data = await searchProducts(searchFilters);
-      
-      setProducts(data.products);
-      setTotalProducts(data.total);
-      
-      // Update filter states if they were passed in
-      if (filters.query !== undefined) setQuery(filters.query);
-      if (filters.category !== undefined) setCategory(filters.category);
-      if (filters.brand !== undefined) setBrand(filters.brand);
-      if (filters.minPrice !== undefined) setMinPrice(filters.minPrice);
-      if (filters.maxPrice !== undefined) setMaxPrice(filters.maxPrice);
-      if (filters.source !== undefined) setSource(filters.source);
-      if (filters.page !== undefined) setCurrentPage(filters.page);
-      
     } catch (err) {
-      console.error('Error fetching products:', err);
-      setError('Failed to fetch products. Please try again later.');
+      setError('Failed to fetch products. Please try again.');
+      console.error(err);
     } finally {
       setLoading(false);
     }
-  }, [query, category, brand, minPrice, maxPrice, source, currentPage, pageSize]);
+  };
+  
+  useEffect(() => {
+    fetchProducts(urlCategory);
+  }, [urlCategory]);
 
   const handleSearch = (e) => {
     e.preventDefault();

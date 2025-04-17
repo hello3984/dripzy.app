@@ -17,9 +17,14 @@
   },
   "scripts": {
     "start": "react-scripts start",
+    "start:port": "PORT=$npm_config_port react-scripts start",
+    "dev": "PORT=3006 react-scripts start",
+    "dev:clean": "lsof -ti:3000,3001,3006 | xargs kill -9 2>/dev/null || true && PORT=3006 react-scripts start",
     "build": "react-scripts build",
     "test": "react-scripts test",
-    "eject": "react-scripts eject"
+    "eject": "react-scripts eject",
+    "lint:fix": "eslint src/ --fix",
+    "lint:strict": "eslint src/ --max-warnings=0"
   },
   "eslintConfig": {
     "extends": [

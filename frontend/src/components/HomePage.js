@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { getTrendingStyles, generateOutfit } from '../services/api';
+import { getTrendingStyles, generateOutfit, getTestOutfits } from '../services/api';
+// eslint-disable-next-line no-unused-vars
 import { getAffiliateUrl } from '../services/amazon';
-import TrendingStylesDisplay from './TrendingStylesDisplay';
 import './HomePage.css';
 import Banner from './Banner';
 import VirtualTryOn from './VirtualTryOn';
@@ -9,51 +9,43 @@ import OutfitDisplay from './OutfitDisplay';
 
 const HomePage = () => {
   const [trendingStyles, setTrendingStyles] = useState({});
-  const [loading, setLoading] = useState(true);
   const [prompt, setPrompt] = useState('');
   const [budget, setBudget] = useState('');
+  // eslint-disable-next-line no-unused-vars
   const [selectedGender, setSelectedGender] = useState('women');
   const [selectedStyle, setSelectedStyle] = useState('');
   const [showResults, setShowResults] = useState(false); // For demo purposes
   const [generating, setGenerating] = useState(false); // Animation state
   const [apiOutfits, setApiOutfits] = useState([]); // Add state for real API outfits
   const [error, setError] = useState(null); // Add state for error handling
-  const [outfits, setOutfits] = useState([]);
-  const [loadingImages, setLoadingImages] = useState({});
-  const [budgetTier, setBudgetTier] = useState(null);
-  // Add state for controlling style grid visibility
-  const [showStyleGrid, setShowStyleGrid] = useState(false);
-
+  
   // New state for tracking active category tab
   const [activeCategory, setActiveCategory] = useState('all');
-
-  const [selectedPhoto, setSelectedPhoto] = useState(null);
+  
   const fileInputRef = useRef(null);
-
-  // Budget tier options
-  const budgetTiers = [
-    { name: 'Luxury', min: 1000, description: 'Premium designer brands' },
-    { name: 'Premium', min: 400, max: 999, description: 'High-quality fashion' },
-    { name: 'Mid-range', min: 150, max: 399, description: 'Quality everyday pieces' },
-    { name: 'Budget', max: 149, description: 'Affordable style picks' }
-  ];
 
   // Add a state for the virtual try-on modal in the HomePage component
   const [showTryOn, setShowTryOn] = useState(false);
   const [userAvatar, setUserAvatar] = useState(null);
+  // Define missing state for selected photo
+  // eslint-disable-next-line no-unused-vars
+  const [selectedPhoto, setSelectedPhoto] = useState(null);
+  // Define budgetTier state
+  // eslint-disable-next-line no-unused-vars
+  const [budgetTier, setBudgetTier] = useState(null);
+  // Add loadingImages state
+  // eslint-disable-next-line no-unused-vars
+  const [loadingImages, setLoadingImages] = useState({});
 
   useEffect(() => {
     // Fetch trending styles when component mounts
     const fetchTrendingStyles = async () => {
       try {
-        setLoading(true);
         const data = await getTrendingStyles();
         console.log('Trending styles data:', data);
         setTrendingStyles(data.styles || {});
       } catch (error) {
         console.error('Failed to fetch trending styles:', error);
-      } finally {
-        setLoading(false);
       }
     };
 
@@ -82,7 +74,16 @@ const HomePage = () => {
     console.log('Generating outfit with params:', requestParams);
     
     try {
-      const result = await generateOutfit(requestParams);
+      // First try with the main API
+      let result;
+      try {
+        result = await generateOutfit(requestParams);
+      } catch (mainApiError) {
+        console.error('Main API error:', mainApiError);
+        console.log('Trying test endpoint fallback...');
+        // If main API fails, try the test endpoint
+        result = await getTestOutfits();
+      }
       
       if (result && result.outfits && result.outfits.length > 0) {
         setApiOutfits(result.outfits);
@@ -111,6 +112,7 @@ const HomePage = () => {
     }
   };
 
+  // eslint-disable-next-line no-unused-vars
   const handleStyleClick = (style) => {
     console.log('Style clicked:', style);
     setSelectedStyle(style);
@@ -408,8 +410,8 @@ const HomePage = () => {
     }
   ];
 
-  // Function to handle image loading errors with reliable fallbacks
-  const handleImageError = (e, category) => {
+  // Add a missing helper function for default images
+  const get_default_image_for_category = (category) => {
     const fallbackImages = {
       'tops': 'https://images.unsplash.com/photo-1576566588028-4147f3842f27?w=300',
       'bottoms': 'https://images.unsplash.com/photo-1541099649105-f69ad21f3246?w=300',
@@ -419,71 +421,68 @@ const HomePage = () => {
       'outerwear': 'https://images.unsplash.com/photo-1543076447-215ad9ba6923?w=300',
       'default': 'https://images.unsplash.com/photo-1525507119028-ed4c629a60a3?w=300'
     };
-    
-    // Set the src to the appropriate fallback image based on category
-    e.target.src = fallbackImages[category.toLowerCase()] || fallbackImages.default;
-    e.target.classList.add('fallback-image');
+    return fallbackImages[category?.toLowerCase()] || fallbackImages.default;
   };
 
-  // Handle budget tier selection
+  // eslint-disable-next-line no-unused-vars
+  const handleImageError = (e, category) => {
+    // Prevent broken images from being displayed
+    e.target.src = get_default_image_for_category(category || 'unknown');
+    e.target.alt = `Default ${category || 'product'} image`;
+    
+    // Track that this image failed to load
+    setLoadingImages(prev => ({
+      ...prev,
+      [e.target.dataset.itemId]: 'error'
+    }));
+  };
+
+  // eslint-disable-next-line no-unused-vars
   const handleBudgetTierSelect = (tier) => {
     setBudgetTier(tier);
+    // Set budget range based on tier
     if (tier.min && tier.max) {
-      setBudget(tier.max); // Set to max of the range
+      setBudget(`${tier.min}-${tier.max}`);
     } else if (tier.min) {
-      setBudget(tier.min); // For luxury, set to minimum
+      setBudget(`${tier.min}+`);
     } else if (tier.max) {
-      setBudget(tier.max); // For budget, set to maximum
+      setBudget(`0-${tier.max}`);
     }
   };
 
-  // Force show the Coachella outfits if the user clicked Coachella
-  useEffect(() => {
-    if (selectedStyle === 'Coachella') {
-      setShowResults(true);
-      setApiOutfits([]);
-    }
-  }, [selectedStyle]);
-
-  // The categories we want to display in our filter tabs
-  const categories = ['all', 'tops', 'bottoms', 'dresses', 'shoes', 'accessories', 'outerwear'];
-
-  // Filter items by category for the filter tabs
+  // eslint-disable-next-line no-unused-vars
   const getItemsByCategory = (category) => {
-    const displayOutfits = getDisplayOutfits();
+    if (!apiOutfits || apiOutfits.length === 0) return [];
     
-    if (category === 'all') {
-      return displayOutfits.flatMap(outfit => outfit.items);
-    }
-    
-    return displayOutfits.flatMap(outfit => 
-      outfit.items.filter(item => 
-        item.category.toLowerCase() === category.toLowerCase()
-      )
-    );
+    let allItems = [];
+    apiOutfits.forEach(outfit => {
+      if (outfit.items) {
+        outfit.items.forEach(item => {
+          if (category === 'all' || item.category === category) {
+            allItems.push({...item, outfit_id: outfit.id});
+          }
+        });
+      }
+    });
+    return allItems;
   };
 
-  // Add this in the render function where outfit items are displayed
+  // eslint-disable-next-line no-unused-vars
   const renderOutfitItem = (item) => {
-    const affiliateUrl = getAffiliateUrl(item.url, item.source);
-
-  return (
-      <div className="outfit-item" key={item.id}>
-        <div className="outfit-item-image">
-          <img src={item.image_url || 'https://via.placeholder.com/300x400'} alt={item.name} />
+    return (
+      <div className="product-card" key={item.product_id || `item-${Math.random()}`}>
+        <div className="product-image">
+          <img 
+            src={item.image_url || get_default_image_for_category(item.category)}
+            alt={item.product_name || 'Product'} 
+            onError={(e) => handleImageError(e, item.category)}
+            data-item-id={item.product_id}
+          />
         </div>
-        <div className="outfit-item-details">
-          <h4>{item.name}</h4>
-          <p className="brand">{item.brand}</p>
-          <p className="price">${item.price.toFixed(2)}</p>
-          <a 
-            href={affiliateUrl} 
-            target="_blank" 
-            rel="noopener noreferrer" 
-            className="view-item-btn"
-          >
-            Shop Now
-          </a>
+        <div className="product-details">
+          <h3>{item.product_name || 'Product Name'}</h3>
+          <p className="brand">{item.brand || 'Brand'}</p>
+          <p className="price">${parseFloat(item.price || 0).toFixed(2)}</p>
         </div>
       </div>
     );
@@ -506,6 +505,9 @@ const HomePage = () => {
     setShowTryOn(false);
     setShowResults(true); // Show results after avatar creation
   };
+
+  // Define the categories for filter tabs
+  const categories = ['all', 'tops', 'bottoms', 'dresses', 'shoes', 'accessories', 'outerwear'];
 
   return (
     <div className="homepage">

@@ -8,7 +8,8 @@ import './OutfitDisplay.css';
 const OutfitDisplay = ({ outfit, onTryOn }) => {
   if (!outfit) return null;
 
-  // Format the price for display
+  // Format price for display
+  // eslint-disable-next-line no-unused-vars
   const price = outfit.total_price ? new Intl.NumberFormat('en-US', {
     style: 'currency',
     currency: 'USD',

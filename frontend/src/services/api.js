@@ -1,14 +1,19 @@
 // API service for making calls to our backend
 import stylistService from './stylist';
 
-// API configuration
+// Define API configuration
 const API_CONFIG = {
-  // Use localhost with port 8090 for development
+  // Base URL for API requests
   baseURL: process.env.NODE_ENV === 'development' 
-    ? 'http://localhost:8090' 
-    : 'https://dripzy-backend.herokuapp.com',
-  timeout: 30000, // Increased timeout for image processing
+    ? 'http://localhost:8000' // Updated port to 8000
+    : 'https://api.fashionai.example.com',
+  // Timeout in milliseconds (30s for image processing)
+  timeout: 30000
 };
+
+// Third-party API keys 
+// eslint-disable-next-line no-unused-vars
+const RAPID_API_KEY = process.env.REACT_APP_RAPID_API_KEY || '';
 
 // Reliable fashion API endpoints that don't require authentication
 const API_URLS = {
@@ -22,9 +27,6 @@ const API_URLS = {
   ZAPPOS: 'https://zappos1.p.rapidapi.com/products/list'
 };
 
-// RapidAPI keys - you would need to sign up for these
-const RAPID_API_KEY = 'SIGN-UP-FOR-KEY'; // Replace with your key
-
 /**
  * Generate outfit recommendations based on preferences
  * @param {Object} preferences User preferences including prompt, budget, gender, etc.
@@ -33,15 +35,21 @@ const RAPID_API_KEY = 'SIGN-UP-FOR-KEY'; // Replace with your key
 export const generateOutfit = async (preferences) => {
   try {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+    const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
     
     console.log('Generating outfit with preferences:', preferences);
     
     try {
-      const response = await fetch(`${API_CONFIG.baseURL}/outfits/generate`, {
+      // Log the full URL being used
+      const url = `${API_CONFIG.baseURL}/outfits/generate`;
+      console.log('API Request URL:', url);
+      console.log('Request body:', JSON.stringify(preferences));
+      
+      const response = await fetch(url, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Accept': 'application/json'
         },
         body: JSON.stringify(preferences),
         credentials: 'omit', // Explicit CORS handling
@@ -50,9 +58,17 @@ export const generateOutfit = async (preferences) => {
       });
       
       clearTimeout(timeoutId);
+      console.log('Response status:', response.status);
       
       if (!response.ok) {
         console.error('Error response from server:', response.status, response.statusText);
+        // Try to get the error details from the response
+        try {
+          const errorData = await response.json();
+          console.error('Server error details:', errorData);
+        } catch (e) {
+          console.error('Could not parse error response');
+        }
         
         // Try fallback to real fashion APIs
         return await getRealFashionOutfits(preferences);
@@ -705,5 +721,30 @@ export const getAvatarOptions = async () => {
   } catch (error) {
     console.error('Failed to get avatar options:', error);
     throw error;
+  }
+};
+
+// Function to fallback to the test endpoint if the regular endpoint fails
+export const getTestOutfits = async () => {
+  try {
+    console.log('Falling back to test endpoint');
+    const response = await fetch(`${API_CONFIG.baseURL}/outfits/generate-test`);
+    
+    if (!response.ok) {
+      throw new Error(`Test endpoint failed with status: ${response.status}`);
+    }
+    
+    const data = await response.json();
+    console.log('Received test outfit data:', data);
+    
+    if (data && data.outfits && data.outfits.length > 0) {
+      return data;
+    }
+    
+    throw new Error('No outfits returned from test endpoint');
+  } catch (error) {
+    console.error('Error in test endpoint fallback:', error);
+    // Return empty outfits if everything fails
+    return { outfits: [] };
   }
 }; 

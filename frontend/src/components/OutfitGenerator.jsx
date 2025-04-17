@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import './OutfitGenerator.css';
-import MoodChart from '../../components/MoodChart';
-import LoadingIndicator from '../../components/LoadingIndicator';
+import MoodChart from './ui/MoodChart';
+import LoadingIndicator from './ui/LoadingIndicator';
 
 const OutfitGenerator = () => {
   const [prompt, setPrompt] = useState('');
@@ -14,7 +14,7 @@ const OutfitGenerator = () => {
 
   // Define API base URL based on environment
   const API_BASE_URL = process.env.NODE_ENV === 'development' 
-    ? 'http://localhost:5000' // Local development backend
+    ? 'http://localhost:8003' // Local development backend (updated to correct running port)
     : 'https://dripzy-app.onrender.com'; // Production backend
 
   const handlePromptChange = (e) => {
@@ -64,6 +64,7 @@ const OutfitGenerator = () => {
     console.log("Request params:", { prompt, gender, budget });
 
     try {
+      // First attempt - POST to /outfits/generate
       const response = await fetch(`${API_BASE_URL}/outfits/generate`, {
         method: 'POST',
         headers: {
@@ -81,9 +82,27 @@ const OutfitGenerator = () => {
       console.log("Response status:", response.status);
       
       if (!response.ok) {
-        const errorText = await response.text();
-        console.error("API error:", errorText);
-        throw new Error(`Error ${response.status}: ${errorText}`);
+        console.log("POST request failed, trying fallback to GET test endpoint");
+        // If POST request fails, try the test endpoint as fallback
+        const testResponse = await fetch(`${API_BASE_URL}/outfits/generate-test`);
+        
+        if (!testResponse.ok) {
+          const errorText = await response.text();
+          console.error("API error:", errorText);
+          throw new Error(`Error ${response.status}: ${errorText}`);
+        }
+        
+        const data = await testResponse.json();
+        // Added detailed logging for debugging
+        console.log("API test response data:", JSON.stringify(data, null, 2));
+        console.log("First outfit:", data.outfits && data.outfits[0] ? JSON.stringify(data.outfits[0], null, 2) : "No outfits returned");
+        
+        if (!data.outfits || !data.outfits.length) {
+          throw new Error("No outfits returned from API");
+        }
+        
+        setGeneratedOutfit(data.outfits[0]); // Use the first outfit from the array
+        return;
       }
 
       const data = await response.json();

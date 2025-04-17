@@ -11,6 +11,7 @@ from datetime import datetime
 import asyncio
 import time
 import aiohttp
+import copy
 
 # --- Added Imports ---
 import anthropic
@@ -23,6 +24,7 @@ from app.core.cache import cache_service
 from app.core.config import settings
 from app.dependencies import get_db
 from app.services.search_optimizer import get_search_optimizer
+from app.services.product_service import ParallelProductSearchService
 
 router = APIRouter(
     prefix="/outfits",
@@ -210,45 +212,49 @@ def _get_mock_product(category, description, color):
 
 async def generate_outfit_concepts(request: OutfitGenerateRequest) -> List[Dict[str, Any]]:
     """
-    Generate outfit concepts using Claude AI.
+    Generate outfit concepts based on user request using Claude.
     
     Args:
-        request: The outfit generation request with prompt, gender, budget
+        request: The outfit generation request
         
     Returns:
-        List of outfit concepts with detailed item descriptions
+        List of outfit concept dictionaries
     """
-    cache_key = f"outfit_concepts:{request.prompt}:{request.gender}:{request.budget}"
+    prompt = request.prompt
+    gender = request.gender or "unisex"
+    budget = request.budget or 400.0
+    
+    # Try to get cached concepts first
+    cache_key = f"outfit_concepts:{prompt}:{gender}:{budget}"
     cached_concepts = cache_service.get(cache_key)
     if cached_concepts:
-        logger.info(f"Using cached outfit concepts for: {request.prompt}")
+        logger.info(f"Using cached outfit concepts for prompt: {prompt}")
         return cached_concepts
     
-    # Don't proceed without API key and client
-    api_key = os.environ.get("ANTHROPIC_API_KEY")
-    logger.info(f"ANTHROPIC_API_KEY status: {'Found' if api_key else 'Missing'}")
-    if not api_key:
-        logger.error("Missing ANTHROPIC_API_KEY environment variable")
+    # Check API key
+    ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY")
+    logger.info(f"ANTHROPIC_API_KEY status: {'Found' if ANTHROPIC_API_KEY else 'Missing'}")
+    
+    if not ANTHROPIC_API_KEY:
+        logger.warning("Missing ANTHROPIC_API_KEY environment variable")
         return []
     
-    if not anthropic_client:
-        logger.error("Anthropic client not initialized")
-        return []
+    # Initialize Claude client
+    anthropic_client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
     
-    # Prepare for retry logic
+    # Set up retry parameters
     max_attempts = 3
-    backoff_time = 1  # Start with 1 second backoff
+    backoff_time = 2
     
+    # Format prompt for Claude
     prompt_base = f"""
-You are a fashion stylist assistant creating outfits for a customer based on their needs.
-
-### Customer Request
-I am looking for outfit ideas for: {request.prompt}
-Gender: {request.gender if request.gender else 'Any'}
-Budget: {'$' + str(request.budget) if request.budget else 'Any budget'}
+You are a professional fashion stylist creating outfit concepts for:
+- Prompt: "{prompt}"
+- Gender: {gender}
+- Budget: ${budget}
 
 ### Task
-I need you to generate {request.num_outfits or 3} unique outfit concepts suitable for this request.
+I need you to generate 3 unique outfit concepts suitable for this request.
 For each outfit, include the following:
 - outfit_name: A catchy name for the outfit
 - description: A brief description of the overall look and feel
@@ -292,7 +298,8 @@ IMPORTANT: Make sure your response is ONLY valid JSON without any other text.
             logger.info(f"Calling Claude API (attempt {attempt+1}/{max_attempts})")
             start_time = time.time()
             
-            response = await anthropic_client.messages.create(
+            # Use the Anthropic client normally, don't await the create method
+            response = anthropic_client.messages.create(
                 model="claude-3-opus-20240229",
                 max_tokens=2000,
                 temperature=0.7,
@@ -423,16 +430,32 @@ def _determine_style(outfit_name: str, outfit_description: str, user_prompt: str
 
 def _add_collage_to_outfit(outfit: Outfit):
     """Generate and add a collage URL to the outfit object."""
-    image_urls = [item.image_url for item in outfit.items if item.image_url]
-    if len(image_urls) >= 2: # Need at least 2 images for a collage
-        try:
-            collage_url = create_outfit_collage(image_urls, outfit.id)
-            outfit.collage_url = collage_url
-            logger.info(f"Collage created for outfit {outfit.id}: {collage_url}")
-        except Exception as e:
-            logger.error(f"Failed to create collage for outfit {outfit.id}: {str(e)}")
-    else:
-        logger.warning(f"Not enough images ({len(image_urls)}) to create collage for outfit {outfit.id}")
+    try:
+        # Ensure we have items with valid image URLs
+        image_urls = [item.image_url for item in outfit.items if item and item.image_url and isinstance(item.image_url, str)]
+        
+        if len(image_urls) >= 2:  # Need at least 2 images for a collage
+            try:
+                # Add proper error handling for the collage creation
+                collage_url = create_outfit_collage(image_urls, str(outfit.id))
+                outfit.collage_url = collage_url if collage_url else ""
+                logger.info(f"Collage created for outfit {outfit.id}: {collage_url}")
+            except TypeError as type_error:
+                # Handle type errors specifically
+                logger.error(f"Type error creating collage for outfit {outfit.id}: {str(type_error)}")
+                outfit.collage_url = ""
+            except Exception as e:
+                # Handle other exceptions
+                logger.error(f"Failed to create collage for outfit {outfit.id}: {str(e)}")
+                outfit.collage_url = ""
+        else:
+            logger.warning(f"Not enough valid images ({len(image_urls)}) to create collage for outfit {outfit.id}")
+            outfit.collage_url = ""
+    except Exception as e:
+        # Catch any unexpected errors in the function itself
+        logger.error(f"Unexpected error in _add_collage_to_outfit for {getattr(outfit, 'id', 'unknown')}: {str(e)}")
+        if hasattr(outfit, 'collage_url'):
+            outfit.collage_url = ""
 
 # --- End Added Missing Functions ---
 
@@ -499,6 +522,16 @@ async def generate_outfit(request: OutfitGenerateRequest) -> OutfitGenerateRespo
 async def ai_generate_outfit(request: OutfitGenerateRequest):
     """Alias for generate_outfit - used by frontend"""
     return await generate_outfit(request)
+
+@router.get("/generate-test", response_model=OutfitGenerateResponse)
+async def generate_test_outfit():
+    """Test endpoint to generate a default outfit for testing"""
+    test_request = OutfitGenerateRequest(
+        prompt="casual summer outfit",
+        gender="female",
+        budget=200.0
+    )
+    return await generate_outfit(test_request)
 
 @router.get("/trending", response_model=Dict[str, Dict[str, List[str]]])
 async def get_trending_styles():
@@ -688,7 +721,7 @@ async def get_outfit(outfit_id: str):
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to get outfit: {str(e)}") 
+        raise HTTPException(status_code=500, detail=f"Failed to get outfit: {str(e)}")
 
 # New test endpoint with a simple response
 @router.get("/test/simple")
@@ -1288,46 +1321,60 @@ async def test_serpapi_ssl():
 
 async def match_products_to_items(items: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     """
-    Match outfit items to real products using search API.
+    Match outfit items to real products using search API
     
     Args:
-        items: List of outfit item descriptions
+        items: List of items to match
         
     Returns:
-        Enhanced items with matched product details
+        List of items enhanced with matched product details
     """
-    enhanced_items = []
+    logger.info(f"SERPAPI_API_KEY: {'Present' if settings.SERPAPI_API_KEY else 'Not found'}")
     
-    # Don't proceed without API key
-    api_key = os.environ.get("SERPAPI_API_KEY")
-    logger.info(f"SERPAPI_API_KEY status: {'Found' if api_key else 'Missing'}")
-    if not api_key:
-        logger.error("Missing SERPAPI_API_KEY environment variable")
-        return create_fallback_items(items)
+    # Import parallel search service - only imported when needed
+    # to avoid circular imports
+    from app.services.parallel_service import get_parallel_search_service
     
-    # Get search optimizer instance
-    search_optimizer = get_search_optimizer()
-    logger.info("Using search optimizer for product matching")
+    # Create fallback items for any with missing required fields
+    fallback_items = []
+    valid_items = []
     
-    # Use gather to process items concurrently with a limit
-    # Process in batches of 3 to avoid overwhelming the API
-    batch_size = 3
-    for i in range(0, len(items), batch_size):
-        batch = items[i:i+batch_size]
-        batch_results = await asyncio.gather(
-            *[process_single_item(item, search_optimizer) for item in batch],
-            return_exceptions=True
-        )
-        
-        for result in batch_results:
-            if isinstance(result, Exception):
-                logger.error(f"Batch processing error: {str(result)}")
-                # Add fallback item as placeholder
-                enhanced_items.append(create_fallback_item({}))
-            else:
-                enhanced_items.append(result)
+    # Pre-process the items
+    start_time = time.time()
+    for item in items:
+        if not item.get('category') or not item.get('name'):
+            logger.warning(f"Skipping item with missing category or name: {item}")
+            fallback_items.append(create_fallback_item(item))
+        else:
+            # Add original index to maintain order
+            item['original_index'] = len(valid_items)
+            valid_items.append(item)
     
-    return enhanced_items
+    if not valid_items:
+        logger.warning("No valid items to match with real products")
+        return fallback_items
+    
+    # Use parallel search service for better performance
+    logger.info(f"Searching for {len(valid_items)} products in parallel")
+    parallel_service = get_parallel_search_service()
+    
+    # Run all product searches in parallel
+    enhanced_items = await parallel_service.search_products_parallel(valid_items)
+    logger.info(f"Parallel search completed in {time.time() - start_time:.2f} seconds")
+    
+    # Combine with any fallback items
+    all_items = enhanced_items + fallback_items
+    
+    # Fill in default images for any items that are still missing images
+    for item in all_items:
+        if not item.get('image_url') and item.get('category'):
+            logger.warning(f"Item missing image_url: {item.get('name')}")
+            item['image_url'] = get_default_image_for_category(item['category'])
+    
+    # Sort by original index to maintain order if needed
+    all_items.sort(key=lambda x: x.get('original_index', 9999))
+    
+    return all_items
 
 
 async def process_single_item(item: Dict[str, Any], search_optimizer=None) -> Dict[str, Any]:
@@ -1450,15 +1497,58 @@ async def search_product_with_retry(query: str) -> Optional[Dict[str, Any]]:
     try:
         import ssl
         import certifi
-        ssl_context = ssl.create_default_context(cafile=certifi.where())
-        logger.debug("Created SSL context with certifi certificates")
+        import platform
+        
+        # Check if we're on macOS
+        if platform.system() == 'Darwin':
+            # On macOS, we need to use a specific approach
+            import subprocess
+            
+            # Get the path to macOS certificates
+            mac_cert_path = subprocess.run(
+                ["/usr/bin/security", "find-certificate", "-a", "-p", "/System/Library/Keychains/SystemRootCertificates.keychain"],
+                capture_output=True,
+                text=True,
+                check=False
+            ).stdout
+            
+            # Create a temporary cert file if we got certificates
+            if mac_cert_path:
+                import tempfile
+                with tempfile.NamedTemporaryFile(delete=False, mode='w') as temp_cert_file:
+                    temp_cert_file.write(mac_cert_path)
+                    temp_cert_path = temp_cert_file.name
+                
+                # Use the temporary cert file
+                ssl_context = ssl.create_default_context(cafile=temp_cert_path)
+                logger.debug(f"Created SSL context with macOS system certificates")
+            else:
+                # Fall back to certifi if we couldn't get macOS certs
+                ssl_context = ssl.create_default_context(cafile=certifi.where())
+                logger.debug("Created SSL context with certifi certificates (macOS fallback)")
+        else:
+            # On other systems, use certifi
+            ssl_context = ssl.create_default_context(cafile=certifi.where())
+            logger.debug("Created SSL context with certifi certificates")
     except Exception as e:
-        logger.warning(f"Could not create SSL context with certifi: {e}")
-        # Fallback to less secure but functional SSL context
-        ssl_context = ssl.create_default_context()
-        ssl_context.check_hostname = False
-        ssl_context.verify_mode = ssl.CERT_NONE
-        logger.warning("SSL certificate verification disabled for SerpAPI requests")
+        logger.warning(f"Could not create SSL context with certificates: {e}")
+        try:
+            # Try one more approach - get certificates from requests library if available
+            try:
+                import requests
+                ssl_context = ssl.create_default_context(cafile=requests.certs.where())
+                logger.debug("Created SSL context with requests certificates")
+            except (ImportError, AttributeError):
+                # Final fallback - disable verification (not recommended for production)
+                logger.warning("Using insecure SSL context as last resort")
+                ssl_context = ssl.create_default_context()
+                ssl_context.check_hostname = False
+                ssl_context.verify_mode = ssl.CERT_NONE
+        except Exception as inner_e:
+            logger.error(f"Failed to create any SSL context: {inner_e}")
+            # Absolute last resort
+            ssl_context = ssl._create_unverified_context()
+            logger.warning("SSL certificate verification completely disabled for SerpAPI requests")
     
     for attempt in range(max_attempts):
         current_backoff = initial_backoff * (backoff_factor ** attempt)
@@ -1637,26 +1727,26 @@ def extract_price(price_str: str) -> float:
         return 29.99  # Default price on error
 
 
-def create_fallback_item(item: Dict[str, Any]) -> Dict[str, Any]:
-    """Create a fallback item when product matching fails."""
-    category = item.get('category', 'Item')
-    color = item.get('color', 'Stylish')
+def create_fallback_item(item: dict) -> dict:
+    """Creates a fallback item with default values when product matching fails."""
+    fallback_item = dict(item)  # Preserve all original fields
     
-    fallback = {
+    # Default placeholder values for required fields
+    fallback_item.update({
         "product_id": str(uuid.uuid4()),
-        "title": f"{color} {category}",
-        "brand": "Fashion Brand",
-        "source": "Fashion Store",
-        "price": 29.99,
-        "image_url": get_default_image_for_category(category),
-        "product_url": "https://example.com/product",
-        "delivery": "Standard delivery",
-        "rating": 4.5,
-        "reviews": 42,
-    }
+        "matched": False,
+        "brand": item.get("brand", "Generic"),
+        "price": 0,
+        "url": "",
+        "image_url": get_default_image_for_category(item.get("category", "")),
+        "api_source": "fallback"
+    })
     
-    # Preserve original item fields
-    return {**item, **fallback}
+    # Make sure we preserve the search_keywords if they exist
+    if "search_keywords" in item and item["search_keywords"]:
+        fallback_item["search_keywords"] = item["search_keywords"]
+    
+    return fallback_item
 
 
 def create_fallback_items(items: List[Dict[str, Any]]) -> List[Dict[str, Any]]:

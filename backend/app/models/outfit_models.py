@@ -37,7 +37,7 @@ class Outfit(BaseModel):
     items: List[OutfitItem]
     total_price: float = 0.0
     image_url: Optional[str] = None
-    collage_url: Optional[str] = None
+    collage_url: Optional[Any] = None  # Can be a string or a dict with image and map
     brand_display: Optional[Dict[str, str]] = {}
     stylist_rationale: Optional[str] = None
 
@@ -49,6 +49,7 @@ class OutfitGenerateRequest(BaseModel):
     prompt: str
     gender: Optional[str] = "unisex"
     budget: Optional[float] = None
+    preferences: Optional[str] = None
     preferred_brands: Optional[List[str]] = []
     preferred_colors: Optional[List[str]] = []
     excluded_categories: Optional[List[str]] = []

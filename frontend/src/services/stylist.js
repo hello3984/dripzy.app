@@ -436,7 +436,8 @@ export const getStylistCommentary = (outfit) => {
   };
 };
 
-export default {
+// Create a named stylist service before exporting
+const stylistService = {
   analyzeProductTrend,
   findOccasionMatches,
   curateOutfits,
@@ -446,4 +447,6 @@ export default {
   bodyTypeRecommendations,
   fashionPersonalities,
   colorSeasonAnalysis
-}; 
+};
+
+export default stylistService; 
