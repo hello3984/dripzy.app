@@ -373,13 +373,16 @@ def create_outfit_collage(image_urls, outfit_id=None):
         outfit_id: Optional unique identifier for the outfit
         
     Returns:
-        Dict containing the collage image and image map
+        Either a string URL or a dict with 'image' and 'map' keys
     """
     try:
         # Handle both parameter patterns - maintain backward compatibility
-        # Some code calls with (image_urls) and some with (image_urls, outfit_id)
         logger.info(f"Creating collage for outfit_id: {outfit_id}")
         
+        # Ensure outfit_id is always a string if provided
+        if outfit_id is not None and not isinstance(outfit_id, str):
+            outfit_id = str(outfit_id)
+            
         # Store outfit_id for reference if needed
         outfit_items = []
         
@@ -427,7 +430,13 @@ def create_outfit_collage(image_urls, outfit_id=None):
             unique_id = outfit_id or str(uuid.uuid4())
             collage_url = f"https://example.com/collage/{unique_id}.jpg"
             logger.info(f"Created collage with URL: {collage_url}")
-            return collage_url
+            
+            # Return format depends on input type
+            if isinstance(image_urls, list):
+                return collage_url
+            else:
+                return {"image": collage_url, "map": []}
+                
         except TypeError as e:
             # Specific handler for type errors
             logger.error(f"Type error in collage generation: {str(e)}")

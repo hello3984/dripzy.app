@@ -3,12 +3,13 @@ import stylistService from './stylist';
 
 // Define API configuration
 const API_CONFIG = {
-  // Base URL for API requests
-  baseURL: process.env.NODE_ENV === 'development' 
-    ? 'http://localhost:8000' // Updated port to 8000
-    : 'https://api.fashionai.example.com',
-  // Timeout in milliseconds (30s for image processing)
-  timeout: 30000
+  // When deployed on Render
+  // baseURL: 'https://dripzy-app.onrender.com',
+  
+  // For local development - backend is running on port 8015
+  baseURL: 'http://localhost:8015',
+  
+  timeout: 30000 // 30 seconds timeout for image processing
 };
 
 // Third-party API keys 
