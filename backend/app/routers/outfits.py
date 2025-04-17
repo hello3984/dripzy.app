@@ -4,7 +4,7 @@ from typing import List, Optional, Dict, Any
 import os
 import json
 import random
-import logging # Added logging
+import logging
 import re
 import uuid
 from datetime import datetime
@@ -12,15 +12,12 @@ from datetime import datetime
 # --- Added Imports ---
 import anthropic
 from dotenv import load_dotenv
-from app.services.image_service import create_outfit_collage # Keep collage function
-from app.services.serpapi_service import SerpAPIService # Import the class instead
+from app.services.image_service import create_outfit_collage
+from app.services.serpapi_service import SerpAPIService
 from app.utils.image_processing import create_brand_display
 from app.models.outfit_models import OutfitItem, Outfit, OutfitGenerateRequest, OutfitGenerateResponse
-from app.core.cache import cache_service # Added import for cache_service
-from app.core.config import settings # Import settings for dependency
-
-# No need to create instance as we're importing it
-# ---------------------
+from app.core.cache import cache_service
+from app.core.config import settings
 
 router = APIRouter(
     prefix="/outfits",
@@ -33,7 +30,6 @@ load_dotenv()
 anthropic_api_key = os.getenv("ANTHROPIC_API_KEY")
 if not anthropic_api_key:
     print("WARNING: ANTHROPIC_API_KEY not found in .env file. Outfit generation will use mock data.")
-    # raise ValueError("ANTHROPIC_API_KEY not found in environment variables") # Option: raise error if key is essential
 
 anthropic_client = None
 if anthropic_api_key:
@@ -87,7 +83,6 @@ You MUST provide your response as valid JSON with this exact structure:
 # Mock outfit data
 def get_mock_outfits():
     """Get mock outfits for demo purposes (simplified version)"""
-    import logging
     logger = logging.getLogger(__name__)
     logger.warning("Using minimal mock outfits instead of real data")
     
@@ -123,9 +118,6 @@ def get_mock_outfits():
         }
     ]
 
-# Initialize product scraper (Can be removed if ProductScraper class isn't used elsewhere)
-# product_scraper = ProductScraper() # Comment out/remove if only finder is used
-
 # Configure basic logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -155,7 +147,7 @@ def _match_categories(category):
         return "Shoes"
     elif any(term in category for term in ['hat', 'cap', 'beanie', 'scarf', 'accessory', 'accessories', 'jewelry', 'bag', 'watch', 'necklace', 'earrings', 'bracelet', 'handbag', 'purse', 'backpack']):
         return "Accessory"
-else:
+    else:
         return "Top"  # Default to Top if no match
 
 # Helper function to generate mock product details
@@ -245,7 +237,7 @@ async def generate_outfit_concepts(request: OutfitGenerateRequest) -> List[Dict[
         match = re.search(r'```json\s*(\{.*?\})\s*```', raw_response, re.DOTALL)
         if match:
             json_content = match.group(1)
-else:
+        else:
             # If no markdown block, find the first opening curly brace
             first_brace_index = raw_response.find('{')
             if first_brace_index != -1:
@@ -260,9 +252,9 @@ else:
         
         # Ensure json_content is not None before trying to load
         if json_content is None:
-             logger.error(f"Failed to extract any potential JSON content from Claude response.")
-             logger.error(f"Raw response content was: {raw_response}")
-             return []
+            logger.error(f"Failed to extract any potential JSON content from Claude response.")
+            logger.error(f"Raw response content was: {raw_response}")
+            return []
 
         try:
             response_data = json.loads(json_content)
@@ -329,8 +321,8 @@ async def generate_outfit(request: OutfitGenerateRequest) -> OutfitGenerateRespo
         
         # Handle case where concept generation failed
         if not outfit_concepts:
-             logger.warning("Outfit concept generation failed or returned empty. Using fallback mockups.")
-             return OutfitGenerateResponse(outfits=get_mock_outfits(), prompt=request.prompt)
+            logger.warning("Outfit concept generation failed or returned empty. Using fallback mockups.")
+            return OutfitGenerateResponse(outfits=get_mock_outfits(), prompt=request.prompt)
 
         # Step 2: Try to match real products to concepts
         logger.info("--- CALLING enhance_outfits_with_products ---")
@@ -576,9 +568,7 @@ async def debug_test():
 # --- Dependency Function ---
 def get_serpapi_service() -> SerpAPIService:
     # Ensure the service is created with the key from settings
-    # Pass the imported settings object to the constructor
-    return SerpAPIService(settings=settings) 
-# -------------------------
+    return SerpAPIService(settings=settings)
 
 # --- Updated Function Signatures to use Depends --- 
 
@@ -589,46 +579,30 @@ async def _find_products_for_item(query: str, category: str,
                            alternatives_count: int = 5,
                            gender: Optional[str] = None) -> List[Dict[str, Any]]:
     """
-    Find products matching an item description, including alternatives.
+    Find products matching a given query and category.
     
     Args:
-        query: Search query built from keywords/description
-        category: Item category
-        budget: Budget constraint
+        query: Search query for the product
+        category: Product category
+        budget: Optional budget constraint
         include_alternatives: Whether to include alternative products
-        alternatives_count: Number of alternatives to include
-        gender: Optional gender filter (will be passed as kwargs)
+        alternatives_count: Number of alternative products to include
+        gender: Optional gender filter
         
     Returns:
-        List of matching products (main result plus alternatives)
+        List of matching products
     """
     try:
-        serpapi_service_instance = get_serpapi_service() 
-
-        # Calculate price range based on budget and category
-        min_price, max_price = None, None
-        if budget:
-            if category in ["Outerwear", "Dress"]:
-                max_price = budget * 0.5  # These can be up to 50% of total budget
-            elif category == "Shoes":
-                max_price = budget * 0.3  # Shoes up to 30% of budget
-            elif category in ["Top", "Bottom"]:
-                max_price = budget * 0.25  # Basic clothing up to 25% of budget
-            elif category == "Accessory":
-                max_price = budget * 0.15  # Accessories up to 15% of budget
+        logger.info(f"--- CALLING serpapi_service.search_products for {category} - {query} ---")
         
-        # Request limit includes main product + alternatives
-        search_limit = alternatives_count + 1 if include_alternatives else 1
+        # Get service instance correctly
+        serpapi_service_instance = get_serpapi_service()
         
-        logger.info(f"--- CALLING serpapi_service.search_products for '{query}' ---")
-        # Pass gender as a kwarg which will be filtered out, ensuring no parameter errors
+        # Call method on the instance
         products = await serpapi_service_instance.search_products(
             query=query,
             category=category,
-            num_products=search_limit,
-            budget=budget,
-            min_price=min_price,
-            max_price=max_price,
+            num_products=alternatives_count + 1,  # +1 for main product
             gender=gender  # This will be caught by **kwargs in the method
         )
         logger.info(f"--- RETURNED from serpapi_service.search_products (found {len(products)} products) ---")
@@ -639,7 +613,7 @@ async def _find_products_for_item(query: str, category: str,
         return []
 
 async def enhance_outfits_with_products(outfit_concepts: List[Dict[str, Any]], 
-                                  request: OutfitGenerateRequest) -> List[Outfit]:
+                              request: OutfitGenerateRequest) -> List[Outfit]:
     """
     Try to enhance outfit concepts with real product matches, but prioritize
     the concept even if products can't be found.
