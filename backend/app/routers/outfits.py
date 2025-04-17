@@ -437,9 +437,20 @@ def _add_collage_to_outfit(outfit: Outfit):
         if len(image_urls) >= 2:  # Need at least 2 images for a collage
             try:
                 # Add proper error handling for the collage creation
-                collage_url = create_outfit_collage(image_urls, str(outfit.id))
-                outfit.collage_url = collage_url if collage_url else ""
-                logger.info(f"Collage created for outfit {outfit.id}: {collage_url}")
+                collage_result = create_outfit_collage(image_urls, str(outfit.id))
+                
+                # Handle different return types from create_outfit_collage
+                if isinstance(collage_result, str):
+                    outfit.collage_url = collage_result if collage_result else ""
+                elif isinstance(collage_result, dict) and "image" in collage_result:
+                    outfit.collage_url = collage_result["image"] if collage_result["image"] else ""
+                    # Store image map if available
+                    if "map" in collage_result and collage_result["map"]:
+                        outfit.image_map = collage_result["map"]
+                else:
+                    outfit.collage_url = ""
+                
+                logger.info(f"Collage created for outfit {outfit.id}: {collage_result}")
             except TypeError as type_error:
                 # Handle type errors specifically
                 logger.error(f"Type error creating collage for outfit {outfit.id}: {str(type_error)}")
@@ -473,16 +484,17 @@ async def generate_outfit(request: OutfitGenerateRequest) -> OutfitGenerateRespo
     """
     logger.info(f"Generating outfit for prompt: {request.prompt}, gender: {request.gender}, budget: {request.budget}")
     
-    # Check the cache first
-    cache_key = f"outfit_response:{request.prompt}:{request.gender}:{request.budget}"
-    cached_response = cache_service.get(cache_key, "long")
-    if cached_response:
-        logger.info(f"Using cached outfit response for: {request.prompt}")
-        return OutfitGenerateResponse(**cached_response)
-    
     try:
+        # Check the cache first
+        cache_key = f"outfit_response:{request.prompt}:{request.gender}:{request.budget}"
+        cached_response = cache_service.get(cache_key, "long")
+        if cached_response:
+            logger.info(f"Using cached outfit response for: {request.prompt}")
+            return OutfitGenerateResponse(**cached_response)
+        
         # Step 1: Generate outfit concepts with Claude
         logger.info("Generating outfit concepts with Claude")
+        
         outfit_concepts = await generate_outfit_concepts(request)
         
         # Handle case where concept generation failed
@@ -510,7 +522,10 @@ async def generate_outfit(request: OutfitGenerateRequest) -> OutfitGenerateRespo
         # Fall back to mock data with error message
         fallback_outfits = get_mock_outfits()
         for outfit in fallback_outfits:
-            outfit['description'] = f"[ERROR] {outfit.get('description', 'Mock outfit')}" 
+            if isinstance(outfit, dict) and 'description' in outfit:
+                outfit['description'] = f"[ERROR] {outfit.get('description', 'Mock outfit')}"
+            elif hasattr(outfit, 'description'):
+                outfit.description = f"[ERROR] {outfit.description}"
         
         return OutfitGenerateResponse(
             outfits=fallback_outfits,
@@ -743,7 +758,7 @@ async def debug_test():
 # --- Dependency Function ---
 def get_serpapi_service() -> SerpAPIService:
     # Ensure the service is created with the key from settings
-    return SerpAPIService(settings=settings)
+    return SerpAPIService(api_key=settings.SERPAPI_API_KEY)
 
 # --- Updated Function Signatures to use Depends --- 
 
@@ -795,8 +810,7 @@ async def _find_products_for_item(query: str, category: str,
             products = await serpapi_service_instance.search_products(
                 query=search_query,
                 category=category,
-                num_products=search_count,
-                gender=gender
+                num_results=search_count
             )
             
             if products:
@@ -820,9 +834,15 @@ async def _find_products_for_item(query: str, category: str,
         logger.info(f"Using similar products from cache for {category} - {query}")
         return similar_products
     
-    # Final fallback
+    # Final fallback - create a list with a single fallback item
     logger.warning(f"All attempts failed, using fallback products for {category} - {query}")
-    return _get_fallback_items(items)
+    fallback_item = {
+        "description": query,
+        "category": category,
+        "color": "",
+        "name": query
+    }
+    return create_fallback_items([fallback_item])
 
 def _get_similar_cached_products(query: str, category: Optional[str]) -> List[Dict[str, Any]]:
     """

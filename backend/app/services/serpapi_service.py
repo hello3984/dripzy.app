@@ -16,7 +16,7 @@ import aiohttp
 import certifi
 
 from app.core.cache import cache_service
-from app.core.config import settings, get_settings
+from app.core.config import settings
 from app.core.connection_pool import get_connection_pool
 
 # Configure logging
@@ -109,7 +109,6 @@ class SerpAPIService:
     
     def __init__(self, api_key=None):
         """Initialize the SerpAPI service with an API key."""
-        settings = get_settings()
         self.api_key = api_key or settings.SERPAPI_API_KEY
         if not self.api_key:
             logger.warning("No SerpAPI key provided")
@@ -380,4 +379,4 @@ class SerpAPIService:
 # --------------------------------------- 
 
 # Create the global instance with settings
-serpapi_service = SerpAPIService(settings=settings) 
+serpapi_service = SerpAPIService(api_key=settings.SERPAPI_API_KEY) 

@@ -11,6 +11,15 @@ import './OutfitCollage.css';
  */
 const OutfitCollage = ({ collageImage, imageMap, outfitName, outfit }) => {
   const [hoveredItem, setHoveredItem] = useState(null);
+  const [imageError, setImageError] = useState(false);
+
+  // Handler for image loading errors
+  const handleImageError = (e) => {
+    console.log("Error loading image, using fallback");
+    setImageError(true);
+    // Set a default placeholder image
+    e.target.src = "https://via.placeholder.com/800x600?text=Outfit+Collage";
+  };
 
   // If individual product images are available, use those instead of the collage
   if (outfit && outfit.items && outfit.items.length > 0) {
@@ -51,15 +60,16 @@ const OutfitCollage = ({ collageImage, imageMap, outfitName, outfit }) => {
         <div className="outfit-items-grid">
           {items.map((item, index) => (
             <div 
-              key={item.product_id} 
+              key={item.product_id || index} 
               className={`outfit-item-card ${item.category.toLowerCase()}`}
               onClick={() => window.open(item.url, '_blank', 'noopener,noreferrer')}
             >
               <div className="item-image-container">
                 <img 
-                  src={item.image_url} 
-                  alt={item.product_name} 
+                  src={item.image_url || "https://via.placeholder.com/400x600?text=Product+Image"} 
+                  alt={item.product_name || "Fashion item"} 
                   className="item-image"
+                  onError={handleImageError}
                 />
                 <button className="favorite-button">
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -80,15 +90,15 @@ const OutfitCollage = ({ collageImage, imageMap, outfitName, outfit }) => {
         </div>
         
         <div className="outfit-details">
-          <h2 className="outfit-name">{outfitName}</h2>
-          <div className="outfit-price">${outfit.total_price.toFixed(2)}</div>
-          <p className="outfit-description">{outfit.description}</p>
+          <h2 className="outfit-name">{outfitName || "Stylish Outfit"}</h2>
+          <div className="outfit-price">${outfit.total_price ? outfit.total_price.toFixed(2) : "0.00"}</div>
+          <p className="outfit-description">{outfit.description || "A perfectly curated outfit for your style."}</p>
           
           <div className="outfit-brands">
-            {Object.entries(brandsByCategory).map(([category, brands]) => (
+            {Object.entries(brandsByCategory).map(([category, brands], index) => (
               <div key={category} className="brand-category">
                 <span className="category-name">{category}</span> {brands}
-                {category !== Object.keys(brandsByCategory).pop() && <span className="brand-separator">,</span>}
+                {index !== Object.entries(brandsByCategory).length - 1 && <span className="brand-separator">,</span>}
               </div>
             ))}
           </div>
@@ -98,7 +108,7 @@ const OutfitCollage = ({ collageImage, imageMap, outfitName, outfit }) => {
   }
 
   // Fallback to old collage if individual items aren't available
-  if (!collageImage) {
+  if (!collageImage && !imageError) {
     return (
       <div className="outfit-collage-placeholder">
         <p>No collage available</p>
@@ -107,9 +117,13 @@ const OutfitCollage = ({ collageImage, imageMap, outfitName, outfit }) => {
   }
 
   // Ensure the image has the proper data URL format
-  const imageSource = collageImage.startsWith('data:') 
-    ? collageImage 
-    : `data:image/png;base64,${collageImage}`;
+  let imageSource = imageError 
+    ? "https://via.placeholder.com/800x600?text=Outfit+Collage" 
+    : (collageImage?.startsWith('data:') 
+      ? collageImage 
+      : (collageImage?.startsWith('http') 
+          ? collageImage 
+          : `data:image/png;base64,${collageImage}`));
 
   // Handle mouse enter on an area
   const handleMouseEnter = (item) => {
@@ -138,6 +152,7 @@ const OutfitCollage = ({ collageImage, imageMap, outfitName, outfit }) => {
           alt={outfitName || 'Outfit Collage'} 
           className="outfit-collage-image" 
           useMap="#outfitMap"
+          onError={handleImageError}
         />
         
         {/* Overlay for hovered item */}
@@ -165,7 +180,7 @@ const OutfitCollage = ({ collageImage, imageMap, outfitName, outfit }) => {
               alt={`${item.category} item`}
               title={`Shop ${item.category}`}
               shape="rect"
-              coords={item.coords.join(',')}
+              coords={item.coords?.join(',') || "0,0,0,0"}
               onClick={() => handleAreaClick(item.url)}
               onMouseEnter={() => handleMouseEnter(item)}
               onMouseLeave={handleMouseLeave}

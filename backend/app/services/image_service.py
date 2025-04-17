@@ -376,74 +376,46 @@ def create_outfit_collage(image_urls, outfit_id=None):
         Either a string URL or a dict with 'image' and 'map' keys
     """
     try:
-        # Handle both parameter patterns - maintain backward compatibility
+        # Log function entry
         logger.info(f"Creating collage for outfit_id: {outfit_id}")
         
         # Ensure outfit_id is always a string if provided
-        if outfit_id is not None and not isinstance(outfit_id, str):
-            outfit_id = str(outfit_id)
+        outfit_id = str(outfit_id) if outfit_id is not None else str(uuid.uuid4())
             
-        # Store outfit_id for reference if needed
-        outfit_items = []
-        
-        # Convert simple list of URLs to outfit items format if needed
-        if isinstance(image_urls, list) and all(isinstance(url, str) for url in image_urls):
-            for i, url in enumerate(image_urls):
-                outfit_items.append({
-                    'image_url': url,
-                    'x': i * 100,  # Simple layout
-                    'y': 0,
-                    'width': 100,
-                    'height': 100
-                })
-        else:
-            # Assume image_urls is actually outfit_items in the old format
-            outfit_items = image_urls
-            
-        # Fix type errors by ensuring all coordinate values are integers
-        for item in outfit_items:
-            # Convert any string coordinates to integers
-            for attr in ['x', 'y', 'width', 'height']:
-                if attr in item and item[attr] is not None:
-                    if isinstance(item[attr], str):
-                        try:
-                            item[attr] = int(float(item[attr]))
-                        except (ValueError, TypeError):
-                            item[attr] = 0
-                    elif not isinstance(item[attr], int):
-                        try:
-                            item[attr] = int(item[attr])
-                        except (ValueError, TypeError):
-                            item[attr] = 0
-                elif attr in item:
-                    # Handle None values
-                    item[attr] = 0
-        
-        # Handle image optimization to reduce memory usage
-        image_count = len(outfit_items) if isinstance(outfit_items, list) else 0
-        logger.info(f"Creating collage with {image_count} items")
-        
-        # Continue with the rest of the collage generation logic
-        try:
-            # Rest of collage generation logic would go here
-            # For now, just return a placeholder result
-            unique_id = outfit_id or str(uuid.uuid4())
-            collage_url = f"https://example.com/collage/{unique_id}.jpg"
-            logger.info(f"Created collage with URL: {collage_url}")
-            
-            # Return format depends on input type
-            if isinstance(image_urls, list):
+        # Determine the input type - list of URLs or list of item dictionaries
+        if isinstance(image_urls, list):
+            # Check if it's a simple list of URL strings
+            if all(isinstance(url, str) for url in image_urls):
+                logger.info(f"Creating collage from {len(image_urls)} image URLs")
+                # Return a placeholder URL with the outfit ID
+                collage_url = f"https://via.placeholder.com/800x600?text=Outfit+{outfit_id[:8]}"
+                logger.info(f"Created placeholder collage URL: {collage_url}")
                 return collage_url
             else:
-                return {"image": collage_url, "map": []}
+                # It's a list of items with more complex structure
+                logger.info(f"Creating collage from {len(image_urls)} complex items")
+                outfit_items = image_urls
+                # Return a placeholder result with the outfit ID
+                result = {
+                    "image": f"https://via.placeholder.com/800x600?text=Outfit+{outfit_id[:8]}",
+                    "map": []
+                }
+                logger.info(f"Created placeholder collage result: {result}")
+                return result
+        else:
+            # Handle unexpected input type
+            logger.warning(f"Unexpected input type for collage: {type(image_urls)}")
+            # Return a generic placeholder
+            return {
+                "image": f"https://via.placeholder.com/800x600?text=Error",
+                "map": []
+            }
                 
-        except TypeError as e:
-            # Specific handler for type errors
-            logger.error(f"Type error in collage generation: {str(e)}")
-            return "" if isinstance(image_urls, list) else {"image": "", "map": []}
-        except Exception as e:
-            logger.error(f"Error in collage generation: {str(e)}")
-            return "" if isinstance(image_urls, list) else {"image": "", "map": []}
     except Exception as e:
+        # Log and handle any errors
         logger.error(f"Error creating outfit collage: {str(e)}")
-        return "" if isinstance(image_urls, list) else {"image": "", "map": []} 
+        # Return a safe fallback value
+        if isinstance(image_urls, list) and all(isinstance(url, str) for url in image_urls):
+            return "https://via.placeholder.com/800x600?text=Error"
+        else:
+            return {"image": "https://via.placeholder.com/800x600?text=Error", "map": []} 
