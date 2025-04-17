@@ -3,11 +3,11 @@ import stylistService from './stylist';
 
 // Define API configuration
 const API_CONFIG = {
-  // When deployed on Render
-  // baseURL: 'https://dripzy-app.onrender.com',
+  // When deployed on Render - UNCOMMENT THIS LINE FOR PRODUCTION
+  baseURL: 'https://dripzy-app.onrender.com',
   
-  // For local development - backend is running on port 8015
-  baseURL: 'http://localhost:8015',
+  // For local development only - COMMENT THIS LINE FOR PRODUCTION
+  // baseURL: 'http://localhost:8015',
   
   timeout: 30000 // 30 seconds timeout for image processing
 };

@@ -11,6 +11,7 @@ import ssl
 import uvicorn
 import argparse
 from dotenv import load_dotenv
+import certifi
 
 # Configure logging
 logging.basicConfig(
@@ -30,14 +31,17 @@ if serpapi_key:
     masked_key = serpapi_key[:4] + "..." + serpapi_key[-4:] if len(serpapi_key) > 8 else "***"
     logger.info(f"Key value: {masked_key}")
 
-# Create a custom SSL context to resolve SSL issues
-try:
-    ssl_context = ssl.create_default_context()
-    logger.info("Created default SSL context")
-except Exception as e:
-    logger.warning(f"Could not create default SSL context: {e}")
-    ssl_context = ssl._create_unverified_context()
-    logger.warning("Using unverified SSL context")
+def create_ssl_context():
+    """Create a default SSL context with proper certificate verification"""
+    try:
+        # Create default context using certifi for certificate verification
+        ssl_context = ssl.create_default_context(cafile=certifi.where())
+        logger.info("Created default SSL context with certifi certificates")
+        return ssl_context
+    except Exception as e:
+        logger.error(f"Error creating SSL context: {str(e)}")
+        # Fallback to default context
+        return ssl.create_default_context()
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Run the FastAPI server")
@@ -45,11 +49,11 @@ def parse_args():
     parser.add_argument("--reload", dest="reload", action="store_true", help="Enable auto-reload")
     parser.add_argument("--no-reload", dest="reload", action="store_false", help="Disable auto-reload")
     parser.add_argument("--stable", action="store_true", help="Run in stable mode (no reload, production-like)")
+    parser.add_argument("--workers", type=int, default=1, help="Number of worker processes")
     parser.set_defaults(reload=True)
     return parser.parse_args()
 
-# Run the server
-if __name__ == "__main__":
+def main():
     # Parse command line arguments
     args = parse_args()
     
@@ -63,6 +67,12 @@ if __name__ == "__main__":
     
     # Set OpenSSL environment variables to allow insecure connections
     os.environ["PYTHONHTTPSVERIFY"] = "0"  # Disable HTTPS verification
+    
+    # Create and set default SSL context
+    ssl_context = create_ssl_context()
+    # Set the default SSL context for all HTTPS requests
+    ssl._create_default_https_context = lambda: ssl_context
+    logger.info("Created default SSL context for application")
     
     # Check if .watchexclude file exists and use it
     exclude_file = os.path.join(os.path.dirname(__file__), ".watchexclude")
@@ -78,5 +88,9 @@ if __name__ == "__main__":
         reload_excludes=["tests/*", "test_*", "__pycache__/*", "*.pyc"] if reload_enabled else None,
         ssl_keyfile=None,
         ssl_certfile=None,
-        log_level="info"
-    ) 
+        log_level="info",
+        workers=args.workers
+    )
+
+if __name__ == "__main__":
+    main() 

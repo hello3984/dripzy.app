@@ -13,9 +13,10 @@ from typing import Dict, List, Any, Optional
 import httpx
 from fastapi import HTTPException
 import aiohttp
+import certifi
 
 from app.core.cache import cache_service
-from app.core.config import settings
+from app.core.config import settings, get_settings
 from app.core.connection_pool import get_connection_pool
 
 # Configure logging
@@ -106,18 +107,17 @@ ssl_context = create_ssl_context()
 class SerpAPIService:
     """Service for searching products using SerpAPI."""
     
-    def __init__(self, settings: Optional[Any] = None):
-        """Initialize SerpAPI service with API key and cache."""
-        # Prioritize key from settings if provided, otherwise try environment
-        if settings and settings.SERPAPI_API_KEY:
-            self.api_key = settings.SERPAPI_API_KEY
-            logger.info("SerpAPI key loaded from settings.")
-        else:
-            self.api_key = os.environ.get("SERPAPI_API_KEY")
-            logger.info("Attempted to load SerpAPI key from environment.")
-        
+    def __init__(self, api_key=None):
+        """Initialize the SerpAPI service with an API key."""
+        settings = get_settings()
+        self.api_key = api_key or settings.SERPAPI_API_KEY
         if not self.api_key:
-            logger.warning("SERPAPI_API_KEY not found. Using fallback data.")
+            logger.warning("No SerpAPI key provided")
+        else:
+            logger.info("SerpAPI key loaded from settings.")
+            
+        # Set up SSL context with certificate verification
+        self.ssl_context = self._create_ssl_context()
         
         # Initialize cache with configurable TTL
         self.short_cache_ttl = int(os.getenv("CACHE_TTL_SHORT", "300"))  # 5 minutes
@@ -131,6 +131,17 @@ class SerpAPIService:
         self.rate_limited = False
         self.rate_limit_reset = 0
         
+    def _create_ssl_context(self):
+        """Create a secure SSL context with proper certificate verification"""
+        try:
+            ssl_context = ssl.create_default_context(cafile=certifi.where())
+            logger.info("Created verified SSL context for SerpAPI service")
+            return ssl_context
+        except Exception as e:
+            logger.error(f"Error creating SSL context: {str(e)}")
+            # Fallback to default
+            return ssl.create_default_context()
+    
     async def test_api_key(self) -> bool:
         """
         Test if the SerpAPI key is valid by making a simple test request.
@@ -184,143 +195,119 @@ class SerpAPIService:
     async def search_products(
         self, 
         query: str, 
-        category: Optional[str] = None,
-        num_products: int = 5,
-        budget: Optional[float] = None,
-        min_price: Optional[float] = None,
-        max_price: Optional[float] = None,
-        gender: Optional[str] = None,  # We'll explicitly accept this but not use it
-        limit: Optional[int] = None,   # Accept but not use this parameter
-        **kwargs  # Accept any additional parameters
+        category: str = None,
+        num_results: int = 6
     ) -> List[Dict[str, Any]]:
         """
-        Search for products using SerpAPI
+        Search for products using SerpAPI's Google Shopping search.
         
         Args:
-            query: Search query
-            category: Product category
-            num_products: Number of products to return
-            budget: Optional budget to filter products
-            min_price: Optional minimum price
-            max_price: Optional maximum price
+            query: The search query for products
+            category: Optional product category
+            num_results: Number of results to return (default: 6)
             
         Returns:
-            List of product data dictionaries
+            List of product dictionaries with details
         """
-        # Check for rate limiting first
-        if self.rate_limited and time.time() < self.rate_limit_reset:
-            logger.warning(f"SerpAPI is rate limited. Using fallback data.")
-            return self._get_fallback_products(category or "Top", num_products)
-            
-        # Create a cache key based on the search query and parameters
-        cache_key = f"serpapi:products:{query}:{category}:{num_products}:{budget}:{min_price}:{max_price}"
-        
-        # Try to get cached results first to improve response time
-        cached_results = cache_service.get(cache_key, "medium")
-        if cached_results:
-            logger.info(f"Using cached product results for query: {query}")
-            return cached_results
-            
-        # If no API key, return fallback data
         if not self.api_key:
-            logger.warning("No SerpAPI key. Using fallback product data.")
-            return self._get_fallback_products(category or "Top", num_products)
-            
+            logger.warning("Missing SerpAPI key, returning fallback products")
+            return self._get_fallback_products(query, category)
+        
+        # Clean and prepare the query
+        cleaned_query = query.strip()
+        if category:
+            # Add category as prefix if provided (helps narrow results)
+            cleaned_query = f"{category} {cleaned_query}" if category else cleaned_query
+        
+        logger.info(f"Searching products for query: {cleaned_query}")
+        
+        # Build the request parameters
+        params = {
+            "api_key": self.api_key,
+            "engine": "google_shopping",
+            "google_domain": "google.com",
+            "q": cleaned_query,
+            "num": num_results * 2,  # Request more than needed to filter
+            "hl": "en",
+            "gl": "us",
+            "tbs": "mr:1" # Sort by relevance
+        }
+        
         try:
-            # Set up the search parameters
-            params = {
-                "engine": "google_shopping",
-                "google_domain": "google.com",
-                "q": query,
-                "num": min(12, num_products * 2),  # Request more than needed in case some are filtered out
-                "api_key": self.api_key,
-                "hl": "en",
-                "gl": "us",
-                "tbs": "mr:1",  # Include only relevant results
-            }
+            # Get connection pool
+            pool = get_connection_pool("serpapi")
             
-            # Add price range if provided
-            if min_price is not None and max_price is not None:
-                params["tbs"] += f",price:1,ppr_min:{min_price},ppr_max:{max_price}"
-            elif min_price is not None:
-                params["tbs"] += f",price:1,ppr_min:{min_price}"
-            elif max_price is not None:
-                params["tbs"] += f",price:1,ppr_max:{max_price}"
-            elif budget is not None:
-                # Set max price to budget
-                params["tbs"] += f",price:1,ppr_max:{budget}"
+            # Make the request using the connection pool
+            async with pool.acquire() as client:
+                # Set the SSL context for this request
+                client._transport = httpx.AsyncHTTPTransport(verify=certifi.where())
                 
-            logger.info(f"Searching products for query: {query}")
-            
-            # Get a connection from the pool manager instead of creating a new client
-            pool = get_connection_pool()
-            client = await pool.get_client("serpapi")
-            
-            # Perform the request using the pooled connection
-            response = await client.get(self.search_url, params=params)
+                response = await client.get("https://serpapi.com/search", params=params)
+                response.raise_for_status()
+                data = response.json()
+                
+                if "shopping_results" not in data:
+                    logger.warning(f"No shopping results returned for query: {cleaned_query}")
+                    return self._get_fallback_products(query, category)
+                
+                # Process and format the results
+                return self._process_products(data["shopping_results"], num_results, category)
+                
+        except httpx.HTTPStatusError as e:
+            status_code = e.response.status_code
+            logger.error(f"HTTP error during product search for query '{query}': {status_code}")
             
             # Handle rate limiting
-            if response.status_code == 429:
-                logger.warning("SerpAPI rate limit reached")
-                self.rate_limited = True
-                # Set reset time to 5 minutes from now
-                self.rate_limit_reset = time.time() + 300
-                return self._get_fallback_products(category or "Top", num_products)
-                
-            # Handle other errors
-            if response.status_code != 200:
-                logger.error(f"SerpAPI error: {response.status_code} - {response.text}")
-                return self._get_fallback_products(category or "Top", num_products)
-                
-            # Parse the response data
-            response_data = response.json()
-            shopping_results = response_data.get("shopping_results", [])
+            if status_code == 429:
+                logger.warning("SerpAPI rate limit reached, using fallback products")
             
-            # Process the results
-            products = []
-            for item in shopping_results[:num_products]:
-                price_raw = item.get("price", "")
-                # Extract numeric price from string (e.g. "$49.99" -> 49.99)
-                price_match = re.search(r'[\d,]+\.?\d*', price_raw.replace("$", ""))
-                price = float(price_match.group().replace(",", "")) if price_match else 0.0
-                
-                thumbnail = item.get("thumbnail", "")
-                # Get a higher-quality image if possible
-                if "googleusercontent.com" in thumbnail:
-                    image = self._get_high_quality_image(thumbnail)
-                else:
-                    image = thumbnail
-                
-                product = {
-                    "product_id": f"serpapi-{uuid.uuid4()}",
-                    "product_name": item.get("title", "").strip(),
-                    "brand": item.get("source", "").strip(),
-                    "category": category or "uncategorized",
-                    "price": price,
-                    "image_url": image,
-                    "product_url": item.get("link", ""),
-                    "currency": "USD",
-                    "description": item.get("snippet", ""),
-                    "source": "serpapi"
-                }
-                
-                products.append(product)
+            return self._get_fallback_products(query, category)
             
-            # Cache the results if we got any
-            if products:
-                cache_service.set(cache_key, products, "medium")
-                return products
-            else:
-                logger.warning(f"No products found for query: {query}")
-                return self._get_fallback_products(category or "Top", num_products)
-                
-        except asyncio.TimeoutError:
-            logger.error(f"Timeout while searching products for query: {query}")
-            return self._get_fallback_products(category or "Top", num_products)
-        except Exception as e:
+        except (httpx.RequestError, httpx.ConnectError, ssl.SSLError) as e:
             logger.error(f"Error during product search for query '{query}': {str(e)}")
-            return self._get_fallback_products(category or "Top", num_products)
+            return self._get_fallback_products(query, category)
+            
+        except Exception as e:
+            logger.error(f"Unexpected error during product search for query '{query}': {str(e)}")
+            return self._get_fallback_products(query, category)
+    
+    def _process_products(
+        self, 
+        results: List[Dict[str, Any]], 
+        limit: int,
+        category: str = None
+    ) -> List[Dict[str, Any]]:
+        """Process and format the search results."""
+        products = []
         
+        # Take only the requested number of results
+        results = results[:limit]
+        
+        for result in results:
+            # Generate a unique product ID
+            product_id = f"serpapi-{uuid.uuid4()}"
+            
+            # Extract price as a float
+            price = self._extract_price(result.get("price", "0"))
+            
+            # Standardize product fields
+            product = {
+                "product_id": product_id,
+                "product_name": result.get("title", "Product Name"),
+                "brand": result.get("source", ""),
+                "category": category or "General",
+                "price": price,
+                "image_url": result.get("thumbnail", ""),
+                "product_url": result.get("link", ""),
+                "currency": "USD",
+                "description": result.get("snippet", ""),
+                "source": "serpapi"
+            }
+            
+            products.append(product)
+        
+        return products
+    
     def _get_similar_cached_products(self, query: str, category: Optional[str] = None) -> List[Dict[str, Any]]:
         """
         Get cached products from similar queries
