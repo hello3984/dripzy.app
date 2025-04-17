@@ -1,4 +1,4 @@
-# Fashion AI - Style Explorer
+# DRIPZY.APP  - Style Explorer
 
 A modern AI-powered fashion recommendation app that helps users discover personalized outfit suggestions based on their style preferences, moods, and occasions.
 
