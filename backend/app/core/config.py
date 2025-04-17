@@ -2,19 +2,25 @@ from pydantic_settings import BaseSettings
 import os
 import logging
 from typing import List, Optional
+from dotenv import load_dotenv
 
 # Configure logger
 logger = logging.getLogger(__name__)
 
-# Debugging environmental variables
-try:
-    logger.info("Attempting to load .env file...")
-    # Check if .env file exists
-    dotenv_path = os.path.join(os.path.dirname(__file__), "../.env")
-    env_file_exists = os.path.exists(dotenv_path)
-    logger.info(f".env file found and loaded: {env_file_exists}")
-except Exception as e:
-    logger.error(f"Error checking .env file: {str(e)}")
+# Load environment variables from .env file
+logger.info("Attempting to load .env file...")
+env_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), ".env")
+found = os.path.exists(env_path)
+if found:
+    load_dotenv(env_path)
+    loaded = True
+    logger.info(f".env file found at {env_path} and loaded")
+else:
+    loaded = False
+    logger.info(".env file not found in expected location")
+
+# Log status
+logger.info(f".env file found and loaded: {loaded}")
 
 class Settings(BaseSettings):
     """Application settings"""

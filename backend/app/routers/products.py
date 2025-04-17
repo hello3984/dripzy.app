@@ -9,6 +9,7 @@ from datetime import datetime
 import logging
 
 from app.services.product_service import ProductService
+from app.services.search_optimizer import get_search_optimizer
 
 router = APIRouter(
     prefix="/products",

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, Depends, Query, Body, Response
+from fastapi import APIRouter, HTTPException, Depends, Query, Body, Response, Request, status, BackgroundTasks
 from pydantic import BaseModel, Field
 from typing import List, Optional, Dict, Any
 import os
@@ -8,6 +8,9 @@ import logging
 import re
 import uuid
 from datetime import datetime
+import asyncio
+import time
+import aiohttp
 
 # --- Added Imports ---
 import anthropic
@@ -18,6 +21,8 @@ from app.utils.image_processing import create_brand_display
 from app.models.outfit_models import OutfitItem, Outfit, OutfitGenerateRequest, OutfitGenerateResponse
 from app.core.cache import cache_service
 from app.core.config import settings
+from app.dependencies import get_db
+from app.services.search_optimizer import get_search_optimizer
 
 router = APIRouter(
     prefix="/outfits",
@@ -204,71 +209,204 @@ def _get_mock_product(category, description, color):
 # --- Added Missing Functions ---
 
 async def generate_outfit_concepts(request: OutfitGenerateRequest) -> List[Dict[str, Any]]:
-    """Generate outfit concepts using Anthropic API."""
-    # Log the key being used by the client (or from settings)
-    key_to_log = anthropic_client.api_key if anthropic_client else settings.ANTHROPIC_API_KEY
-    logger.info(f"Anthropic client exists: {anthropic_client is not None}. Key available: {'Exists' if key_to_log else 'Not Found'}")
+    """
+    Generate outfit concepts using Claude AI.
+    
+    Args:
+        request: The outfit generation request with prompt, gender, budget
+        
+    Returns:
+        List of outfit concepts with detailed item descriptions
+    """
+    cache_key = f"outfit_concepts:{request.prompt}:{request.gender}:{request.budget}"
+    cached_concepts = cache_service.get(cache_key)
+    if cached_concepts:
+        logger.info(f"Using cached outfit concepts for: {request.prompt}")
+        return cached_concepts
+    
+    # Don't proceed without API key and client
+    api_key = os.environ.get("ANTHROPIC_API_KEY")
+    logger.info(f"ANTHROPIC_API_KEY status: {'Found' if api_key else 'Missing'}")
+    if not api_key:
+        logger.error("Missing ANTHROPIC_API_KEY environment variable")
+        return []
     
     if not anthropic_client:
-        logger.warning("Anthropic client not initialized. Cannot generate AI concepts.")
-        # Returning empty list to trigger fallback in main function
-        return [] 
+        logger.error("Anthropic client not initialized")
+        return []
+    
+    # Prepare for retry logic
+    max_attempts = 3
+    backoff_time = 1  # Start with 1 second backoff
+    
+    prompt_base = f"""
+You are a fashion stylist assistant creating outfits for a customer based on their needs.
 
-    try:
-        user_message = f"Generate outfit concepts based on this request: Prompt='{request.prompt}', Gender='{request.gender}', Budget='{request.budget}', Preferences='{request.preferences}'"
-        
-        # Log just before the call
-        logger.info(f"Attempting Anthropic API call with key: {'Exists' if anthropic_client.api_key else 'None'}") 
-        
-        message = anthropic_client.messages.create(
-            model="claude-3-opus-20240229", # Or your preferred Claude model
-            max_tokens=1500,
-            system=SYSTEM_PROMPT,
-            messages=[
-                {"role": "user", "content": user_message}
-            ]
-        )
-        
-        # Extract JSON content - Claude might wrap it in ```json ... ``` or have leading text
-        raw_response = message.content[0].text
-        json_content = None
+### Customer Request
+I am looking for outfit ideas for: {request.prompt}
+Gender: {request.gender if request.gender else 'Any'}
+Budget: {'$' + str(request.budget) if request.budget else 'Any budget'}
 
-        # First, try to find JSON within markdown code blocks
-        match = re.search(r'```json\s*(\{.*?\})\s*```', raw_response, re.DOTALL)
-        if match:
-            json_content = match.group(1)
-        else:
-            # If no markdown block, find the first opening curly brace
-            first_brace_index = raw_response.find('{')
-            if first_brace_index != -1:
-                # Attempt to extract JSON from the first brace onwards
-                json_content = raw_response[first_brace_index:]
-                # Optional: Find the matching closing brace for robustness (more complex)
-            else:
-                # If no '{' found, cannot parse
-                logger.error(f"Could not find JSON object start ('{{') in Claude response.")
-                logger.error(f"Raw response content was: {raw_response}")
-                return [] # Return empty list if no JSON structure found
-        
-        # Ensure json_content is not None before trying to load
-        if json_content is None:
-            logger.error(f"Failed to extract any potential JSON content from Claude response.")
-            logger.error(f"Raw response content was: {raw_response}")
-            return []
+### Task
+I need you to generate {request.num_outfits or 3} unique outfit concepts suitable for this request.
+For each outfit, include the following:
+- outfit_name: A catchy name for the outfit
+- description: A brief description of the overall look and feel
+- style: The primary style category (e.g. casual, formal, bohemian)
+- occasion: When this outfit would be appropriate to wear
+- stylist_rationale: Why this outfit works for the request
+- items: An array of clothing/accessory items that make up the outfit (4-7 items per outfit)
 
+For each item in the outfit, include:
+- category: The specific category (e.g. "jeans", "t-shirt", "sneakers", "handbag")
+- description: Detailed description of the item
+- color: The main color of the item
+- search_keywords: Array of 3-5 search terms that would help find this specific item online
+
+OUTPUT FORMAT: Your entire response must be valid JSON with this structure:
+[
+  {{
+    "outfit_name": "Example Outfit",
+    "description": "A stylish ensemble perfect for...",
+    "style": "casual",
+    "occasion": "everyday",
+    "stylist_rationale": "This outfit works because...",
+    "items": [
+      {{
+        "category": "jeans",
+        "description": "High-waisted straight leg jeans",
+        "color": "blue",
+        "search_keywords": ["high waisted", "straight leg", "denim", "jeans"]
+      }},
+      // more items...
+    ]
+  }},
+  // more outfits...
+]
+
+IMPORTANT: Make sure your response is ONLY valid JSON without any other text.
+"""
+
+    for attempt in range(max_attempts):
         try:
-            response_data = json.loads(json_content)
-            concepts = response_data.get("outfits", [])
-            logger.info(f"Successfully generated {len(concepts)} outfit concepts from Claude.")
-            return concepts
-        except json.JSONDecodeError as json_err:
-            logger.error(f"Failed to parse JSON response from Claude: {json_err}")
-            logger.error(f"Raw response content was: {raw_response}")
-            return [] # Return empty list on parse failure
+            logger.info(f"Calling Claude API (attempt {attempt+1}/{max_attempts})")
+            start_time = time.time()
+            
+            response = await anthropic_client.messages.create(
+                model="claude-3-opus-20240229",
+                max_tokens=2000,
+                temperature=0.7,
+                system="You are a fashion stylist specialist who creates detailed outfit recommendations.",
+                messages=[
+                    {"role": "user", "content": prompt_base}
+                ]
+            )
+            
+            elapsed = time.time() - start_time
+            logger.info(f"Claude API response received in {elapsed:.2f}s")
+            
+            if not response.content:
+                logger.warning("Empty response from Claude API")
+                continue
+                
+            # Extract content from response
+            text_content = response.content[0].text
+            
+            # Extract JSON from the response
+            outfit_concepts = extract_json_from_text(text_content)
+            
+            if outfit_concepts and isinstance(outfit_concepts, list) and len(outfit_concepts) > 0:
+                logger.info(f"Successfully extracted {len(outfit_concepts)} outfit concepts")
+                cache_service.set(cache_key, outfit_concepts)
+                return outfit_concepts
+            else:
+                logger.warning(f"Failed to extract valid outfit concepts JSON (attempt {attempt+1})")
+        
+        except Exception as e:
+            logger.error(f"Error calling Claude API (attempt {attempt+1}): {str(e)}")
+        
+        # If we got here, the attempt failed
+        if attempt < max_attempts - 1:
+            logger.info(f"Retrying in {backoff_time} seconds...")
+            await asyncio.sleep(backoff_time)
+            backoff_time *= 2  # Exponential backoff
+    
+    logger.error(f"All {max_attempts} attempts to generate outfit concepts failed")
+    return []
 
-    except Exception as e:
-        logger.error(f"Error calling Anthropic API: {str(e)}", exc_info=True)
-        return [] # Return empty list on API failure
+
+def extract_json_from_text(text: str) -> Optional[List[Dict[str, Any]]]:
+    """
+    Extract JSON from text returned by Claude.
+    
+    This handles several common response formats:
+    1. Clean JSON with no surrounding text
+    2. JSON with markdown code fences
+    3. JSON embedded in regular text
+    
+    Args:
+        text: The text response from Claude
+        
+    Returns:
+        Parsed JSON object or None if extraction failed
+    """
+    # Case 1: Try direct JSON parsing first
+    try:
+        parsed = json.loads(text)
+        if isinstance(parsed, list) and len(parsed) > 0:
+            return parsed
+    except json.JSONDecodeError:
+        pass
+    
+    # Case 2: Try to extract from markdown code blocks
+    code_block_pattern = r"```(?:json)?\s*([\s\S]*?)\s*```"
+    code_blocks = re.findall(code_block_pattern, text)
+    
+    for block in code_blocks:
+        try:
+            parsed = json.loads(block)
+            if isinstance(parsed, list) and len(parsed) > 0:
+                return parsed
+        except json.JSONDecodeError:
+            continue
+    
+    # Case 3: Try to extract JSON array from anywhere in the text
+    try:
+        # Find the outermost array brackets
+        array_start = text.find('[')
+        if array_start >= 0:
+            # Find the matching closing bracket
+            brace_count = 0
+            for i in range(array_start, len(text)):
+                if text[i] == '[':
+                    brace_count += 1
+                elif text[i] == ']':
+                    brace_count -= 1
+                    if brace_count == 0:
+                        # Found the end of the array
+                        json_str = text[array_start:i+1]
+                        parsed = json.loads(json_str)
+                        if isinstance(parsed, list) and len(parsed) > 0:
+                            return parsed
+                        break
+    except (json.JSONDecodeError, ValueError, IndexError):
+        pass
+    
+    # Final attempt: Just try to find any valid JSON array anywhere
+    try:
+        # Extract anything that looks like JSON array
+        array_pattern = r"\[(.*)\]"
+        match = re.search(array_pattern, text, re.DOTALL)
+        if match:
+            json_str = f"[{match.group(1)}]"
+            parsed = json.loads(json_str)
+            if isinstance(parsed, list) and len(parsed) > 0:
+                return parsed
+    except (json.JSONDecodeError, IndexError):
+        pass
+    
+    logger.error("Could not extract valid JSON from response")
+    return None
 
 def _determine_style(outfit_name: str, outfit_description: str, user_prompt: str) -> str:
     """Determine outfit style based on keywords if not provided."""
@@ -302,8 +440,7 @@ def _add_collage_to_outfit(outfit: Outfit):
 @router.post("/generate", response_model=OutfitGenerateResponse)
 async def generate_outfit(request: OutfitGenerateRequest) -> OutfitGenerateResponse:
     """
-    Generate outfit recommendations based on user request, with better separation
-    of concept generation and product matching.
+    Generate outfit recommendations based on user request.
     
     Args:
         request: The outfit generation request containing prompt, gender, budget
@@ -313,35 +450,44 @@ async def generate_outfit(request: OutfitGenerateRequest) -> OutfitGenerateRespo
     """
     logger.info(f"Generating outfit for prompt: {request.prompt}, gender: {request.gender}, budget: {request.budget}")
     
+    # Check the cache first
+    cache_key = f"outfit_response:{request.prompt}:{request.gender}:{request.budget}"
+    cached_response = cache_service.get(cache_key, "long")
+    if cached_response:
+        logger.info(f"Using cached outfit response for: {request.prompt}")
+        return OutfitGenerateResponse(**cached_response)
+    
     try:
         # Step 1: Generate outfit concepts with Claude
-        logger.info("--- CALLING generate_outfit_concepts ---")
+        logger.info("Generating outfit concepts with Claude")
         outfit_concepts = await generate_outfit_concepts(request)
-        logger.info(f"--- RETURNED from generate_outfit_concepts (found {len(outfit_concepts)} concepts) ---")
         
         # Handle case where concept generation failed
         if not outfit_concepts:
-            logger.warning("Outfit concept generation failed or returned empty. Using fallback mockups.")
+            logger.warning("Outfit concept generation failed. Using fallback mockups.")
             return OutfitGenerateResponse(outfits=get_mock_outfits(), prompt=request.prompt)
 
-        # Step 2: Try to match real products to concepts
-        logger.info("--- CALLING enhance_outfits_with_products ---")
+        # Step 2: Match products to concepts
+        logger.info(f"Enhancing {len(outfit_concepts)} outfit concepts with real products")
         enhanced_outfits = await enhance_outfits_with_products(outfit_concepts, request)
-        logger.info(f"--- RETURNED from enhance_outfits_with_products (created {len(enhanced_outfits)} outfits) ---")
         
-        # Create the response using the enhanced outfits
-        logger.info("--- PREPARING final response ---")
-        return OutfitGenerateResponse(
+        # Create the response
+        response = OutfitGenerateResponse(
             outfits=enhanced_outfits,
             prompt=request.prompt
         )
         
+        # Cache successful response
+        cache_service.set(cache_key, response.dict(), "long")
+        
+        return response
+        
     except Exception as e:
-        logger.error(f"Error in outfit generation pipeline: {str(e)}", exc_info=True)
-        # Fall back to mock data, but clearly mark it as a fallback
+        logger.error(f"Error in outfit generation: {str(e)}", exc_info=True)
+        # Fall back to mock data with error message
         fallback_outfits = get_mock_outfits()
         for outfit in fallback_outfits:
-            outfit['description'] = f"[FALLBACK OUTFIT] {outfit.get('description', 'Mock outfit')}" 
+            outfit['description'] = f"[ERROR] {outfit.get('description', 'Mock outfit')}" 
         
         return OutfitGenerateResponse(
             outfits=fallback_outfits,
@@ -423,16 +569,16 @@ async def debug_serpapi():
     # Try to reload environment variables
     load_dotenv()
     
-    # Check if SERPAPI_KEY is in environment variables
-    serpapi_key = os.getenv("SERPAPI_KEY")
+    # Check if SERPAPI_API_KEY is in environment variables
+    serpapi_key = os.getenv("SERPAPI_API_KEY")
     masked_key = serpapi_key[:4] + "..." + serpapi_key[-4:] if serpapi_key and len(serpapi_key) > 8 else None
     
     # Check if the key exists in a secret file
-    secret_file_exists = os.path.exists("/etc/secrets/SERPAPI_KEY")
+    secret_file_exists = os.path.exists("/etc/secrets/SERPAPI_API_KEY")
     secret_file_content = None
     if secret_file_exists:
         try:
-            with open("/etc/secrets/SERPAPI_KEY", "r") as f:
+            with open("/etc/secrets/SERPAPI_API_KEY", "r") as f:
                 secret_content = f.read().strip()
                 secret_file_content = secret_content[:4] + "..." + secret_content[-4:] if len(secret_content) > 8 else "***"
         except Exception as e:
@@ -480,16 +626,16 @@ async def debug_serpapi_config():
     # Try to reload environment variables
     load_dotenv()
     
-    # Check if SERPAPI_KEY is in environment variables
-    serpapi_key = os.getenv("SERPAPI_KEY")
+    # Check if SERPAPI_API_KEY is in environment variables
+    serpapi_key = os.getenv("SERPAPI_API_KEY")
     masked_key = serpapi_key[:4] + "..." + serpapi_key[-4:] if serpapi_key and len(serpapi_key) > 8 else None
     
     # Check if the key exists in a secret file
-    secret_file_exists = os.path.exists("/etc/secrets/SERPAPI_KEY")
+    secret_file_exists = os.path.exists("/etc/secrets/SERPAPI_API_KEY")
     secret_file_content = None
     if secret_file_exists:
         try:
-            with open("/etc/secrets/SERPAPI_KEY", "r") as f:
+            with open("/etc/secrets/SERPAPI_API_KEY", "r") as f:
                 secret_content = f.read().strip()
                 secret_file_content = secret_content[:4] + "..." + secret_content[-4:] if len(secret_content) > 8 else "***"
         except Exception as e:
@@ -553,17 +699,13 @@ async def test_simple():
 # Fully independent debug test endpoint that doesn't rely on any external resource
 @router.get("/debug-test")
 async def debug_test():
-    """A completely independent test endpoint that returns hardcoded data without external dependencies"""
-    return {
-        "status": "ok",
-        "message": "Debug test endpoint working correctly",
-        "serpapi_config": {
-            "fixed": True,
-            "using_settings": False,
-            "cache_ttl": 604800,  # 7 days
-            "retry_strategy": "exponential_backoff"
-        }
-    }
+    """Debug test endpoint"""
+    try:
+        data = {"message": "Debug test endpoint working", "success": True}
+        return data
+    except Exception as e:
+        logger.error(f"Error in debug test: {e}")
+        return {"error": str(e)}
 
 # --- Dependency Function ---
 def get_serpapi_service() -> SerpAPIService:
@@ -579,7 +721,7 @@ async def _find_products_for_item(query: str, category: str,
                            alternatives_count: int = 5,
                            gender: Optional[str] = None) -> List[Dict[str, Any]]:
     """
-    Find products matching a given query and category.
+    Find products matching a given query and category with retry logic.
     
     Args:
         query: Search query for the product
@@ -592,31 +734,104 @@ async def _find_products_for_item(query: str, category: str,
     Returns:
         List of matching products
     """
-    try:
-        logger.info(f"--- CALLING serpapi_service.search_products for {category} - {query} ---")
-        
-        # Get service instance correctly
-        serpapi_service_instance = get_serpapi_service()
-        
-        # Call method on the instance
-        products = await serpapi_service_instance.search_products(
-            query=query,
-            category=category,
-            num_products=alternatives_count + 1,  # +1 for main product
-            gender=gender  # This will be caught by **kwargs in the method
-        )
-        logger.info(f"--- RETURNED from serpapi_service.search_products (found {len(products)} products) ---")
-        
-        return products
-    except Exception as e:
-        logger.error(f"Error finding products for {category} - {query}: {str(e)}")
+    cache_key = f"products:{query}:{category}:{budget}:{gender}"
+    cached_products = cache_service.get(cache_key)
+    if cached_products:
+        logger.info(f"Using cached results for {category} - {query}")
+        return cached_products
+    
+    # Add retry logic
+    max_retries = 2
+    search_count = alternatives_count + 1 if include_alternatives else 3  # Main product + alternatives
+    
+    for attempt in range(max_retries):
+        try:
+            logger.info(f"SerpAPI search attempt {attempt+1}/{max_retries} for {category} - {query}")
+            
+            # Get service instance
+            serpapi_service_instance = get_serpapi_service()
+            
+            # Primary search with original query
+            search_query = query
+            if attempt == 1:
+                # Try simplified query on second attempt
+                words = query.split()
+                search_query = f"{category} {words[0]}" if words else category
+                logger.info(f"Using simplified query: {search_query}")
+            
+            products = await serpapi_service_instance.search_products(
+                query=search_query,
+                category=category,
+                num_products=search_count,
+                gender=gender
+            )
+            
+            if products:
+                logger.info(f"Found {len(products)} products for {category}")
+                cache_service.set(cache_key, products)
+                return products
+                
+            # Wait between attempts
+            if attempt < max_retries - 1:
+                await asyncio.sleep(1)
+                
+        except Exception as e:
+            logger.error(f"Error in product search attempt {attempt+1}: {str(e)}")
+            # Wait between attempts
+            if attempt < max_retries - 1:
+                await asyncio.sleep(1)
+    
+    # After all retries, check if we can use similar products from cache
+    similar_products = _get_similar_cached_products(query, category)
+    if similar_products:
+        logger.info(f"Using similar products from cache for {category} - {query}")
+        return similar_products
+    
+    # Final fallback
+    logger.warning(f"All attempts failed, using fallback products for {category} - {query}")
+    return _get_fallback_items(items)
+
+def _get_similar_cached_products(query: str, category: Optional[str]) -> List[Dict[str, Any]]:
+    """
+    Find similar products in cache based on keywords.
+    """
+    if not category:
         return []
+    
+    # Get all product cache keys
+    all_keys = list(cache_service._get_cache_by_level("medium").keys())
+    product_keys = [k for k in all_keys if k.startswith("products:")]
+    
+    # Filter by category first
+    category_keys = [k for k in product_keys if f":{category}:" in k]
+    if not category_keys:
+        category_keys = product_keys  # Fallback to all product keys
+    
+    # Find best match based on query keywords
+    query_words = set(query.lower().split())
+    best_key = None
+    best_match_count = 0
+    
+    for key in category_keys:
+        key_words = set(key.lower().split(":")[1].split())
+        match_count = len(query_words.intersection(key_words))
+        
+        if match_count > best_match_count:
+            best_match_count = match_count
+            best_key = key
+    
+    # Require at least one word match
+    if best_match_count > 0 and best_key:
+        products = cache_service.get(best_key)
+        if products:
+            return products
+    
+    return []
 
 async def enhance_outfits_with_products(outfit_concepts: List[Dict[str, Any]], 
                               request: OutfitGenerateRequest) -> List[Outfit]:
     """
-    Try to enhance outfit concepts with real product matches, but prioritize
-    the concept even if products can't be found.
+    Match real products to outfit concepts using parallel processing.
     
     Args:
         outfit_concepts: Concepts generated by Claude
@@ -626,9 +841,9 @@ async def enhance_outfits_with_products(outfit_concepts: List[Dict[str, Any]],
         List of Outfit objects with products matched where possible
     """
     enhanced_outfits = []
-    logger.info(f"--- Starting enhance loop for {len(outfit_concepts)} concepts ---")
+    logger.info(f"Processing {len(outfit_concepts)} outfit concepts")
+    
     for idx, concept in enumerate(outfit_concepts):
-        logger.info(f"--- Processing concept {idx+1}/{len(outfit_concepts)}: {concept.get('outfit_name')}")
         try:
             # Create a unique ID for the outfit
             outfit_id = str(uuid.uuid4())
@@ -638,104 +853,123 @@ async def enhance_outfits_with_products(outfit_concepts: List[Dict[str, Any]],
             outfit_description = concept.get("description", "A stylish outfit recommendation")
             outfit_style = concept.get("style", _determine_style(outfit_name, outfit_description, request.prompt))
             outfit_occasion = concept.get("occasion", "Casual")
+            items_data = concept.get("items", [])
             
-            # Try to match products for each item, but don't break if we can't find matches
+            # Process all items in parallel for speed
             outfit_items = []
-            total_price = 0
-            brand_display = {}
+            total_price = 0.0
+            brands = {}
             
-            # Process each conceptual item and try to match real products
-            logger.info(f"--- Starting item loop for concept {idx+1} ({len(concept.get('items', []))} items) ---")
-            for item_idx, item_concept in enumerate(concept.get("items", [])):
-                # Get search info
-                category = item_concept.get("category")
-                description = item_concept.get("description", "")
-                search_keywords = item_concept.get("search_keywords", [])
-                
-                # Build search query from keywords and description
-                search_query = " ".join(search_keywords) if search_keywords else description
-                
-                logger.info(f"--- Processing item {item_idx+1}: {category} - '{search_query}' ---")
-                try:
-                    # Try to find matching products
-                    logger.info(f"--- CALLING _find_products_for_item for item {item_idx+1} ---")
-                    products = await _find_products_for_item(
-                        search_query, 
-                        category, 
-                        request.budget,
+            # Use asyncio.gather to process items in parallel
+            if items_data:
+                # Prepare all item search tasks
+                item_tasks = []
+                for item_idx, item_concept in enumerate(items_data):
+                    # Get standardized category
+                    item_category = _match_categories(item_concept.get("category", ""))
+                    
+                    # Build search query from item data
+                    description = item_concept.get("description", "")
+                    color = item_concept.get("color", "")
+                    keywords = item_concept.get("search_keywords", [])
+                    
+                    # Combine all item data into a search query
+                    search_parts = []
+                    if color and color.lower() not in description.lower():
+                        search_parts.append(color)
+                    search_parts.append(description)
+                    if keywords:
+                        search_parts.extend(keywords[:2])  # Only use first 2 keywords to avoid over-specific queries
+                    
+                    search_query = " ".join(search_parts)
+                    
+                    # Create task for this item
+                    task = _find_products_for_item(
+                        query=search_query,
+                        category=item_category, 
+                        budget=request.budget,
                         include_alternatives=request.include_alternatives,
-                        alternatives_count=item_concept.get("alternatives_count", 5), # Allow overriding count?
                         gender=request.gender
                     )
-                    logger.info(f"--- RETURNED from _find_products_for_item for item {item_idx+1} (found {len(products)}) ---")
+                    item_tasks.append((item_concept, item_category, task))
+                
+                # Process tasks in batches of 3 to avoid overloading the API
+                batch_size = 3
+                for i in range(0, len(item_tasks), batch_size):
+                    batch = item_tasks[i:i+batch_size]
                     
-                    if products:
-                        # First product is the main match
-                        main_product = products[0]
+                    # Wait for batch to complete
+                    batch_results = []
+                    for item_concept, category, task in batch:
+                        try:
+                            products = await task
+                            batch_results.append((item_concept, category, products))
+                        except Exception as e:
+                            logger.error(f"Error processing item: {str(e)}")
+                            batch_results.append((item_concept, category, []))
+                    
+                    # Process batch results
+                    for item_concept, category, products in batch_results:
+                        if products:
+                            # First product is the main match
+                            main_product = products[0]
+                            alternatives = products[1:] if len(products) > 1 else []
+                            
+                            # Track brand for brand display
+                            brand = main_product.get("brand", "")
+                            if brand:
+                                brands[brand] = brands.get(brand, 0) + 1
+                            
+                            # Get price
+                            price = float(main_product.get("price", 0.0))
+                            total_price += price
+                            
+                            # Create the outfit item
+                            outfit_item = OutfitItem(
+                                product_id=main_product.get("product_id", str(uuid.uuid4())),
+                                product_name=main_product.get("product_name", item_concept.get("description", "")),
+                                brand=brand,
+                                category=category,
+                                price=price,
+                                url=main_product.get("url", ""),
+                                image_url=main_product.get("image_url", ""),
+                                description=main_product.get("description", ""),
+                                concept_description=item_concept.get("description", ""),
+                                color=item_concept.get("color", ""),
+                                alternatives=alternatives,
+                                is_fallback=False
+                            )
+                        else:
+                            # Create fallback item if no products found
+                            logger.warning(f"No products found for {category}, using fallback")
+                            mock_product = _get_mock_product(category, item_concept.get("description"), item_concept.get("color"))
+                            
+                            outfit_item = OutfitItem(
+                                product_id=f"fallback-{uuid.uuid4()}",
+                                product_name=mock_product.get("name", item_concept.get("description", "")),
+                                brand=mock_product.get("brand", "Various"),
+                                category=category,
+                                price=29.99,  # Default fallback price
+                                url="",
+                                image_url=mock_product.get("image_url", ""),
+                                description=item_concept.get("description", ""),
+                                concept_description=item_concept.get("description", ""),
+                                color=item_concept.get("color", ""),
+                                alternatives=[],
+                                is_fallback=True
+                            )
+                            total_price += 29.99
                         
-                        # Remaining products are alternatives (if any)
-                        alternatives = products[1:] if len(products) > 1 else []
-                        
-                        # Create OutfitItem from the main product
-                        outfit_item = OutfitItem(
-                            product_id=main_product.get("product_id", ""),
-                            product_name=main_product.get("product_name", item_concept.get("description", "")),
-                            brand=main_product.get("brand", "Various"),
-                            category=category,
-                            price=main_product.get("price", 0.0),
-                            url=main_product.get("url", ""),
-                            image_url=main_product.get("image_url", ""),
-                            description=main_product.get("description", ""),
-                            concept_description=item_concept.get("description", ""),
-                            color=item_concept.get("color", ""),
-                            alternatives=alternatives,
-                            is_fallback=False
-                        )
-                        
-                        # Update running data
                         outfit_items.append(outfit_item)
-                        total_price += outfit_item.price
-                        
-                        # Track brand for display
-                        if outfit_item.brand:
-                            brand_display[outfit_item.brand] = main_product.get("image_url", "")
-                    else:
-                        # If no product match, still include the concept item with fallback flag
-                        outfit_item = OutfitItem(
-                            product_id=f"concept_{uuid.uuid4().hex[:8]}",
-                            product_name=f"{category}: {description}",
-                            brand="Concept Only",
-                            category=category,
-                            price=0.0,
-                            url="",
-                            image_url=f"https://via.placeholder.com/300x400?text={category}",
-                            description=description,
-                            concept_description=description,
-                            color=item_concept.get("color", ""),
-                            alternatives=[],
-                            is_fallback=True
-                        )
-                        outfit_items.append(outfit_item)
-                        
-                except Exception as item_error:
-                    # Log but continue with other items
-                    logger.error(f"Error matching products for {category}: {str(item_error)}")
-                    # Still include the concept item
-                    outfit_item = OutfitItem(
-                        product_id=f"concept_{uuid.uuid4().hex[:8]}",
-                        product_name=f"{category}: {description}",
-                        brand="Concept Only",
-                        category=category,
-                        price=0.0,
-                        url="",
-                        image_url=f"https://via.placeholder.com/300x400?text={category}",
-                        description=description,
-                        concept_description=description,
-                        color=item_concept.get("color", ""),
-                        alternatives=[],
-                        is_fallback=True
-                    )
-                    outfit_items.append(outfit_item)
+            
+            # Create brand display info
+            brand_display = {}
+            if brands:
+                # Sort brands by frequency
+                sorted_brands = sorted(brands.items(), key=lambda x: x[1], reverse=True)
+                # Keep top 3 brands
+                for brand, count in sorted_brands[:3]:
+                    brand_display[brand] = str(count)
             
             # Create outfit with available items
             outfit = Outfit(
@@ -753,23 +987,29 @@ async def enhance_outfits_with_products(outfit_concepts: List[Dict[str, Any]],
             # Generate collage if we have images
             if outfit_items:
                 try:
-                    logger.info(f"--- CALLING _add_collage_to_outfit for concept {idx+1} ---")
-                    _add_collage_to_outfit(outfit) # Sync call
-                    logger.info(f"--- RETURNED from _add_collage_to_outfit for concept {idx+1} ---")
+                    _add_collage_to_outfit(outfit)
                 except Exception as collage_error:
                     logger.error(f"Error creating collage: {str(collage_error)}")
             
             enhanced_outfits.append(outfit)
-            logger.info(f"--- Finished processing concept {idx+1} ---")
+            
         except Exception as outfit_error:
-            logger.error(f"Error enhancing outfit: {str(outfit_error)}")
-    
-    # If no outfits could be processed, use mock outfit as fallback
+            logger.error(f"Error enhancing outfit concept: {str(outfit_error)}")
+            # Continue with next outfit instead of failing completely
+            
+    # Check if we have any enhanced outfits
     if not enhanced_outfits:
-        logger.warning("No outfits could be enhanced. Using fallback mockups.")
-        return get_mock_outfits()
-    
-    return enhanced_outfits 
+        logger.warning("No outfits could be enhanced, using mockups")
+        # Convert mock outfits to Outfit objects
+        mock_outfits = []
+        for mock in get_mock_outfits():
+            if isinstance(mock, dict):
+                mock_outfits.append(Outfit(**mock))
+            else:
+                mock_outfits.append(mock)
+        return mock_outfits
+        
+    return enhanced_outfits
 
 # Add new endpoint to get alternatives for an item
 @router.get("/alternatives/{item_id}", response_model=List[Dict[str, Any]])
@@ -1045,3 +1285,472 @@ async def test_serpapi_ssl():
             "status": "error",
             "message": f"Error testing SerpAPI: {str(e)}"
         } 
+
+async def match_products_to_items(items: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """
+    Match outfit items to real products using search API.
+    
+    Args:
+        items: List of outfit item descriptions
+        
+    Returns:
+        Enhanced items with matched product details
+    """
+    enhanced_items = []
+    
+    # Don't proceed without API key
+    api_key = os.environ.get("SERPAPI_API_KEY")
+    logger.info(f"SERPAPI_API_KEY status: {'Found' if api_key else 'Missing'}")
+    if not api_key:
+        logger.error("Missing SERPAPI_API_KEY environment variable")
+        return create_fallback_items(items)
+    
+    # Get search optimizer instance
+    search_optimizer = get_search_optimizer()
+    logger.info("Using search optimizer for product matching")
+    
+    # Use gather to process items concurrently with a limit
+    # Process in batches of 3 to avoid overwhelming the API
+    batch_size = 3
+    for i in range(0, len(items), batch_size):
+        batch = items[i:i+batch_size]
+        batch_results = await asyncio.gather(
+            *[process_single_item(item, search_optimizer) for item in batch],
+            return_exceptions=True
+        )
+        
+        for result in batch_results:
+            if isinstance(result, Exception):
+                logger.error(f"Batch processing error: {str(result)}")
+                # Add fallback item as placeholder
+                enhanced_items.append(create_fallback_item({}))
+            else:
+                enhanced_items.append(result)
+    
+    return enhanced_items
+
+
+async def process_single_item(item: Dict[str, Any], search_optimizer=None) -> Dict[str, Any]:
+    """Process a single outfit item to find a matching product."""
+    try:
+        # Skip if missing required fields
+        if not item.get('category') or not item.get('description'):
+            logger.warning(f"Skipping item with missing fields: {item}")
+            return create_fallback_item(item)
+        
+        # Use search optimizer if provided
+        if search_optimizer:
+            # Enhance item with additional search terms
+            enhanced_item = search_optimizer.enhance_item_for_search(item)
+            
+            # Get optimized primary query and fallbacks
+            primary_query, fallback_queries = search_optimizer.optimize_search_query(enhanced_item)
+            
+            logger.info(f"Optimized query: {primary_query}")
+            if fallback_queries:
+                logger.debug(f"Fallback queries: {fallback_queries[:2]}...")
+                
+            # Try primary query first
+            matched_product = await search_product_with_retry(primary_query)
+            
+            # If primary query fails, try fallbacks in sequence
+            if not matched_product and fallback_queries:
+                for i, fallback_query in enumerate(fallback_queries[:3]):  # Try up to 3 fallbacks
+                    logger.info(f"Trying fallback query {i+1}: {fallback_query}")
+                    matched_product = await search_product_with_retry(fallback_query)
+                    if matched_product:
+                        logger.info(f"Fallback query {i+1} succeeded")
+                        break
+        else:
+            # Fall back to original logic if optimizer not available
+            query = build_search_query(item)
+            
+            if not query.strip():
+                logger.warning(f"Empty search query for item: {item}")
+                return create_fallback_item(item)
+                
+            logger.info(f"Searching for product: {query}")
+            matched_product = await search_product_with_retry(query)
+        
+        if matched_product:
+            # Successfully found a product
+            enhanced_item = {**item, **matched_product}
+            logger.info(f"Found product match: {matched_product.get('title', 'No title')} - ${matched_product.get('price', 'N/A')}")
+            return enhanced_item
+        else:
+            # No product found, create fallback
+            logger.warning(f"No product match found for item")
+            return create_fallback_item(item)
+            
+    except Exception as e:
+        logger.error(f"Error matching product for item: {str(e)}", exc_info=True)
+        return create_fallback_item(item)
+
+
+def build_search_query(item: Dict[str, Any]) -> str:
+    """Build an optimized search query from item details."""
+    search_terms = item.get('search_keywords', [])
+    color = item.get('color', '')
+    category = item.get('category', '')
+    brand = item.get('brand', '')
+    
+    # Use search keywords if available, otherwise build from description
+    if search_terms and len(search_terms) > 0:
+        # Filter out empty strings and join with spaces
+        query_terms = [term for term in search_terms if term and len(term.strip()) > 0]
+        
+        # Add important attributes not present in search terms
+        if color and color.lower() not in ' '.join(query_terms).lower():
+            query_terms.append(color)
+        if category and category.lower() not in ' '.join(query_terms).lower():
+            query_terms.append(category)
+        if brand and brand.lower() not in ' '.join(query_terms).lower() and len(brand) < 20:
+            query_terms.insert(0, brand)  # Put brand first for better results
+    else:
+        # Fall back to description-based query with smart filtering
+        description = item.get('description', '')
+        # Clean description - remove filler words for better search
+        description = re.sub(r'\b(a|an|the|with|for|and|or|that|this|these|those)\b', ' ', description, flags=re.IGNORECASE)
+        description = re.sub(r'\s+', ' ', description).strip()
+        
+        query_terms = []
+        if brand and len(brand) < 20:
+            query_terms.append(brand)
+        if color:
+            query_terms.append(color)
+        if category:
+            query_terms.append(category)
+        if description:
+            # Use first 5 words of description for more focused search
+            desc_words = description.split()[:5]
+            query_terms.append(' '.join(desc_words))
+            
+    # Join and truncate long queries
+    query = ' '.join([term for term in query_terms if term and len(term.strip()) > 0])
+    query = query[:100] if len(query) > 100 else query
+    
+    return query
+
+
+async def search_product_with_retry(query: str) -> Optional[Dict[str, Any]]:
+    """
+    Search for a product with retry logic.
+    
+    Args:
+        query: The search query string
+        
+    Returns:
+        Matched product information or None if not found
+    """
+    max_attempts = 3
+    backoff_factor = 2
+    initial_backoff = 1  # Start with 1 second backoff
+    
+    # Create SSL context
+    try:
+        import ssl
+        import certifi
+        ssl_context = ssl.create_default_context(cafile=certifi.where())
+        logger.debug("Created SSL context with certifi certificates")
+    except Exception as e:
+        logger.warning(f"Could not create SSL context with certifi: {e}")
+        # Fallback to less secure but functional SSL context
+        ssl_context = ssl.create_default_context()
+        ssl_context.check_hostname = False
+        ssl_context.verify_mode = ssl.CERT_NONE
+        logger.warning("SSL certificate verification disabled for SerpAPI requests")
+    
+    for attempt in range(max_attempts):
+        current_backoff = initial_backoff * (backoff_factor ** attempt)
+        
+        try:
+            # Build search parameters with clothing-specific filtering
+            search_params = {
+                "q": query + " clothing",
+                "tbm": "shop",
+                "num": 5,
+                "api_key": os.environ.get("SERPAPI_API_KEY"),
+                "tbs": "mr:1",  # Show highly rated items first
+            }
+            
+            # Make search request with timeout
+            timeout = aiohttp.ClientTimeout(total=15)  # 15 seconds total timeout
+            connector = aiohttp.TCPConnector(ssl=ssl_context)
+            
+            async with aiohttp.ClientSession(timeout=timeout, connector=connector) as session:
+                async with session.get(
+                    "https://serpapi.com/search.json", 
+                    params=search_params
+                ) as response:
+                    if response.status != 200:
+                        error_text = await response.text()
+                        logger.warning(f"SerpAPI returned status {response.status} (attempt {attempt+1}): {error_text[:200]}")
+                        if attempt < max_attempts - 1:
+                            logger.info(f"Retrying in {current_backoff} seconds...")
+                            await asyncio.sleep(current_backoff)
+                        continue
+                        
+                    try:
+                        data = await response.json()
+                    except json.JSONDecodeError as e:
+                        logger.error(f"Failed to parse JSON response: {str(e)}")
+                        if attempt < max_attempts - 1:
+                            await asyncio.sleep(current_backoff)
+                        continue
+                    
+                    if not data:
+                        logger.warning("Empty response data")
+                        if attempt < max_attempts - 1:
+                            await asyncio.sleep(current_backoff)
+                        continue
+                        
+                    if "error" in data:
+                        logger.error(f"API error: {data['error']}")
+                        if attempt < max_attempts - 1:
+                            await asyncio.sleep(current_backoff)
+                        continue
+                    
+                    if "shopping_results" not in data or not data["shopping_results"]:
+                        logger.warning(f"No shopping results found (attempt {attempt+1})")
+                        if attempt < max_attempts - 1:
+                            await asyncio.sleep(current_backoff)
+                        continue
+                    
+                    # Find best matching product from results
+                    shopping_results = data["shopping_results"]
+                    selected_product = select_best_product(shopping_results, query)
+                    
+                    if not selected_product:
+                        logger.warning("No suitable product found in results")
+                        if attempt < max_attempts - 1:
+                            await asyncio.sleep(current_backoff)
+                        continue
+                    
+                    # Extract and normalize product data
+                    return {
+                        "product_id": str(uuid.uuid4()),
+                        "title": selected_product.get("title", ""),
+                        "brand": extract_brand(selected_product),
+                        "source": selected_product.get("source", ""),
+                        "price": extract_price(selected_product.get("price", "")),
+                        "image_url": selected_product.get("thumbnail", ""),
+                        "product_url": selected_product.get("link", ""),
+                        "delivery": selected_product.get("delivery", ""),
+                        "rating": selected_product.get("rating", 0),
+                        "reviews": selected_product.get("reviews", 0),
+                    }
+                    
+        except aiohttp.ClientError as e:
+            logger.error(f"API request error (attempt {attempt+1}): {str(e)}")
+        except asyncio.TimeoutError:
+            logger.error(f"API request timeout after 15 seconds (attempt {attempt+1})")
+        except Exception as e:
+            logger.error(f"Unexpected error during product search (attempt {attempt+1}): {str(e)}", exc_info=True)
+        
+        # If we got here, the attempt failed
+        if attempt < max_attempts - 1:
+            logger.info(f"Retrying product search in {current_backoff} seconds...")
+            await asyncio.sleep(current_backoff)
+    
+    # All attempts failed
+    logger.error(f"All {max_attempts} attempts to search for product failed: {query}")
+    return None
+
+
+def select_best_product(products: List[Dict[str, Any]], query: str) -> Optional[Dict[str, Any]]:
+    """Select the best matching product from results based on relevance."""
+    if not products:
+        return None
+        
+    # Simple scoring system for product relevance
+    query_terms = set(query.lower().split())
+    
+    scored_products = []
+    for product in products:
+        title = product.get("title", "").lower()
+        
+        # Calculate term match score
+        term_match_score = sum(1 for term in query_terms if term in title)
+        
+        # Prioritize products with images
+        has_image = 1 if product.get("thumbnail") else 0
+        
+        # Prioritize products with ratings
+        has_rating = 1 if product.get("rating") else 0
+        
+        # Calculate final score
+        score = term_match_score + has_image*2 + has_rating
+        
+        scored_products.append((score, product))
+    
+    # Sort by score (highest first)
+    scored_products.sort(reverse=True, key=lambda x: x[0])
+    
+    # Return highest scoring product
+    return scored_products[0][1] if scored_products else None
+
+
+def extract_brand(product: Dict[str, Any]) -> str:
+    """Extract brand information from product data."""
+    # If brand is explicitly provided
+    if "brand" in product and product["brand"]:
+        return product["brand"]
+    
+    # Try to extract from source
+    source = product.get("source", "")
+    if source and not source.lower().startswith("http"):
+        return source.split()[0]  # Often the first word is the brand
+    
+    # Try to extract from title
+    title = product.get("title", "")
+    if title:
+        # Common brand positioning is at the start of title
+        title_parts = title.split()
+        if len(title_parts) > 0:
+            potential_brand = title_parts[0]
+            # Most brands are capitalized and not extremely long
+            if potential_brand[0].isupper() and len(potential_brand) < 15:
+                return potential_brand
+    
+    return "Fashion Brand"
+
+
+def extract_price(price_str: str) -> float:
+    """Extract numerical price from string format."""
+    if not price_str:
+        return 29.99  # Default price
+    
+    try:
+        # Remove currency symbols and commas
+        clean_price = re.sub(r'[^\d.]', '', price_str)
+        
+        # Handle empty string after cleaning
+        if not clean_price:
+            return 29.99
+        
+        price = float(clean_price)
+        # Sanity check on price range
+        if price < 0.1 or price > 10000:
+            return 29.99
+        return price
+    except (ValueError, TypeError):
+        return 29.99  # Default price on error
+
+
+def create_fallback_item(item: Dict[str, Any]) -> Dict[str, Any]:
+    """Create a fallback item when product matching fails."""
+    category = item.get('category', 'Item')
+    color = item.get('color', 'Stylish')
+    
+    fallback = {
+        "product_id": str(uuid.uuid4()),
+        "title": f"{color} {category}",
+        "brand": "Fashion Brand",
+        "source": "Fashion Store",
+        "price": 29.99,
+        "image_url": get_default_image_for_category(category),
+        "product_url": "https://example.com/product",
+        "delivery": "Standard delivery",
+        "rating": 4.5,
+        "reviews": 42,
+    }
+    
+    # Preserve original item fields
+    return {**item, **fallback}
+
+
+def create_fallback_items(items: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Create fallback items for an entire list"""
+    return [create_fallback_item(item) for item in items]
+
+
+def get_default_image_for_category(category: str) -> str:
+    """Get a default image URL based on item category."""
+    category = category.lower() if category else ""
+    
+    # Define category to image mapping
+    category_images = {
+        "shirt": "https://example.com/images/shirt.jpg",
+        "t-shirt": "https://example.com/images/tshirt.jpg",
+        "jeans": "https://example.com/images/jeans.jpg",
+        "pants": "https://example.com/images/pants.jpg",
+        "dress": "https://example.com/images/dress.jpg",
+        "shoes": "https://example.com/images/shoes.jpg",
+        "sneakers": "https://example.com/images/sneakers.jpg",
+        "jacket": "https://example.com/images/jacket.jpg",
+        "coat": "https://example.com/images/coat.jpg",
+        "sweater": "https://example.com/images/sweater.jpg",
+        "hat": "https://example.com/images/hat.jpg",
+        "bag": "https://example.com/images/bag.jpg",
+        "handbag": "https://example.com/images/handbag.jpg",
+        "scarf": "https://example.com/images/scarf.jpg",
+        "sunglasses": "https://example.com/images/sunglasses.jpg",
+        "watch": "https://example.com/images/watch.jpg",
+        "necklace": "https://example.com/images/necklace.jpg",
+        "earrings": "https://example.com/images/earrings.jpg",
+        "bracelet": "https://example.com/images/bracelet.jpg",
+        "ring": "https://example.com/images/ring.jpg",
+    }
+    
+    # Check if we have a matching category image
+    for key, url in category_images.items():
+        if key in category:
+            return url
+    
+    # Default image if no match
+    return "https://example.com/images/clothing.jpg" 
+
+@router.post("/run-serpapi-analysis", include_in_schema=False)
+async def run_serpapi_analysis(iterations: int = 10):
+    """
+    Admin endpoint to run SerpAPI analysis
+    This will make multiple API calls to analyze search patterns
+    """
+    # Prevent abuse by requiring authentication in production
+    if not settings.debug:
+        return {"error": "This endpoint is only available in debug mode"}
+        
+    try:
+        # Import analyzer dynamically
+        from app.services.serpapi_analyzer import SerpAPIAnalyzer
+        
+        # Run in background task to not block response
+        background_tasks = BackgroundTasks()
+        
+        async def run_analysis():
+            try:
+                logger.info(f"Starting SerpAPI analysis with {iterations} iterations")
+                analyzer = SerpAPIAnalyzer()
+                await analyzer.run_analysis(iterations=iterations)
+                logger.info("SerpAPI analysis completed")
+            except Exception as e:
+                logger.error(f"Error in SerpAPI analysis: {e}", exc_info=True)
+        
+        background_tasks.add_task(run_analysis)
+        
+        return {
+            "message": f"Started SerpAPI analysis with {iterations} iterations in background",
+            "success": True
+        }
+    except ImportError:
+        return {"error": "SerpAPI analyzer module not found"}
+    except Exception as e:
+        logger.error(f"Error starting SerpAPI analysis: {e}")
+        return {"error": str(e)}
+
+
+@router.get("/search-optimization-status")
+async def search_optimization_status():
+    """Get the current search optimization status and recommendations"""
+    try:
+        search_optimizer = get_search_optimizer()
+        recommendations = search_optimizer.get_search_recommendations()
+        
+        return {
+            "analysis_loaded": search_optimizer.analysis_loaded,
+            "recommendations": recommendations,
+            "success": True
+        }
+    except Exception as e:
+        logger.error(f"Error getting search optimization status: {e}")
+        return {"error": str(e)} 

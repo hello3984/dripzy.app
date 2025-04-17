@@ -1,7 +1,44 @@
-# Python Backend
+# Environments
+.env
+.env.local
+.env.*
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# Python cache
 __pycache__/
 *.py[cod]
 *$py.class
+.pytest_cache/
+
+# Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Distribution
+dist/
+build/
+
+# Project specific
+backend/app/services/serpapi_analysis.json
+.DS_Store
+*.har
+*.bak
+temp_*
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Python Backend
 *.so
 .Python
 env/
