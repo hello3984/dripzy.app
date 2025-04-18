@@ -9,6 +9,9 @@ const OutfitCollage = ({ outfit, prompt }) => {
   // Extract emoji from prompt if it exists
   const promptTitle = prompt || outfit.name || 'Stylish Outfit';
   const hasEmoji = /[\p{Emoji}]/u.test(promptTitle);
+  
+  // Log outfit data to help debug
+  console.log("Outfit data:", outfit);
 
   // Categorize items by type
   const categories = {};
@@ -42,34 +45,63 @@ const OutfitCollage = ({ outfit, prompt }) => {
       </motion.h1>
 
       <div className="collage-grid">
-        {outfit.items.map((item, index) => (
-          <motion.div 
-            key={item.product_id || index}
-            className={`collage-item item-${index}`}
-            initial={{ opacity: 0, scale: 0.8 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.4, delay: index * 0.1 }}
-          >
-            <div className="item-image-container">
-              {item.image_url ? (
-                <img 
-                  src={item.image_url}
-                  alt={item.product_name || `Fashion item ${index + 1}`}
-                  className="collage-image"
-                />
-              ) : (
-                <div className="placeholder-image">
-                  <span>{item.category?.charAt(0) || '?'}</span>
+        {outfit.items.map((item, index) => {
+          // Generate product URL
+          const productUrl = item.product_url || item.url || '';
+          const searchQuery = encodeURIComponent(`${item.brand || ''} ${item.product_name || ''} ${item.category || ''}`).trim();
+          const fallbackUrl = `https://www.google.com/search?tbm=shop&q=${searchQuery}`;
+          const finalUrl = productUrl || fallbackUrl;
+          
+          console.log(`Item ${index} URL:`, finalUrl);
+          
+          return (
+            <motion.div 
+              key={item.product_id || index}
+              className={`collage-item item-${index}`}
+              initial={{ opacity: 0, scale: 0.8 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ duration: 0.4, delay: index * 0.1 }}
+            >
+              <div className="product-card">
+                <div className="image-container">
+                  {item.image_url ? (
+                    <img 
+                      src={item.image_url}
+                      alt={item.product_name || `Fashion item ${index + 1}`}
+                      className="product-image"
+                    />
+                  ) : (
+                    <div className="placeholder-image">
+                      <span>{item.category?.charAt(0) || '?'}</span>
+                    </div>
+                  )}
                 </div>
-              )}
-              <div className="hover-details">
-                <h3>{item.product_name || `Item ${index + 1}`}</h3>
-                {item.brand && <p className="brand">{item.brand}</p>}
-                {item.price && <p className="price">${parseFloat(item.price).toFixed(2)}</p>}
+                
+                <div className="product-details">
+                  <h3 className="product-name">{item.product_name || `Item ${index + 1}`}</h3>
+                  {item.brand && <p className="product-brand">{item.brand}</p>}
+                  {item.price && <p className="product-price">${parseFloat(item.price).toFixed(2)}</p>}
+                  
+                  <a 
+                    href={finalUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="shop-button"
+                    onClick={() => console.log("Link clicked for:", item.product_name)}
+                  >
+                    Shop Now
+                  </a>
+                </div>
               </div>
-            </div>
-          </motion.div>
-        ))}
+            </motion.div>
+          );
+        })}
+      </div>
+
+      <div className="outfit-description">
+        <p>{outfit.description || "A stylish outfit perfect for your occasion."}</p>
+        <p className="stylist-rationale">{outfit.stylist_rationale || ""}</p>
+        <p className="total-price">Total Price: ${outfit.total_price?.toFixed(2) || "N/A"}</p>
       </div>
 
       <div className="style-tags">
@@ -111,34 +143,33 @@ const OutfitCollage = ({ outfit, prompt }) => {
 
         .collage-grid {
           display: grid;
-          grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-          grid-auto-rows: 300px;
-          gap: 1.5rem;
+          grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+          gap: 2rem;
           margin-bottom: 2rem;
         }
 
-        .collage-item {
+        .product-card {
+          background: white;
           border-radius: 12px;
           overflow: hidden;
-          position: relative;
-        }
-
-        .item-image-container {
-          height: 100%;
-          width: 100%;
-          position: relative;
-          overflow: hidden;
-          border-radius: 12px;
           box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
           transition: transform 0.3s ease, box-shadow 0.3s ease;
+          height: 100%;
+          display: flex;
+          flex-direction: column;
         }
 
-        .item-image-container:hover {
-          transform: scale(1.03);
-          box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+        .product-card:hover {
+          transform: translateY(-5px);
+          box-shadow: 0 12px 25px rgba(0, 0, 0, 0.15);
         }
 
-        .collage-image {
+        .image-container {
+          height: 300px;
+          overflow: hidden;
+        }
+
+        .product-image {
           width: 100%;
           height: 100%;
           object-fit: cover;
@@ -150,48 +181,72 @@ const OutfitCollage = ({ outfit, prompt }) => {
           align-items: center;
           justify-content: center;
           background: linear-gradient(45deg, #f0f0f0, #e0e0e0);
-        }
-
-        .placeholder-image span {
           font-size: 3rem;
           color: #a0aec0;
           font-weight: 600;
         }
 
-        .hover-details {
-          position: absolute;
-          bottom: 0;
-          left: 0;
-          right: 0;
-          background: linear-gradient(transparent, rgba(0, 0, 0, 0.7));
-          color: white;
-          padding: 1rem;
-          opacity: 0;
-          transition: opacity 0.3s ease;
+        .product-details {
+          padding: 1.5rem;
+          display: flex;
+          flex-direction: column;
+          flex-grow: 1;
         }
 
-        .item-image-container:hover .hover-details {
-          opacity: 1;
-        }
-
-        .hover-details h3 {
-          margin: 0;
-          font-size: 1rem;
+        .product-name {
+          font-size: 1.2rem;
+          margin: 0 0 0.5rem;
           font-weight: 500;
-          margin-bottom: 0.25rem;
         }
 
-        .brand {
-          margin: 0;
-          font-size: 0.8rem;
-          opacity: 0.9;
-          margin-bottom: 0.25rem;
-        }
-
-        .price {
-          margin: 0;
-          font-weight: 600;
+        .product-brand {
+          color: #666;
+          margin: 0 0 0.5rem;
           font-size: 0.9rem;
+        }
+
+        .product-price {
+          font-weight: 600;
+          font-size: 1.1rem;
+          margin: 0 0 1rem;
+        }
+
+        .shop-button {
+          background-color: #4a56e2;
+          color: white;
+          padding: 0.8rem 1rem;
+          border-radius: 8px;
+          text-align: center;
+          font-weight: 500;
+          margin-top: auto;
+          text-decoration: none;
+          transition: background-color 0.2s ease;
+          cursor: pointer;
+          display: block;
+        }
+
+        .shop-button:hover {
+          background-color: #3a46d2;
+        }
+
+        .outfit-description {
+          text-align: center;
+          margin-top: 2rem;
+          font-size: 1.1rem;
+          color: #444;
+          line-height: 1.6;
+        }
+
+        .stylist-rationale {
+          font-style: italic;
+          color: #666;
+          margin-top: 1rem;
+        }
+
+        .total-price {
+          font-weight: 600;
+          margin-top: 1rem;
+          color: #333;
         }
 
         .style-tags {
@@ -232,27 +287,18 @@ const OutfitCollage = ({ outfit, prompt }) => {
         @media (min-width: 768px) {
           .collage-grid {
             grid-template-columns: repeat(3, 1fr);
-            grid-template-rows: repeat(2, 300px);
           }
+        }
 
-          .item-0 {
-            grid-column: 1;
-            grid-row: 1 / span 2;
+        @media (max-width: 767px) {
+          .collage-grid {
+            grid-template-columns: repeat(2, 1fr);
           }
+        }
 
-          .item-1 {
-            grid-column: 2;
-            grid-row: 1;
-          }
-
-          .item-2 {
-            grid-column: 3;
-            grid-row: 1;
-          }
-
-          .item-3 {
-            grid-column: 2 / span 2;
-            grid-row: 2;
+        @media (max-width: 480px) {
+          .collage-grid {
+            grid-template-columns: 1fr;
           }
         }
       `}</style>
