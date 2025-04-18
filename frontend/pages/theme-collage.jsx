@@ -4,6 +4,9 @@ import Head from 'next/head';
 import OutfitCollage from '../components/OutfitCollage';
 import LoadingIndicator from '../components/LoadingIndicator';
 
+// Import the API configuration
+import { API_CONFIG } from '../src/services/api';
+
 const ThemeCollage = () => {
   const [prompt, setPrompt] = useState('');
   const [gender, setGender] = useState('female');
@@ -41,7 +44,7 @@ const ThemeCollage = () => {
     setGeneratedPrompt(prompt);
 
     try {
-      const response = await fetch('http://localhost:8004/outfits/generate', {
+      const response = await fetch(`${API_CONFIG.baseURL}/outfits/generate`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -175,7 +178,7 @@ const ThemeCollage = () => {
         {isLoading && (
           <div className="loading-container">
             <LoadingIndicator />
-            <p>Creating your themed outfit collage...</p>
+            <p>Creating your themed outfit collage... This may take 1-2 minutes to search for the perfect products.</p>
           </div>
         )}
 

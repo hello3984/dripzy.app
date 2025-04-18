@@ -2,11 +2,11 @@
 import stylistService from './stylist';
 
 // Define API configuration
-const API_CONFIG = {
+export const API_CONFIG = {
   // Base URL for API calls - changes based on environment
   baseURL: process.env.NODE_ENV === 'production' 
-    ? 'https://api.dripzy.app/api' 
-    : 'http://localhost:8000',
+    ? 'https://dripzy-app.onrender.com' 
+    : 'http://localhost:9999',
   
   timeout: 30000 // 30 seconds timeout for image processing
 };

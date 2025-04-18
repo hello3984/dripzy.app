@@ -3,6 +3,9 @@ import { motion } from 'framer-motion';
 import OutfitCollage from './OutfitCollage';
 import LoadingIndicator from './LoadingIndicator';
 
+// Import the API configuration
+import { API_CONFIG } from '../services/api';
+
 const ThemeCollage = () => {
   const [prompt, setPrompt] = useState('');
   const [gender, setGender] = useState('female');
@@ -40,7 +43,7 @@ const ThemeCollage = () => {
     setGeneratedPrompt(prompt);
 
     try {
-      const response = await fetch('http://localhost:8004/outfits/generate', {
+      const response = await fetch(`${API_CONFIG.baseURL}/outfits/generate`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
