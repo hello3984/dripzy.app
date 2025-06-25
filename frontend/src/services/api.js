@@ -37,13 +37,9 @@ export const generateOutfit = async (preferences) => {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
     
-    console.log('Generating outfit with preferences:', preferences);
-    
     try {
       // ENHANCEMENT: Use ultra-fast endpoint with smart retailer selection
       const url = `${API_CONFIG.baseURL}/outfits/ultra-fast-generate`;
-      console.log('API Request URL (Enhanced):', url);
-      console.log('Request body:', JSON.stringify(preferences));
       
       const response = await fetch(url, {
         method: 'POST',
@@ -58,16 +54,13 @@ export const generateOutfit = async (preferences) => {
       });
       
       clearTimeout(timeoutId);
-      console.log('Response status:', response.status);
       
       if (!response.ok) {
-        console.error('Error response from server:', response.status, response.statusText);
         // Try to get the error details from the response
         try {
           const errorData = await response.json();
-          console.error('Server error details:', errorData);
         } catch (e) {
-          console.error('Could not parse error response');
+          // Could not parse error response
         }
         
         // Try fallback to real fashion APIs
@@ -76,7 +69,6 @@ export const generateOutfit = async (preferences) => {
       
       try {
         const data = await response.json();
-        console.log('Received outfit data:', data);
         // Enhance outfit data with real URLs if needed
         if (data.outfits && data.outfits.length > 0) {
           const enhancedOutfits = await enhanceOutfitsWithRealUrls(data.outfits);
@@ -87,29 +79,26 @@ export const generateOutfit = async (preferences) => {
         }
         return data;
       } catch (jsonError) {
-        console.error('Error parsing JSON:', jsonError);
         return await getRealFashionOutfits(preferences);
       }
     } catch (fetchError) {
       clearTimeout(timeoutId);
-      console.error('Fetch error:', fetchError);
       
       if (fetchError.name === 'AbortError') {
-        console.log('Request timed out, using fallback');
+        // Request timed out, using fallback
       }
       
       // Try fallback APIs
       return await getRealFashionOutfits(preferences);
     }
   } catch (error) {
-    console.error('Error in generateOutfit:', error);
     throw error;
   }
 };
 
 // Get real fashion data from multiple reliable sources
 async function getRealFashionOutfits(preferences) {
-  console.log('Using real fashion APIs for outfit generation');
+  // Using real fashion APIs for outfit generation
   
   try {
     // Fetch from multiple sources in parallel for better chances of success
@@ -133,7 +122,6 @@ async function getRealFashionOutfits(preferences) {
     // If all fetch attempts fail, fall back to reliable mock data
     return createFashionMockOutfits(preferences);
   } catch (error) {
-    console.error('Error in real fashion outfit generation:', error);
     return createFashionMockOutfits(preferences);
   }
 }
@@ -628,17 +616,14 @@ export const getTrendingStyles = async () => {
     }
 
     const text = await response.text();
-    console.log('Raw trending styles response:', text);
     
     try {
       const data = JSON.parse(text);
       return data;
     } catch (parseError) {
-      console.error('Failed to parse trending styles JSON:', parseError);
       return { styles: {} };
     }
   } catch (error) {
-    console.error('Failed to get trending styles:', error);
     return { styles: {} }; // Return empty object instead of throwing
   }
 };
@@ -676,7 +661,6 @@ export const searchProducts = async (filters) => {
 
     return await response.json();
   } catch (error) {
-    console.error('Failed to search products:', error);
     throw error;
   }
 };
@@ -702,7 +686,6 @@ export const generateTryOn = async (tryOnRequest) => {
 
     return await response.json();
   } catch (error) {
-    console.error('Failed to generate try-on:', error);
     throw error;
   }
 };
@@ -728,7 +711,6 @@ export const uploadUserImage = async (imageFile) => {
 
     return await response.json();
   } catch (error) {
-    console.error('Failed to upload user image:', error);
     throw error;
   }
 };
@@ -747,7 +729,6 @@ export const getAvatarOptions = async () => {
 
     return await response.json();
   } catch (error) {
-    console.error('Failed to get avatar options:', error);
     throw error;
   }
 };
@@ -755,7 +736,6 @@ export const getAvatarOptions = async () => {
 // Function to fallback to the test endpoint if the regular endpoint fails
 export const getTestOutfits = async () => {
   try {
-    console.log('Falling back to test endpoint');
     const response = await fetch(`${API_CONFIG.baseURL}/outfits/generate-test`);
     
     if (!response.ok) {
@@ -763,7 +743,6 @@ export const getTestOutfits = async () => {
     }
     
     const data = await response.json();
-    console.log('Received test outfit data:', data);
     
     if (data && data.outfits && data.outfits.length > 0) {
       return data;
@@ -771,7 +750,6 @@ export const getTestOutfits = async () => {
     
     throw new Error('No outfits returned from test endpoint');
   } catch (error) {
-    console.error('Error in test endpoint fallback:', error);
     // Return empty outfits if everything fails
     return { outfits: [] };
   }

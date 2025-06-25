@@ -40,7 +40,7 @@ const OutfitCollage = ({ collageImage, imageMap, outfitName, outfit }) => {
 
   // Handler for image loading errors - simply hide the element
   const handleImageError = (e) => {
-    console.log("Error loading image, element will be hidden");
+            // Error loading image, element will be hidden
     e.target.style.display = 'none';
     e.target.parentNode.classList.add('image-load-error');
   };

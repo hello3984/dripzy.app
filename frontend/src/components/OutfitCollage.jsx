@@ -11,7 +11,7 @@ const OutfitCollage = ({ outfit, prompt }) => {
   const hasEmoji = /[\p{Emoji}]/u.test(promptTitle);
   
   // Log outfit data to help debug
-  console.log("Outfit data:", outfit);
+  // Outfit data for collage display
 
   // Categorize items by type
   const categories = {};
@@ -83,13 +83,8 @@ const OutfitCollage = ({ outfit, prompt }) => {
             e.preventDefault();
             
             if (finalUrl) {
-              // Add analytics tracking if needed
-              console.log(`Clicking product: ${item.product_name || item.name} -> ${finalUrl}`);
-              
               // Open in new tab (like competitor)
               window.open(finalUrl, '_blank', 'noopener,noreferrer');
-            } else {
-              console.warn('No URL available for product:', item);
             }
           };
 

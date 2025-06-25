@@ -69,7 +69,7 @@ const ThemeCollage = () => {
       }
     } catch (err) {
       setError(`Failed to generate outfit: ${err.message}`);
-      console.error('Error generating outfit:', err);
+      // Error generating outfit
     } finally {
       setIsLoading(false);
     }

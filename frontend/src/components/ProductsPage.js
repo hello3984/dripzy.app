@@ -63,7 +63,7 @@ const ProductsPage = () => {
       setError(null);
     } catch (err) {
       setError('Failed to fetch products. Please try again.');
-      console.error(err);
+      // Error occurred during search
     } finally {
       setLoading(false);
     }

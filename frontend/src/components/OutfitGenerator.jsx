@@ -59,9 +59,7 @@ const OutfitGenerator = () => {
     setLoading(true);
     setError(null);
     
-    console.log("Sending request to backend with prompt:", prompt);
-    console.log("Using Enhanced API endpoint:", `${API_BASE_URL}/outfits/ultra-fast-generate`);
-    console.log("Request params:", { prompt, gender, budget });
+    // Using Enhanced API endpoint with smart retailer selection
 
     try {
       // ENHANCED: Use ultra-fast endpoint with smart Farfetch/Nordstrom routing
@@ -79,23 +77,19 @@ const OutfitGenerator = () => {
         mode: 'cors',
       });
 
-      console.log("Response status:", response.status);
-      
       if (!response.ok) {
-        console.log("POST request failed, trying fallback to GET test endpoint");
+        // POST request failed, trying fallback to GET test endpoint
         // If POST request fails, try the test endpoint as fallback
         const testResponse = await fetch(`${API_BASE_URL}/outfits/generate-test`);
         
         if (!testResponse.ok) {
           const errorText = await response.text();
-          console.error("API error:", errorText);
+          // API error occurred
           throw new Error(`Error ${response.status}: ${errorText}`);
         }
         
         const data = await testResponse.json();
-        // Added detailed logging for debugging
-        console.log("API test response data:", JSON.stringify(data, null, 2));
-        console.log("First outfit:", data.outfits && data.outfits[0] ? JSON.stringify(data.outfits[0], null, 2) : "No outfits returned");
+        // API test response received
         
         if (!data.outfits || !data.outfits.length) {
           throw new Error("No outfits returned from API");
@@ -106,9 +100,7 @@ const OutfitGenerator = () => {
       }
 
       const data = await response.json();
-      // Added detailed logging for debugging
-      console.log("API response data:", JSON.stringify(data, null, 2));
-      console.log("First outfit:", data.outfits && data.outfits[0] ? JSON.stringify(data.outfits[0], null, 2) : "No outfits returned");
+      // API response received
       
       if (!data.outfits || !data.outfits.length) {
         throw new Error("No outfits returned from API");
@@ -116,7 +108,7 @@ const OutfitGenerator = () => {
       
       setGeneratedOutfit(data.outfits[0]); // Use the first outfit from the array
     } catch (err) {
-      console.error('Failed to generate outfit:', err);
+      // Failed to generate outfit
       setError(`Failed to generate outfit: ${err.message}`);
       // Remove the mock data generation to ensure we only show real data
     } finally {
@@ -214,7 +206,6 @@ const OutfitGenerator = () => {
                         src={item.image_url} 
                         alt={item.product_name || item.type} 
                         onError={(e) => {
-                          console.log(`Image failed to load: ${item.image_url}`);
                           e.target.style.display = 'none';
                           e.target.parentNode.innerHTML = '<div class="missing-image-note">Image unavailable</div>';
                         }}

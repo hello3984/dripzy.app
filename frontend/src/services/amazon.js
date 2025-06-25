@@ -24,7 +24,7 @@ export const getAffiliateUrl = (url, source) => {
       
       return amazonUrl.toString();
     } catch (error) {
-      console.error('Error creating affiliate URL:', error);
+      // Error creating affiliate URL
       return url;
     }
   }
