@@ -2471,44 +2471,111 @@ async def enhance_outfits_with_products_fast(outfit_concepts: List[Dict[str, Any
                     description = item_concept.get("description", "")
                     color = item_concept.get("color", "")
                     
-                    # PERFORMANCE: Skip search, use optimized mock data with SMART URLs
-                    mock_data = _get_mock_product(category, description, color, request.prompt, request.budget or 300)
-                    
-                    # COMPREHENSIVE SMART RETAILER SELECTION
-                    brand = mock_data["brand"]
-                    product_name = mock_data["name"]
-                    
-                    # Use our advanced retailer selection system
-                    retailer_choice = _determine_retailer_choice(
-                        prompt=request.prompt,
-                        style=concept.get("style", "casual"),
-                        budget=request.budget or 300,
-                        brand=brand,
-                        category=category
-                    )
-                    
-                    # Generate optimized URL based on smart retailer choice
-                    smart_url = _generate_smart_product_url(
-                        brand=brand,
-                        product_name=product_name,
-                        description=description,
-                        retailer_choice=retailer_choice
-                    )
-                    
-                    outfit_item = OutfitItem(
-                        product_id=f"fast-{uuid.uuid4()}",
-                        product_name=mock_data["name"],
-                        brand=mock_data["brand"],
-                        category=category.lower(),
-                        price=random.uniform(25.0, 150.0),  # Random realistic price
-                        url=smart_url,  # Smart retailer URL
-                        image_url=mock_data["image_url"],
-                        description=description,
-                        concept_description=description,
-                        color=color,
-                        alternatives=[],
-                        is_fallback=False  # Mark as real for better UX
-                    )
+                    # REAL PRODUCT SEARCH: Use SerpAPI to get actual products with real brands/images/URLs
+                    try:
+                        # Build search query from AI description
+                        search_query = f"{description} {request.gender or ''} {color}".strip()
+                        
+                        # Determine which retailer to search based on theme/budget
+                        retailer_choice = _determine_retailer_choice(
+                            prompt=request.prompt,
+                            style=concept.get("style", "casual"),
+                            budget=request.budget or 300,
+                            brand="",  # Don't pre-assign brand
+                            category=category
+                        )
+                        
+                        # Search real products using SerpAPI
+                        logger.info(f"🔍 SERPAPI SEARCH: query='{search_query}', category='{category}'")
+                        serpapi_service_instance = get_serpapi_service()
+                        logger.info(f"🔑 SERPAPI SERVICE: api_key exists = {bool(serpapi_service_instance.api_key)}")
+                        
+                        real_products = await serpapi_service_instance.search_products(
+                            query=search_query,
+                            category=category,
+                            num_results=3
+                        )
+                        
+                        logger.info(f"🎯 SERPAPI RESULTS: got {len(real_products) if real_products else 0} products")
+                        
+                        if real_products and len(real_products) > 0:
+                            # Use REAL product from search results
+                            real_product = real_products[0]  # Take first/best result
+                            
+                            outfit_item = OutfitItem(
+                                product_id=f"real-{uuid.uuid4()}",
+                                product_name=real_product.get("product_name", description),
+                                brand=real_product.get("brand", "Designer"),
+                                category=category.lower(),
+                                price=real_product.get("price", random.uniform(50.0, 200.0)),
+                                url=real_product.get("url", ""),  # REAL product URL
+                                image_url=real_product.get("image_url", ""),  # REAL product image
+                                description=description,
+                                concept_description=description,
+                                color=color,
+                                alternatives=[],
+                                is_fallback=False
+                            )
+                        else:
+                            # Fallback to enhanced mock only if SerpAPI fails
+                            mock_data = _get_mock_product(category, description, color, request.prompt, request.budget or 300)
+                            smart_url = _generate_smart_product_url(
+                                brand=mock_data["brand"],
+                                product_name=mock_data["name"],
+                                description=description,
+                                retailer_choice=retailer_choice
+                            )
+                            
+                            outfit_item = OutfitItem(
+                                product_id=f"fallback-{uuid.uuid4()}",
+                                product_name=mock_data["name"],
+                                brand=mock_data["brand"],
+                                category=category.lower(),
+                                price=random.uniform(50.0, 200.0),
+                                url=smart_url,
+                                image_url=mock_data["image_url"],
+                                description=description,
+                                concept_description=description,
+                                color=color,
+                                alternatives=[],
+                                is_fallback=True
+                            )
+                            
+                    except Exception as search_error:
+                        logger.error(f"❌ SERPAPI SEARCH ERROR for '{description}': {str(search_error)}")
+                        logger.error(f"❌ ERROR TYPE: {type(search_error).__name__}")
+                        import traceback
+                        logger.error(f"❌ FULL TRACEBACK: {traceback.format_exc()}")
+                        # Enhanced fallback with realistic product names
+                        mock_data = _get_mock_product(category, description, color, request.prompt, request.budget or 300)
+                        retailer_choice = _determine_retailer_choice(
+                            prompt=request.prompt,
+                            style=concept.get("style", "casual"),
+                            budget=request.budget or 300,
+                            brand=mock_data["brand"],
+                            category=category
+                        )
+                        smart_url = _generate_smart_product_url(
+                            brand=mock_data["brand"],
+                            product_name=mock_data["name"],
+                            description=description,
+                            retailer_choice=retailer_choice
+                        )
+                        
+                        outfit_item = OutfitItem(
+                            product_id=f"fallback-{uuid.uuid4()}",
+                            product_name=mock_data["name"],
+                            brand=mock_data["brand"],
+                            category=category.lower(),
+                            price=random.uniform(50.0, 200.0),
+                            url=smart_url,
+                            image_url=mock_data["image_url"],
+                            description=description,
+                            concept_description=description,
+                            color=color,
+                            alternatives=[],
+                            is_fallback=True
+                        )
                     
                     outfit_items.append(outfit_item)
                     total_price += outfit_item.price
@@ -2772,9 +2839,18 @@ def _generate_smart_product_url(brand: str, product_name: str, description: str,
     is_luxury_context = retailer_choice["retailer"] == "farfetch"
     budget_level = "high" if retailer_choice.get("score", 0) > 10 else "mid" if retailer_choice.get("score", 0) > -5 else "accessible"
     
-    # THEME-AWARE SEARCH TERM MAPPING
+    # ENHANCED THEME-AWARE SEARCH TERM MAPPING
     # Maps themes to contextual search terms that find relevant products
     theme_context_mapping = {
+        # Winter/Cold Weather Themes
+        "winter": {
+            "sweater": ["chunky knit sweater", "turtleneck sweater", "winter sweater", "wool sweater"],
+            "coat": ["winter coat", "wool coat", "puffer jacket", "faux fur coat"],
+            "boots": ["winter boots", "ankle boots", "knee boots", "snow boots"],
+            "pants": ["wool trousers", "winter pants", "faux leather leggings", "thermal leggings"],
+            "accessories": ["winter scarf", "beanie", "winter gloves", "warm accessories"]
+        },
+        
         # Beach/Vacation Themes
         "beach": {
             "dress": ["sundress", "beach dress", "vacation dress", "resort wear"],
@@ -2823,9 +2899,11 @@ def _generate_smart_product_url(brand: str, product_name: str, description: str,
         }
     }
     
-    # DETECT THEME from context
+    # ENHANCED THEME DETECTION from context
     detected_theme = "casual"  # default
-    if any(word in prompt_context for word in ["beach", "vacation", "resort", "summer"]):
+    if any(word in prompt_context for word in ["winter", "wonderland", "cold", "snow", "cozy", "warm"]):
+        detected_theme = "winter"
+    elif any(word in prompt_context for word in ["beach", "vacation", "resort", "summer"]):
         detected_theme = "beach"
     elif any(word in prompt_context for word in ["office", "work", "professional", "business"]):
         detected_theme = "office"  
@@ -2834,19 +2912,22 @@ def _generate_smart_product_url(brand: str, product_name: str, description: str,
     elif any(word in prompt_context for word in ["festival", "boho", "music", "coachella"]):
         detected_theme = "festival"
     
-    # EXTRACT CATEGORY from description/product_name
+    # ENHANCED CATEGORY DETECTION from description/product_name
     category_detected = "clothing"  # default
     search_text = f"{description} {product_name}".lower()
     
+    # Enhanced category keywords with winter-specific items
     category_keywords = {
+        "sweater": ["sweater", "pullover", "knit", "turtleneck", "cardigan"],
+        "coat": ["coat", "parka", "jacket", "blazer", "outerwear", "fur"],
         "dress": ["dress", "midi", "maxi", "gown"],
         "top": ["top", "shirt", "blouse", "tee", "tank", "crop"],
         "shorts": ["shorts"], 
-        "pants": ["pants", "trousers", "jeans"],
-        "shoes": ["shoes", "heels", "boots", "sandals", "sneakers", "flats", "pumps"],
+        "pants": ["pants", "trousers", "jeans", "leggings"],
+        "boots": ["boots", "booties"],
+        "shoes": ["shoes", "heels", "sandals", "sneakers", "flats", "pumps"],
         "bag": ["bag", "handbag", "purse", "tote", "clutch"],
-        "blazer": ["blazer", "jacket", "coat"],
-        "jewelry": ["jewelry", "necklace", "earrings", "bracelet", "watch"],
+        "accessories": ["scarf", "hat", "beanie", "gloves", "jewelry", "necklace", "earrings", "bracelet", "watch"],
         "swimwear": ["swimsuit", "bikini", "swim"]
     }
     
@@ -2855,40 +2936,50 @@ def _generate_smart_product_url(brand: str, product_name: str, description: str,
             category_detected = category
             break
     
-    # BUILD CONTEXTUAL SEARCH TERMS
+    # BUILD SMART CONTEXTUAL SEARCH TERMS using actual item descriptions
     theme_terms = theme_context_mapping.get(detected_theme, {})
     contextual_terms = theme_terms.get(category_detected, [])
+    
+    # PRIORITY 1: Use specific item description terms for better results
+    # Extract key descriptive words from the description
+    desc_words = []
+    important_descriptors = [
+        "chunky", "cable", "knit", "turtleneck", "wool", "cashmere", "cotton",
+        "faux", "fur", "leather", "denim", "silk", "linen", "velvet",
+        "high-waisted", "cropped", "oversized", "fitted", "slim", "wide-leg",
+        "midi", "maxi", "mini", "knee-length", "ankle", "platform", "block"
+    ]
+    
+    for word in description.lower().split():
+        if word in important_descriptors or len(word) > 5:  # Include specific descriptors
+            desc_words.append(word.replace("-", " "))
+    
+    # Clean and format description terms
+    if desc_words:
+        base_description = " ".join(desc_words[:3])  # Use first 3 descriptive words
+    else:
+        base_description = category_detected
     
     retailer = retailer_choice["retailer"]
     
     if retailer == "farfetch":
         # FARFETCH: Luxury/Designer focus with sophisticated terms
-        if contextual_terms and is_luxury_context:
-            # Use most sophisticated term + brand for luxury context
-            base_term = contextual_terms[0] if contextual_terms else category_detected
-            if brand and brand not in ["H&M", "Zara", "Gap"]:  # Skip basic brands on luxury sites
-                search_terms = f"designer {base_term} {brand}"
-            else:
-                search_terms = f"designer {base_term}"
+        if brand and brand not in ["H&M", "Zara", "Gap", "Uniqlo"]:  # Skip basic brands on luxury sites
+            search_terms = f"{base_description} {brand}"
         else:
-            # Fallback for luxury context
-            search_terms = f"designer {category_detected}"
+            search_terms = f"designer {base_description}"
             
     else:
-        # NORDSTROM: Accessible with theme-aware terms
-        if contextual_terms:
-            # Use contextual term + brand for better results
-            base_term = contextual_terms[1] if len(contextual_terms) > 1 else contextual_terms[0]
-            if brand:
-                search_terms = f"{base_term} {brand}"
-            else:
-                search_terms = base_term
+        # NORDSTROM: Use specific descriptions + brand for better results
+        if brand:
+            search_terms = f"{base_description} {brand}"
         else:
-            # Fallback with basic terms
-            if brand:
-                search_terms = f"{category_detected} {brand}"  
+            # Use theme-aware terms if no brand, otherwise use description
+            if contextual_terms and detected_theme != "casual":
+                base_term = contextual_terms[0] if contextual_terms else base_description
+                search_terms = base_term
             else:
-                search_terms = category_detected
+                search_terms = base_description
     
     # ADD BUDGET-LEVEL QUALIFIERS
     if budget_level == "high" and retailer == "nordstrom":
