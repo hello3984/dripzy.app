@@ -273,8 +273,8 @@ async def debug_serpapi_direct():
     }
 
 @app.get("/test-serpapi")
-async def test_serpapi_direct(query: str = "winter jacket", category: str = "Top", gender: str = "male"):
-    """Direct test endpoint for SerpAPI product search"""
+async def test_serpapi_direct(query: str = "winter jacket", category: str = "Top"):
+    """Direct test endpoint for SerpAPI product search - FIXED VERSION"""
     from app.services.serpapi_service import serpapi_service
     import logging
     
@@ -282,15 +282,24 @@ async def test_serpapi_direct(query: str = "winter jacket", category: str = "Top
     
     try:
         logger.info(f"Testing SerpAPI search for: {query} in category {category}")
+        # Use exact same approach as working debug-serpapi endpoint
         products = await serpapi_service.search_products(
             query=query,
             category=category,
             num_results=5
         )
+        
+        # Log success for debugging
+        logger.info(f"Successfully retrieved {len(products)} products")
+        if products:
+            first_product = products[0]
+            is_fallback = "fallback" in first_product.get("product_id", "")
+            logger.info(f"First product is_fallback: {is_fallback}")
+        
         return {"products": products, "count": len(products)}
     except Exception as e:
         logger.error(f"Error testing SerpAPI: {str(e)}", exc_info=True)
-        return {"error": str(e)}
+        return {"error": str(e), "fallback_products": []}
 
 # Add a very simple debug endpoint to test API is working
 @app.get("/api-test")
