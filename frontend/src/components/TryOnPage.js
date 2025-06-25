@@ -71,7 +71,7 @@ const TryOnPage = () => {
         setSelectedAvatar(data[0].id); // Select first avatar by default
       }
     } catch (err) {
-      console.error('Error fetching avatars:', err);
+      // Error fetching avatars
       setError('Failed to fetch avatars. Please try again later.');
     } finally {
       setLoading(false);
@@ -100,7 +100,7 @@ const TryOnPage = () => {
       const data = await uploadUserImage(file);
       setUploadedImageId(data.image_id);
     } catch (err) {
-      console.error('Error uploading image:', err);
+      // Error uploading image
       setError('Failed to upload image. Please try again later.');
     } finally {
       setLoading(false);
@@ -136,7 +136,7 @@ const TryOnPage = () => {
       const result = await generateTryOn(tryOnRequest);
       setTryOnResult(result);
     } catch (err) {
-      console.error('Error generating try-on:', err);
+      // Error generating try-on
       setError('Failed to generate try-on. Please try again later.');
     } finally {
       setTryOnLoading(false);

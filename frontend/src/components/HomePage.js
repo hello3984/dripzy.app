@@ -42,10 +42,10 @@ const HomePage = () => {
     const fetchTrendingStyles = async () => {
       try {
         const data = await getTrendingStyles();
-        console.log('Trending styles data:', data);
+        // Trending styles data received
         setTrendingStyles(data.styles || {});
       } catch (error) {
-        console.error('Failed to fetch trending styles:', error);
+        // Failed to fetch trending styles
       }
     };
 
@@ -71,7 +71,7 @@ const HomePage = () => {
       style_keywords: selectedStyle ? [selectedStyle] : []
     };
     
-    console.log('Generating outfit with params:', requestParams);
+            // Generating outfit with params
     
     try {
       // First try with the main API
@@ -79,8 +79,7 @@ const HomePage = () => {
       try {
         result = await generateOutfit(requestParams);
       } catch (mainApiError) {
-        console.error('Main API error:', mainApiError);
-        console.log('Trying test endpoint fallback...');
+        // Main API error, trying test endpoint fallback
         // If main API fails, try the test endpoint
         result = await getTestOutfits();
       }
@@ -97,12 +96,12 @@ const HomePage = () => {
           }
         }, 200);
       } else {
-        console.warn('No outfits returned from API');
+        // No outfits returned from API
         setApiOutfits([]);
         setShowResults(true); // Still show the section with mock data
       }
     } catch (error) {
-      console.error('Error generating outfit:', error);
+      // Error generating outfit
       setError(`Failed to generate outfit: ${error.message || 'Unknown error'}`);
       // Still show results with mock data
       setApiOutfits([]);
@@ -114,7 +113,7 @@ const HomePage = () => {
 
   // eslint-disable-next-line no-unused-vars
   const handleStyleClick = (style) => {
-    console.log('Style clicked:', style);
+    // Style clicked, updating selections
     setSelectedStyle(style);
     
     // Auto-generation for specific styles with appropriate prompts
@@ -149,7 +148,7 @@ const HomePage = () => {
 
   // Create flattened array of style keywords for easy display
   const flattenedStyles = [];
-  console.log('Trending styles in state:', trendingStyles);
+        // Trending styles in state
   
   // Make sure Coachella is included in the flattened styles
   const coachella = "Coachella";
@@ -173,7 +172,7 @@ const HomePage = () => {
     flattenedStyles.push(coachella);
   }
   
-  console.log('Flattened styles:', flattenedStyles);
+        // Flattened styles processed
 
   // Create enhanced Coachella-specific outfit data with guaranteed working images
   const coachellaOutfits = [

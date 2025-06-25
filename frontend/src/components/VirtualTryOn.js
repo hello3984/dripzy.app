@@ -38,7 +38,7 @@ const VirtualTryOn = ({ onComplete }) => {
         fileInputRef.current.setAttribute('capture', 'user');
         fileInputRef.current.click();
       } catch (err) {
-        console.error("Camera permission denied:", err);
+        // Camera permission denied
         alert("Please allow camera access to use this feature");
       }
     }
@@ -80,7 +80,7 @@ const VirtualTryOn = ({ onComplete }) => {
       setAvatarImage(data.avatarUrl);
       */
     } catch (error) {
-      console.error('Error generating avatar:', error);
+      // Error generating avatar
       setLoading(false);
     }
   };
