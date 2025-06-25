@@ -1795,6 +1795,13 @@ async def search_product_with_retry(query: str) -> Optional[Dict[str, Any]]:
                         continue
                     
                     # Extract and normalize product data
+                    # FIX: Use correct URL field mapping for SerpAPI responses
+                    product_url = (
+                        selected_product.get("link", "") or 
+                        selected_product.get("product_url", "") or
+                        selected_product.get("url", "")
+                    )
+                    
                     return {
                         "product_id": str(uuid.uuid4()),
                         "title": selected_product.get("title", ""),
@@ -1802,7 +1809,9 @@ async def search_product_with_retry(query: str) -> Optional[Dict[str, Any]]:
                         "source": selected_product.get("source", ""),
                         "price": extract_price(selected_product.get("price", "")),
                         "image_url": selected_product.get("thumbnail", ""),
-                        "product_url": selected_product.get("link", ""),
+                        "product_url": product_url,
+                        "purchase_url": product_url,  # Add purchase_url field for consistency
+                        "url": product_url,           # Add url field for frontend compatibility
                         "delivery": selected_product.get("delivery", ""),
                         "rating": selected_product.get("rating", 0),
                         "reviews": selected_product.get("reviews", 0),
