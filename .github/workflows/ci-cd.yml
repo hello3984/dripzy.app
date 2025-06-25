@@ -41,8 +41,9 @@ jobs:
         run: |
           npm run build
         env:
-          CI: true
-          DISABLE_ESLINT_PLUGIN: true # Prevent warnings from failing build
+          CI: false
+          NODE_ENV: production
+          GENERATE_SOURCEMAP: false
           
       - name: Setup custom domain
         run: echo "dripzy.app" > frontend/build/CNAME

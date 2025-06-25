@@ -58,7 +58,7 @@ export const generateOutfit = async (preferences) => {
       if (!response.ok) {
         // Try to get the error details from the response
         try {
-          const errorData = await response.json();
+          await response.json();
         } catch (e) {
           // Could not parse error response
         }
