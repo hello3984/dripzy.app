@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>API Monitoring Dashboard</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", sans-serif;
+            line-height: 1.5;
+            color: #333;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 1rem;
+            background-color: #f9f9f9;
+        }
+        
+        h1, h2, h3 {
+            color: #2c3e50;
+        }
+        
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2rem;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid #eee;
+        }
+        
+        .refresh-controls {
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+        }
+        
+        .status-indicator {
+            display: inline-block;
+            padding: 0.5rem 1rem;
+            border-radius: 4px;
+            font-weight: bold;
+            margin-right: 1rem;
+        }
+        
+        .status-healthy {
+            background-color: #d4edda;
+            color: #155724;
+        }
+        
+        .status-warning {
+            background-color: #fff3cd;
+            color: #856404;
+        }
+        
+        .status-critical {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+        
+        .status-starting {
+            background-color: #cce5ff;
+            color: #004085;
+        }
+        
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+        
+        .card {
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            padding: 1.5rem;
+        }
+        
+        .card h3 {
+            margin-top: 0;
+            padding-bottom: 0.5rem;
+            border-bottom: 1px solid #eee;
+        }
+        
+        .stat {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 0.5rem;
+        }
+        
+        .stat-label {
+            font-weight: 500;
+        }
+        
+        .stat-value {
+            font-weight: 600;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        
+        th, td {
+            padding: 0.75rem;
+            text-align: left;
+            border-bottom: 1px solid #eee;
+        }
+        
+        th {
+            background-color: #f5f5f5;
+            font-weight: 600;
+        }
+        
+        tr:nth-child(even) {
+            background-color: #f9f9f9;
+        }
+        
+        tr:hover {
+            background-color: #f0f0f0;
+        }
+        
+        .slow {
+            color: #e74c3c;
+        }
+        
+        .button {
+            background-color: #4CAF50;
+            border: none;
+            color: white;
+            padding: 0.5rem 1rem;
+            text-align: center;
+            text-decoration: none;
+            display: inline-block;
+            font-size: 14px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        
+        .button:hover {
+            background-color: #45a049;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>API Monitoring Dashboard</h1>
+        <div class="refresh-controls">
+            <label>
+                Auto-refresh: 
+                <select id="refresh-interval">
+                    <option value="0">Off</option>
+                    <option value="5000">5 seconds</option>
+                    <option value="10000" selected>10 seconds</option>
+                    <option value="30000">30 seconds</option>
+                    <option value="60000">1 minute</option>
+                </select>
+            </label>
+            <button id="refresh-now" class="button">Refresh Now</button>
+        </div>
+    </div>
+    
+    <div id="status-panel">
+        <div class="card">
+            <h3>System Status</h3>
+            <div id="system-status">Loading...</div>
+        </div>
+    </div>
+    
+    <div class="dashboard-grid">
+        <div class="card">
+            <h3>Overview</h3>
+            <div id="overview-stats">Loading...</div>
+        </div>
+        
+        <div class="card">
+            <h3>Response Times</h3>
+            <div id="response-times">Loading...</div>
+        </div>
+        
+        <div class="card">
+            <h3>Status Codes</h3>
+            <div id="status-codes">Loading...</div>
+        </div>
+    </div>
+    
+    <div class="card">
+        <h3>Endpoint Performance (Top 10 Slowest)</h3>
+        <div id="endpoint-performance">Loading...</div>
+    </div>
+    
+    <div class="card">
+        <h3>Recent Slow Requests</h3>
+        <div id="slow-requests">Loading...</div>
+    </div>
+    
+    <script>
+        // State management
+        let refreshTimer = null;
+        let metrics = null;
+        
+        // DOM elements
+        const refreshIntervalSelect = document.getElementById('refresh-interval');
+        const refreshButton = document.getElementById('refresh-now');
+        const systemStatusEl = document.getElementById('system-status');
+        const overviewStatsEl = document.getElementById('overview-stats');
+        const responseTimesEl = document.getElementById('response-times');
+        const statusCodesEl = document.getElementById('status-codes');
+        const endpointPerformanceEl = document.getElementById('endpoint-performance');
+        const slowRequestsEl = document.getElementById('slow-requests');
+        
+        // Initialize dashboard
+        function initDashboard() {
+            refreshButton.addEventListener('click', fetchData);
+            refreshIntervalSelect.addEventListener('change', updateRefreshInterval);
+            
+            // Set initial refresh interval
+            updateRefreshInterval();
+            
+            // Initial data fetch
+            fetchData();
+        }
+        
+        // Update refresh interval based on select value
+        function updateRefreshInterval() {
+            if (refreshTimer) {
+                clearInterval(refreshTimer);
+                refreshTimer = null;
+            }
+            
+            const interval = parseInt(refreshIntervalSelect.value, 10);
+            if (interval > 0) {
+                refreshTimer = setInterval(fetchData, interval);
+            }
+        }
+        
+        // Format duration for display
+        function formatDuration(durationSec) {
+            if (!durationSec && durationSec !== 0) return 'N/A';
+            
+            if (durationSec < 0.001) {
+                return `${(durationSec * 1000000).toFixed(2)}μs`;
+            } else if (durationSec < 1) {
+                return `${(durationSec * 1000).toFixed(2)}ms`;
+            } else {
+                return `${durationSec.toFixed(2)}s`;
+            }
+        }
+        
+        // Fetch monitoring data from API
+        async function fetchData() {
+            try {
+                // Fetch metrics data
+                const metricsResponse = await fetch('/monitoring/metrics');
+                metrics = await metricsResponse.json();
+                
+                // Fetch slow requests data
+                const slowRequestsResponse = await fetch('/monitoring/slow-requests');
+                const slowRequests = await slowRequestsResponse.json();
+                
+                // Fetch status data
+                const statusResponse = await fetch('/monitoring/status');
+                const status = await statusResponse.json();
+                
+                // Update UI
+                updateSystemStatus(status);
+                updateOverviewStats(metrics);
+                updateResponseTimes(metrics.response_times);
+                updateStatusCodes(metrics.status_codes);
+                updateEndpointPerformance(metrics.endpoints);
+                updateSlowRequests(slowRequests);
+                
+            } catch (error) {
+                console.error('Error fetching monitoring data:', error);
+                showError('Failed to fetch monitoring data. Please try again.');
+            }
+        }
+        
+        // Update system status panel
+        function updateSystemStatus(status) {
+            const statusClass = `status-${status.status}`;
+            
+            systemStatusEl.innerHTML = `
+                <div class="stat">
+                    <span class="stat-label">Status:</span>
+                    <span class="status-indicator ${statusClass}">${status.status.toUpperCase()}</span>
+                </div>
+                <div class="stat">
+                    <span class="stat-label">Uptime:</span>
+                    <span class="stat-value">${status.uptime}</span>
+                </div>
+                <div class="stat">
+                    <span class="stat-label">Error Rate:</span>
+                    <span class="stat-value ${status.error_rate > 0.01 ? 'slow' : ''}">${(status.error_rate * 100).toFixed(2)}%</span>
+                </div>
+                <div class="stat">
+                    <span class="stat-label">Slow Response Rate:</span>
+                    <span class="stat-value ${status.slow_rate > 0.05 ? 'slow' : ''}">${(status.slow_rate * 100).toFixed(2)}%</span>
+                </div>
+            `;
+        }
+        
+        // Update overview statistics
+        function updateOverviewStats(metrics) {
+            overviewStatsEl.innerHTML = `
+                <div class="stat">
+                    <span class="stat-label">Total Requests:</span>
+                    <span class="stat-value">${metrics.total_requests}</span>
+                </div>
+                <div class="stat">
+                    <span class="stat-label">Requests Per Second:</span>
+                    <span class="stat-value">${metrics.requests_per_second.toFixed(2)}</span>
+                </div>
+                <div class="stat">
+                    <span class="stat-label">Slow Requests:</span>
+                    <span class="stat-value">${metrics.slow_requests}</span>
+                </div>
+                <div class="stat">
+                    <span class="stat-label">Error Requests:</span>
+                    <span class="stat-value">${metrics.error_requests}</span>
+                </div>
+                <div class="stat">
+                    <span class="stat-label">Slow Threshold:</span>
+                    <span class="stat-value">${metrics.slow_threshold}s</span>
+                </div>
+                <div class="stat">
+                    <span class="stat-label">Critical Threshold:</span>
+                    <span class="stat-value">${metrics.critical_threshold}s</span>
+                </div>
+            `;
+        }
+        
+        // Update response times section
+        function updateResponseTimes(responseTimes) {
+            responseTimesEl.innerHTML = `
+                <div class="stat">
+                    <span class="stat-label">Last Minute Average:</span>
+                    <span class="stat-value">${formatDuration(responseTimes.last_minute_avg)}</span>
+                </div>
+                <div class="stat">
+                    <span class="stat-label">Last Hour Average:</span>
+                    <span class="stat-value">${formatDuration(responseTimes.last_hour_avg)}</span>
+                </div>
+                <div class="stat">
+                    <span class="stat-label">Overall Average:</span>
+                    <span class="stat-value">${formatDuration(responseTimes.overall_avg)}</span>
+                </div>
+            `;
+        }
+        
+        // Update status codes section
+        function updateStatusCodes(statusCodes) {
+            let html = '<table><tr><th>Status Code</th><th>Count</th></tr>';
+            
+            Object.entries(statusCodes).sort().forEach(([code, count]) => {
+                const isError = parseInt(code, 10) >= 400;
+                html += `
+                    <tr>
+                        <td>${code}</td>
+                        <td class="${isError ? 'slow' : ''}">${count}</td>
+                    </tr>
+                `;
+            });
+            
+            html += '</table>';
+            statusCodesEl.innerHTML = html;
+        }
+        
+        // Update endpoint performance section
+        function updateEndpointPerformance(endpoints) {
+            if (!endpoints || endpoints.length === 0) {
+                endpointPerformanceEl.innerHTML = '<p>No endpoint data available.</p>';
+                return;
+            }
+            
+            let html = `
+                <table>
+                    <tr>
+                        <th>Endpoint</th>
+                        <th>Count</th>
+                        <th>Avg (ms)</th>
+                        <th>Min (ms)</th>
+                        <th>Max (ms)</th>
+                        <th>95th %</th>
+                        <th>99th %</th>
+                    </tr>
+            `;
+            
+            endpoints.forEach(endpoint => {
+                const avgClass = endpoint.avg_duration > metrics.slow_threshold ? 'slow' : '';
+                const maxClass = endpoint.max_duration > metrics.slow_threshold ? 'slow' : '';
+                
+                html += `
+                    <tr>
+                        <td>${endpoint.endpoint}</td>
+                        <td>${endpoint.count}</td>
+                        <td class="${avgClass}">${(endpoint.avg_duration * 1000).toFixed(2)}</td>
+                        <td>${(endpoint.min_duration * 1000).toFixed(2)}</td>
+                        <td class="${maxClass}">${(endpoint.max_duration * 1000).toFixed(2)}</td>
+                        <td>${endpoint.p95 ? (endpoint.p95 * 1000).toFixed(2) : 'N/A'}</td>
+                        <td>${endpoint.p99 ? (endpoint.p99 * 1000).toFixed(2) : 'N/A'}</td>
+                    </tr>
+                `;
+            });
+            
+            html += '</table>';
+            endpointPerformanceEl.innerHTML = html;
+        }
+        
+        // Update slow requests section
+        function updateSlowRequests(slowRequests) {
+            if (!slowRequests || slowRequests.length === 0) {
+                slowRequestsEl.innerHTML = '<p>No slow requests recorded.</p>';
+                return;
+            }
+            
+            let html = `
+                <table>
+                    <tr>
+                        <th>Timestamp</th>
+                        <th>Method</th>
+                        <th>Endpoint</th>
+                        <th>Status</th>
+                        <th>Duration (s)</th>
+                    </tr>
+            `;
+            
+            slowRequests.forEach(request => {
+                const timestamp = new Date(request.timestamp).toLocaleString();
+                const durationClass = request.duration > metrics.critical_threshold ? 'slow' : '';
+                
+                html += `
+                    <tr>
+                        <td>${timestamp}</td>
+                        <td>${request.method}</td>
+                        <td>${request.endpoint}</td>
+                        <td>${request.status_code}</td>
+                        <td class="${durationClass}">${request.duration.toFixed(2)}</td>
+                    </tr>
+                `;
+            });
+            
+            html += '</table>';
+            slowRequestsEl.innerHTML = html;
+        }
+        
+        // Show error message
+        function showError(message) {
+            const errorDiv = document.createElement('div');
+            errorDiv.className = 'error-message';
+            errorDiv.textContent = message;
+            document.body.prepend(errorDiv);
+            
+            setTimeout(() => {
+                errorDiv.remove();
+            }, 5000);
+        }
+        
+        // Initialize the dashboard
+        document.addEventListener('DOMContentLoaded', initDashboard);
+    </script>
+</body>
+</html> 
