@@ -10,6 +10,11 @@ on:
 permissions:
   contents: write # Needed to push to gh-pages branch
 
+# Allow only one concurrent deployment
+concurrency:
+  group: "frontend-deployment"
+  cancel-in-progress: true
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
@@ -30,7 +35,9 @@ jobs:
         working-directory: frontend
         run: npm run build
         env:
-          CI: true
+          CI: false
+          NODE_ENV: production
+          GENERATE_SOURCEMAP: false
           
       - name: Setup custom domain
         run: echo "dripzy.app" > frontend/build/CNAME

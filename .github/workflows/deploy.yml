@@ -1,9 +1,11 @@
-name: Deploy to GitHub Pages
+name: Deploy to GitHub Pages (DISABLED)
 
 on:
-  push:
-    branches:
-      - gh-pages
+  # Disabled to prevent conflicts with main deployment workflows
+  # push:
+  #   branches:
+  #     - gh-pages
+  workflow_dispatch: # Only allow manual trigger
 
 permissions:
   contents: read
