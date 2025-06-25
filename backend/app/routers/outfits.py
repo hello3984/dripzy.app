@@ -176,7 +176,8 @@ def parse_price(price_string: Optional[str]) -> Optional[float]:
             # Basic sanity check (adjust range as needed)
             if 0 < price < 20000: return price
             else: logger.warning(f"Parsed price {price} outside reasonable range."); return None
-        else: logger.warning(f"Could not find valid number in price string: {price_string}"); return None
+        else:
+            logger.warning(f"Could not find valid number in price string: {price_string}"); return None
     except Exception as e:
         logger.error(f"Error parsing price '{price_string}': {e}")
         return None
@@ -251,31 +252,64 @@ def _match_categories(category):
         return "Top"  # Default to Top if no match
 
 # Helper function to generate mock product details
-def _get_mock_product(category, description, color):
+def _get_mock_product(category, description, color, prompt_context="", budget=300):
     """
     Generate mock product details when real products cannot be sourced.
+    Now intelligently selects brands based on prompt context and budget.
     
     Args:
         category (str): Product category (e.g., "Top", "Bottom", "Shoes")
         description (str): Product description 
         color (str): Product color
+        prompt_context (str): Original user prompt for context
+        budget (float): Budget to determine luxury vs accessible brands
     
     Returns:
         dict: Mock product details including name, brand, and image URL
     """
-    # Define fallback brands by category
-    brands = {
-        "Top": ["H&M", "Zara", "Uniqlo", "Gap", "J.Crew"],
-        "Bottom": ["Levi's", "H&M", "American Eagle", "Gap", "Uniqlo"],
-        "Dress": ["Zara", "H&M", "Mango", "ASOS", "Forever 21"],
-        "Shoes": ["Nike", "Adidas", "Vans", "Converse", "New Balance"],
-        "Accessory": ["Fossil", "Mango", "Zara", "H&M", "ASOS"],
-        "Outerwear": ["North Face", "Columbia", "Patagonia", "Uniqlo", "Gap"],
-    }
+    # SMART BRAND SELECTION: Check for luxury keywords in prompt
+    luxury_keywords = ["luxury", "designer", "high-end", "premium", "elegant", "sophisticated", "couture", "bespoke", "evening"]
+    prompt_lower = prompt_context.lower() if prompt_context else ""
+    budget_threshold = budget and budget > 500
+    keyword_match = any(keyword in prompt_lower for keyword in luxury_keywords)
+    is_luxury_prompt = keyword_match or budget_threshold
+    
+    # Debug logging
+    if prompt_context:
+        logger.info(f"[_get_mock_product] DEBUG: Prompt='{prompt_context}', Budget={budget}, Keywords: {keyword_match}, Luxury: {is_luxury_prompt}")
+        logger.info(f"[_get_mock_product] DEBUG: Keyword matches in prompt: {[k for k in luxury_keywords if k in prompt_lower]}")
+    
+    if is_luxury_prompt:
+        # LUXURY/DESIGNER BRANDS (for Farfetch)
+        luxury_brands = {
+            "Top": ["Saint Laurent", "Gucci", "Isabel Marant", "Ganni", "Khaite"],
+            "Bottom": ["Saint Laurent", "Isabel Marant", "Frame", "Khaite", "The Row"],
+            "Dress": ["Zimmermann", "Ganni", "Staud", "Rotate", "Magda Butrym"],
+            "Shoes": ["Saint Laurent", "Gucci", "Bottega Veneta", "Gianvito Rossi", "Manolo Blahnik"],
+            "Accessory": ["Bottega Veneta", "Gucci", "Saint Laurent", "Staud", "Jacquemus"],
+            "Outerwear": ["The Row", "Acne Studios", "Maison Margiela", "Saint Laurent", "Bottega Veneta"],
+        }
+        brands = luxury_brands
+    else:
+        # ACCESSIBLE BRANDS (for Nordstrom)
+        accessible_brands = {
+            "Top": ["H&M", "Zara", "Uniqlo", "Gap", "J.Crew"],
+            "Bottom": ["Levi's", "H&M", "American Eagle", "Gap", "Uniqlo"],
+            "Dress": ["Zara", "H&M", "Mango", "ASOS", "Urban Outfitters"],
+            "Shoes": ["Nike", "Adidas", "Vans", "Converse", "New Balance"],
+            "Accessory": ["Fossil", "Mango", "Zara", "H&M", "ASOS"],
+            "Outerwear": ["North Face", "Columbia", "Patagonia", "Uniqlo", "Gap"],
+        }
+        brands = accessible_brands
     
     # Select a brand based on category
     category_key = next((k for k in brands.keys() if k.lower() in category.lower()), "Top")
     brand = random.choice(brands.get(category_key, ["Fashion Brand"]))
+    
+    # Debug logging for brand selection
+    if prompt_context:
+        brand_type = "LUXURY" if is_luxury_prompt else "ACCESSIBLE"
+        logger.info(f"[_get_mock_product] Selected {brand_type} brand: {brand} from category: {category_key}")
     
     # Create a product name
     color_prefix = f"{color} " if color else ""
@@ -854,6 +888,44 @@ async def debug_serpapi_config():
         "first_result": {k: v for k, v in first_result.items()} if isinstance(first_result, dict) else str(first_result)
     }
 
+@router.get("/test-mock-product")
+async def test_mock_product():
+    """Test the _get_mock_product function directly"""
+    try:
+        # Test luxury prompt
+        luxury_result = _get_mock_product(
+            category="Top", 
+            description="silk blouse", 
+            color="black",
+            prompt_context="luxury designer sophisticated evening outfit",
+            budget=1000
+        )
+        
+        # Test accessible prompt
+        accessible_result = _get_mock_product(
+            category="Top", 
+            description="cotton shirt", 
+            color="white",
+            prompt_context="casual everyday outfit",
+            budget=100
+        )
+        
+        return {
+            "luxury_test": {
+                "prompt": "luxury designer sophisticated evening outfit",
+                "budget": 1000,
+                "result": luxury_result
+            },
+            "accessible_test": {
+                "prompt": "casual everyday outfit", 
+                "budget": 100,
+                "result": accessible_result
+            }
+        }
+    except Exception as e:
+        logger.error(f"Error in test mock product: {e}")
+        return {"error": str(e)}
+
 @router.get("/{outfit_id}", response_model=Outfit)
 async def get_outfit(outfit_id: str):
     """Get outfit details by ID"""
@@ -891,6 +963,107 @@ async def debug_test():
         return data
     except Exception as e:
         logger.error(f"Error in debug test: {e}")
+        return {"error": str(e)}
+
+@router.get("/test/brand-selection")
+async def test_brand_selection():
+    """Test the brand selection logic directly"""
+    try:
+        # Test luxury prompt
+        luxury_mock = _get_mock_product(
+            category="Top",
+            description="silk blouse", 
+            color="black",
+            prompt_context="luxury designer sophisticated evening outfit",
+            budget=1200
+        )
+        
+        # Test casual prompt
+        casual_mock = _get_mock_product(
+            category="Top",
+            description="cotton shirt",
+            color="white", 
+            prompt_context="casual comfortable weekend outfit",
+            budget=150
+        )
+        
+        # Test the retailer choice logic
+        luxury_retailer = _determine_retailer_choice(
+            prompt="luxury designer sophisticated evening outfit",
+            style="formal",
+            budget=1200,
+            brand=luxury_mock["brand"],
+            category="Top"
+        )
+        
+        casual_retailer = _determine_retailer_choice(
+            prompt="casual comfortable weekend outfit", 
+            style="casual",
+            budget=150,
+            brand=casual_mock["brand"],
+            category="Top"
+        )
+        
+        return {
+            "luxury_test": {
+                "prompt": "luxury designer sophisticated evening outfit",
+                "budget": 1200,
+                "generated_brand": luxury_mock["brand"],
+                "product_name": luxury_mock["name"],
+                "retailer_choice": luxury_retailer["retailer_name"],
+                "confidence": f"{luxury_retailer['confidence']:.1%}",
+                "reasoning": luxury_retailer["reasoning"]
+            },
+            "casual_test": {
+                "prompt": "casual comfortable weekend outfit",
+                "budget": 150, 
+                "generated_brand": casual_mock["brand"],
+                "product_name": casual_mock["name"],
+                "retailer_choice": casual_retailer["retailer_name"],
+                "confidence": f"{casual_retailer['confidence']:.1%}",
+                "reasoning": casual_retailer["reasoning"]
+            }
+        }
+    except Exception as e:
+        logger.error(f"Error in brand selection test: {e}")
+        return {"error": str(e)}
+
+@router.get("/test-mock-product")
+async def test_mock_product():
+    """Test the _get_mock_product function directly"""
+    try:
+        # Test luxury prompt
+        luxury_result = _get_mock_product(
+            category="Top", 
+            description="silk blouse", 
+            color="black",
+            prompt_context="luxury designer sophisticated evening outfit",
+            budget=1000
+        )
+        
+        # Test accessible prompt
+        accessible_result = _get_mock_product(
+            category="Top", 
+            description="cotton shirt", 
+            color="white",
+            prompt_context="casual everyday outfit",
+            budget=100
+        )
+        
+        return {
+            "luxury_test": {
+                "prompt": "luxury designer sophisticated evening outfit",
+                "budget": 1000,
+                "result": luxury_result
+            },
+            "accessible_test": {
+                "prompt": "casual everyday outfit", 
+                "budget": 100,
+                "result": accessible_result
+            }
+        }
+    except Exception as e:
+        logger.error(f"Error in test mock product: {e}")
         return {"error": str(e)}
 
 # --- Dependency Function ---
@@ -2195,8 +2368,29 @@ async def enhance_outfits_with_products_fast(outfit_concepts: List[Dict[str, Any
                     description = item_concept.get("description", "")
                     color = item_concept.get("color", "")
                     
-                    # PERFORMANCE: Skip search, use optimized mock data
-                    mock_data = _get_mock_product(category, description, color)
+                    # PERFORMANCE: Skip search, use optimized mock data with SMART URLs
+                    mock_data = _get_mock_product(category, description, color, request.prompt, request.budget or 300)
+                    
+                    # COMPREHENSIVE SMART RETAILER SELECTION
+                    brand = mock_data["brand"]
+                    product_name = mock_data["name"]
+                    
+                    # Use our advanced retailer selection system
+                    retailer_choice = _determine_retailer_choice(
+                        prompt=request.prompt,
+                        style=concept.get("style", "casual"),
+                        budget=request.budget or 300,
+                        brand=brand,
+                        category=category
+                    )
+                    
+                    # Generate optimized URL based on smart retailer choice
+                    smart_url = _generate_smart_product_url(
+                        brand=brand,
+                        product_name=product_name,
+                        description=description,
+                        retailer_choice=retailer_choice
+                    )
                     
                     outfit_item = OutfitItem(
                         product_id=f"fast-{uuid.uuid4()}",
@@ -2204,7 +2398,7 @@ async def enhance_outfits_with_products_fast(outfit_concepts: List[Dict[str, Any
                         brand=mock_data["brand"],
                         category=category.lower(),
                         price=random.uniform(25.0, 150.0),  # Random realistic price
-                        purchase_url="https://www.nordstrom.com/browse/women",
+                        url=smart_url,  # Smart retailer URL
                         image_url=mock_data["image_url"],
                         description=description,
                         concept_description=description,
@@ -2288,3 +2482,293 @@ async def ultra_fast_generate_outfit(request: OutfitGenerateRequest):
             status="error", 
             status_message=f"⚡ Error fallback: {total_time:.1f}s"
         )
+
+# Add this after the existing _get_mock_product function
+
+def _determine_retailer_choice(prompt: str, style: str, budget: float, brand: str = "", category: str = "") -> Dict[str, Any]:
+    """
+    COMPREHENSIVE SMART RETAILER SELECTION SYSTEM
+    Analyzes keywords, theme, budget, brand, and category to determine the best retailer.
+    
+    Args:
+        prompt: User's original prompt
+        style: Outfit style (casual, formal, etc.)
+        budget: User's budget
+        brand: Product brand (if known)
+        category: Product category
+        
+    Returns:
+        Dict with retailer choice, confidence score, and reasoning
+    """
+    
+    # SCORING SYSTEM: Higher score = More likely for Farfetch
+    farfetch_score = 0
+    reasons = []
+    
+    # 1. KEYWORD ANALYSIS (40% weight)
+    luxury_keywords = [
+        "luxury", "designer", "high-end", "premium", "sophisticated", "elegant", 
+        "couture", "bespoke", "exclusive", "artisanal", "handcrafted", "investment",
+        "timeless", "classic", "refined", "upscale", "chic", "avant-garde"
+    ]
+    
+    casual_keywords = [
+        "casual", "everyday", "basic", "affordable", "budget", "simple", 
+        "comfortable", "practical", "trendy", "fast fashion", "accessible",
+        "mainstream", "versatile", "essential", "staple"
+    ]
+    
+    prompt_lower = prompt.lower()
+    luxury_matches = sum(1 for keyword in luxury_keywords if keyword in prompt_lower)
+    casual_matches = sum(1 for keyword in casual_keywords if keyword in prompt_lower)
+    
+    keyword_score = (luxury_matches * 10) - (casual_matches * 5)
+    farfetch_score += keyword_score
+    
+    if luxury_matches > 0:
+        reasons.append(f"Luxury keywords detected: {luxury_matches}")
+    if casual_matches > 0:
+        reasons.append(f"Casual keywords detected: {casual_matches}")
+    
+    # 2. STYLE/THEME ANALYSIS (30% weight)
+    style_lower = style.lower()
+    theme_mapping = {
+        # Farfetch styles (+points)
+        "formal": 15, "evening": 15, "cocktail": 12, "business": 10, 
+        "professional": 10, "sophisticated": 12, "elegant": 12,
+        "minimalist": 8, "contemporary": 6, "artistic": 8,
+        
+        # Nordstrom styles (-points) 
+        "casual": -10, "streetwear": -8, "athleisure": -12, "sporty": -10,
+        "bohemian": -5, "festival": -8, "beach": -6, "weekend": -8
+    }
+    
+    style_score = theme_mapping.get(style_lower, 0)
+    farfetch_score += style_score
+    
+    if style_score != 0:
+        retailer_tendency = "Farfetch" if style_score > 0 else "Nordstrom"
+        reasons.append(f"Style '{style}' favors {retailer_tendency}")
+    
+    # 3. BUDGET ANALYSIS (20% weight)
+    if budget > 800:
+        budget_score = 20
+        reasons.append(f"High budget (${budget}) → Luxury retailers")
+    elif budget > 500:
+        budget_score = 10
+        reasons.append(f"Mid-high budget (${budget}) → Premium options")
+    elif budget > 250:
+        budget_score = -5
+        reasons.append(f"Mid budget (${budget}) → Accessible luxury")
+    else:
+        budget_score = -15
+        reasons.append(f"Lower budget (${budget}) → Accessible retailers")
+    
+    farfetch_score += budget_score
+    
+    # 4. BRAND POSITIONING ANALYSIS (10% weight)
+    brand_lower = brand.lower() if brand else ""
+    
+    # Farfetch exclusive/primary brands
+    farfetch_brands = {
+        "saint laurent": 15, "gucci": 15, "prada": 15, "balenciaga": 15,
+        "bottega veneta": 12, "acne studios": 10, "ganni": 8, "jacquemus": 10,
+        "isabel marant": 10, "khaite": 8, "staud": 6, "rotate": 6
+    }
+    
+    # Nordstrom accessible brands  
+    nordstrom_brands = {
+        "zara": -10, "h&m": -12, "uniqlo": -8, "gap": -10, "j.crew": -6,
+        "everlane": -4, "levi's": -8, "nike": -6, "adidas": -6
+    }
+    
+    brand_score = 0
+    for brand_name, score in farfetch_brands.items():
+        if brand_name in brand_lower:
+            brand_score = score
+            reasons.append(f"Brand '{brand}' → Farfetch specialist")
+            break
+    
+    if brand_score == 0:  # Check Nordstrom brands
+        for brand_name, score in nordstrom_brands.items():
+            if brand_name in brand_lower:
+                brand_score = score
+                reasons.append(f"Brand '{brand}' → Nordstrom specialist")
+                break
+    
+    farfetch_score += brand_score
+    
+    # 5. CATEGORY-SPECIFIC LOGIC
+    category_lower = category.lower() if category else ""
+    if "shoes" in category_lower and budget > 400:
+        farfetch_score += 5
+        reasons.append("Premium footwear → Farfetch specialty")
+    elif "accessory" in category_lower and budget > 200:
+        farfetch_score += 3
+        reasons.append("Luxury accessories → Farfetch selection")
+    
+    # FINAL DECISION
+    confidence = min(abs(farfetch_score) / 20.0, 1.0)  # Normalize to 0-1
+    
+    if farfetch_score > 5:
+        chosen_retailer = "farfetch"
+        retailer_name = "Farfetch"
+        retailer_reasoning = "Best for luxury/designer items"
+    elif farfetch_score < -5:
+        chosen_retailer = "nordstrom"
+        retailer_name = "Nordstrom"
+        retailer_reasoning = "Best for accessible/contemporary items"
+    else:
+        # Tie-breaker logic
+        if budget > 300:
+            chosen_retailer = "farfetch"
+            retailer_name = "Farfetch"
+            retailer_reasoning = "Default for mid-high budget"
+        else:
+            chosen_retailer = "nordstrom"
+            retailer_name = "Nordstrom"
+            retailer_reasoning = "Default for accessible budget"
+        confidence = 0.3  # Lower confidence for tie-breaker
+    
+    return {
+        "retailer": chosen_retailer,
+        "retailer_name": retailer_name,
+        "confidence": confidence,
+        "score": farfetch_score,
+        "reasoning": f"{retailer_reasoning}. " + "; ".join(reasons),
+        "factors": {
+            "keyword_score": keyword_score,
+            "style_score": style_score, 
+            "budget_score": budget_score,
+            "brand_score": brand_score
+        }
+    }
+
+
+def _generate_smart_product_url(brand: str, product_name: str, description: str, retailer_choice: Dict[str, Any]) -> str:
+    """
+    Generate optimized product URLs based on retailer choice and product details.
+    
+    Args:
+        brand: Product brand
+        product_name: Product name
+        description: Product description
+        retailer_choice: Output from _determine_retailer_choice
+        
+    Returns:
+        Optimized product URL
+    """
+    
+    # Clean and optimize search terms
+    search_terms = f"{brand} {product_name} {description}".strip()
+    # Remove extra spaces and special characters
+    search_terms = " ".join(search_terms.split())
+    search_terms = search_terms.replace(" ", "+").replace("++", "+")
+    
+    retailer = retailer_choice["retailer"]
+    
+    if retailer == "farfetch":
+        # Farfetch: Best for luxury items, designer brands
+        return f"https://www.farfetch.com/shopping/search/items.aspx?q={search_terms}&storeid=9359"
+    else:
+        # Nordstrom: Best for accessible brands, wide selection
+        return f"https://www.nordstrom.com/sr?keyword={search_terms}&origin=keywordsearch"
+
+
+@router.get("/debug/smart-retailer-logic")
+async def debug_smart_retailer_logic():
+    """
+    Test endpoint to demonstrate the comprehensive smart retailer selection system.
+    Shows how keywords, theme, budget, and brand influence retailer choice.
+    """
+    try:
+        test_scenarios = [
+            {
+                "name": "Luxury Evening Outfit",
+                "prompt": "luxury designer sophisticated evening outfit for gala",
+                "style": "formal",
+                "budget": 1200,
+                "brand": "Saint Laurent",
+                "category": "dress"
+            },
+            {
+                "name": "Casual Weekend Look", 
+                "prompt": "casual comfortable weekend outfit for shopping",
+                "style": "casual",
+                "budget": 150,
+                "brand": "Zara",
+                "category": "top"
+            },
+            {
+                "name": "Business Professional",
+                "prompt": "professional business attire for important meeting",
+                "style": "business",
+                "budget": 600,
+                "brand": "J.Crew",
+                "category": "blazer"
+            },
+            {
+                "name": "Trendy Streetwear",
+                "prompt": "trendy urban streetwear outfit for city exploring",
+                "style": "streetwear", 
+                "budget": 200,
+                "brand": "Nike",
+                "category": "sneakers"
+            },
+            {
+                "name": "Mid-Budget Elegance",
+                "prompt": "elegant sophisticated look without breaking bank",
+                "style": "sophisticated",
+                "budget": 400,
+                "brand": "Ganni",
+                "category": "blouse"
+            }
+        ]
+        
+        results = []
+        for scenario in test_scenarios:
+            retailer_choice = _determine_retailer_choice(
+                prompt=scenario["prompt"],
+                style=scenario["style"],
+                budget=scenario["budget"],
+                brand=scenario["brand"],
+                category=scenario["category"]
+            )
+            
+            smart_url = _generate_smart_product_url(
+                brand=scenario["brand"],
+                product_name="test item",
+                description="test description",
+                retailer_choice=retailer_choice
+            )
+            
+            results.append({
+                "scenario": scenario["name"],
+                "inputs": {
+                    "prompt": scenario["prompt"],
+                    "style": scenario["style"],
+                    "budget": scenario["budget"],
+                    "brand": scenario["brand"]
+                },
+                "decision": {
+                    "retailer": retailer_choice["retailer_name"],
+                    "confidence": f"{retailer_choice['confidence']:.1%}",
+                    "score": retailer_choice["score"],
+                    "reasoning": retailer_choice["reasoning"]
+                },
+                "url_preview": smart_url[:80] + "..."
+            })
+        
+        return {
+            "system_description": "Smart Retailer Selection based on Keywords + Theme + Budget + Brand",
+            "scoring_logic": {
+                "farfetch_favored_by": "Luxury keywords, formal styles, high budget (>$500), designer brands",
+                "nordstrom_favored_by": "Casual keywords, everyday styles, accessible budget (<$300), mainstream brands",
+                "confidence_factors": "Higher score differences = higher confidence in decision"
+            },
+            "test_results": results
+        }
+        
+    except Exception as e:
+        logger.error(f"Error in smart retailer logic debug: {e}")
+        return {"error": str(e)}
