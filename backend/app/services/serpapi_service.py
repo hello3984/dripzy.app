@@ -233,14 +233,11 @@ class SerpAPIService:
         }
         
         try:
-            # Get connection pool
-            pool = get_connection_pool("serpapi")
+            # Get connection pool manager and use it properly
+            pool_manager = get_connection_pool()
             
-            # Make the request using the connection pool
-            async with pool.acquire() as client:
-                # Set the SSL context for this request
-                client._transport = httpx.AsyncHTTPTransport(verify=certifi.where())
-                
+            # Make the request using httpx directly
+            async with httpx.AsyncClient(timeout=10.0, verify=certifi.where()) as client:
                 response = await client.get("https://serpapi.com/search", params=params)
                 response.raise_for_status()
                 data = response.json()
@@ -289,6 +286,24 @@ class SerpAPIService:
             # Extract price as a float
             price = self._extract_price(result.get("price", "0"))
             
+            # Get direct product URL - ensure it's the actual product link, not just a search result
+            product_url = result.get("link", "")
+            
+            # If the URL comes from Google Shopping, extract the real product URL
+            if "google.com/shopping/product" in product_url:
+                # Try to extract the actual product URL from the link field
+                if "url=" in product_url:
+                    try:
+                        import urllib.parse
+                        # Find the actual destination URL in the Google Shopping link
+                        parts = product_url.split("url=")
+                        if len(parts) > 1:
+                            real_url = urllib.parse.unquote(parts[1].split("&")[0])
+                            if real_url and "http" in real_url:
+                                product_url = real_url
+                    except Exception as e:
+                        logger.error(f"Error extracting real URL: {str(e)}")
+            
             # Standardize product fields
             product = {
                 "product_id": product_id,
@@ -297,7 +312,7 @@ class SerpAPIService:
                 "category": category or "General",
                 "price": price,
                 "image_url": result.get("thumbnail", ""),
-                "product_url": result.get("link", ""),
+                "product_url": product_url,
                 "currency": "USD",
                 "description": result.get("snippet", ""),
                 "source": "serpapi"
@@ -372,6 +387,40 @@ class SerpAPIService:
         }
         
         return [product]
+
+    def _extract_price(self, price_str: str) -> float:
+        """
+        Extract a clean float price from a price string.
+        
+        Args:
+            price_str: Price string like "$29.99", "€45", etc.
+            
+        Returns:
+            Float price value
+        """
+        try:
+            if not price_str:
+                return 29.99  # Default price
+            
+            # Remove currency symbols and commas
+            clean_price = price_str.replace('$', '').replace('€', '').replace('£', '')
+            clean_price = clean_price.replace(',', '').replace(' ', '').strip()
+            
+            # Extract just the numbers and decimal point
+            import re
+            match = re.search(r'(\d+\.\d+|\d+)', clean_price)
+            if match:
+                clean_price = match.group(0)
+            else:
+                return 29.99
+            
+            price = float(clean_price)
+            # Sanity check on price range
+            if price < 0.1 or price > 10000:
+                return 29.99
+            return price
+        except (ValueError, TypeError):
+            return 29.99  # Default price on error
 
 # --- Removed global instance creation ---
 # No longer create the instance here

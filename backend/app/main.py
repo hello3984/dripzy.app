@@ -1,15 +1,18 @@
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, RedirectResponse
 import logging
 import time
 import os
 from dotenv import load_dotenv
 from datetime import datetime
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 # Import connection pool manager
 from app.core.connection_pool import get_connection_pool
+# Import performance monitoring
+from app.core.monitoring import performance_monitor
 
 # Import AI router only - temporarily commented out until module path is fixed
 # from app.routers.ai import router as ai_router
@@ -17,6 +20,8 @@ from app.core.connection_pool import get_connection_pool
 # from app.routers.debug import router as debug_router
 # Import outfits router
 from app.routers.outfits import router as outfits_router
+# Import monitoring router
+from app.routers.monitoring import router as monitoring_router
 
 # Configure logging
 logging.basicConfig(
@@ -70,14 +75,66 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Add Logging Middleware
+# Create metrics directory if it doesn't exist
+metrics_path = Path("./metrics")
+metrics_path.mkdir(exist_ok=True, parents=True)
+
+# Add Performance Monitoring Middleware
 @app.middleware("http")
-async def log_requests(request: Request, call_next):
+async def monitoring_middleware(request: Request, call_next):
     start_time = time.time()
-    logger.info(f"Incoming request: {request.method} {request.url.path}")
-    response = await call_next(request)
-    process_time = time.time() - start_time
-    logger.info(f"Finished request: {request.method} {request.url.path} - Status={response.status_code} - Time={process_time:.4f}s")
+    method = request.method
+    path = request.url.path
+    
+    # Log request start
+    logger.info(f"Incoming request: {method} {path}")
+    
+    response = None # Initialize response
+    status_code = 500 # Default status code in case of early exit
+    
+    # Process the request
+    try:
+        response = await call_next(request)
+        status_code = response.status_code
+    except Exception as e:
+        logger.error(f"Request failed: {method} {path} - Error: {str(e)}")
+        status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
+        response = JSONResponse(
+            status_code=status_code, 
+            content={"detail": f"Middleware Error: {str(e)}"}
+        )
+    finally:
+        # Calculate duration and record metrics
+        process_time = time.time() - start_time
+        
+        # Ensure status_code is set even if call_next failed before assigning response status
+        if response is not None:
+            status_code = response.status_code 
+        
+        # Record in performance monitor
+        performance_monitor.record_request(
+            method=method,
+            endpoint=path,
+            status_code=status_code,
+            duration=process_time,
+            metadata={
+                "client": request.client.host if request.client else "unknown",
+                "user_agent": request.headers.get("user-agent", "unknown")
+            }
+        )
+        
+        # Log completion
+        logger.info(f"Finished request: {method} {path} - Status={status_code} - Time={process_time:.4f}s")
+    
+    # Ensure a response is always returned
+    if response is None:
+         # This case should ideally not be reached if the except block handles errors properly
+         logger.error(f"Middleware finished without a response object for {method} {path}")
+         response = JSONResponse(
+             status_code=500, 
+             content={"detail": "Internal Server Error in Middleware"}
+         )
+         
     return response
 
 # Include AI router for modular functionality - temporarily commented out
@@ -86,12 +143,13 @@ async def log_requests(request: Request, call_next):
 # app.include_router(debug_router)
 # Include outfits router
 app.include_router(outfits_router)
+# Include monitoring router
+app.include_router(monitoring_router)
 
 # Handle OPTIONS requests for CORS preflight
 @app.options("/{rest_of_path:path}")
 async def options_handler(rest_of_path: str):
     return {}
-
 
 # Global exception handler
 @app.exception_handler(Exception)
@@ -129,6 +187,19 @@ async def health_check():
             content={"status": "unhealthy", "error": str(e)}
         )
 
+@app.get("/dashboard")
+async def get_monitoring_dashboard():
+    """Redirect to the monitoring metrics endpoint."""
+    return JSONResponse(content={
+        "message": "Performance Monitoring Dashboard", 
+        "endpoints": {
+            "metrics": "/monitoring/metrics",
+            "status": "/monitoring/status",
+            "endpoints": "/monitoring/endpoints",
+            "slow_requests": "/monitoring/slow-requests"
+        }
+    })
+
 @app.get("/debug-serpapi")
 async def debug_serpapi_direct():
     """Direct debug endpoint for SerpAPI configuration and account status"""
@@ -162,11 +233,10 @@ async def debug_serpapi_direct():
     
     # Test a search to see if we get fallback data due to rate limits
     try:
-        results = serpapi_service.search_products(
+        results = await serpapi_service.search_products(
             query="blue jeans",
             category="Bottom",
-            gender="unisex",
-            limit=1
+            num_results=1
         )
         first_result = results[0] if results else None
         is_fallback = "fallback" in first_result.get("product_id", "") if first_result else True
@@ -215,8 +285,7 @@ async def test_serpapi_direct(query: str = "winter jacket", category: str = "Top
         products = await serpapi_service.search_products(
             query=query,
             category=category,
-            gender=gender,
-            limit=5
+            num_results=5
         )
         return {"products": products, "count": len(products)}
     except Exception as e:
@@ -230,6 +299,70 @@ async def api_test():
     return {
         "status": "ok",
         "message": "API is working correctly",
+        "timestamp": str(datetime.now())
+    }
+
+# Add test endpoint directly to app
+@app.get("/test-collage")
+async def test_collage_endpoint():
+    """Test endpoint for collage generation"""
+    import logging
+    logger = logging.getLogger(__name__)
+    
+    try:
+        logger.info("Testing collage generation")
+        
+        # Import the real collage_service
+        from app.services.collage_service import collage_service
+        
+        # Use some sample test images
+        test_items = [
+            {
+                "image_url": "https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=600",
+                "category": "Top"
+            },
+            {
+                "image_url": "https://images.unsplash.com/photo-1624378439575-d8705ad7ae80?w=600", 
+                "category": "Bottom"
+            },
+            {
+                "image_url": "https://images.unsplash.com/photo-1560343090-f0409e92791a?w=600",
+                "category": "Shoes"
+            }
+        ]
+        
+        # Test collage service method
+        logger.info("Testing collage_service.create_outfit_collage")
+        collage_result = collage_service.create_outfit_collage(test_items)
+        
+        # Return the results for examination
+        return {
+            "success": True,
+            "collage_result": {
+                "keys": list(collage_result.keys()) if isinstance(collage_result, dict) else None,
+                "image_type": type(collage_result.get("image")).__name__ if isinstance(collage_result, dict) and collage_result.get("image") else None,
+                "image_length": len(collage_result.get("image", "")) if isinstance(collage_result, dict) and collage_result.get("image") else 0,
+                "image_preview": collage_result.get("image", "")[:50] + "..." if isinstance(collage_result, dict) and collage_result.get("image") else None
+            }
+        }
+    except Exception as e:
+        logger.error(f"Error testing collage generation: {str(e)}", exc_info=True)
+        return {"success": False, "error": str(e)}
+
+# Add a direct endpoint for /outfits/collage-test to prevent it from matching /{outfit_id}
+@app.get("/outfits/collage-test")
+async def outfits_collage_test_redirect():
+    """Direct endpoint to handle /outfits/collage-test and redirect to /test-collage"""
+    return RedirectResponse(url="/test-collage")
+
+# Add after the api_test endpoint
+@app.get("/cors-test")
+async def cors_test(request: Request):
+    """Test endpoint for CORS headers"""
+    return {
+        "status": "ok",
+        "received_headers": dict(request.headers),
+        "cors_configured_origins": origins,
         "timestamp": str(datetime.now())
     }
 

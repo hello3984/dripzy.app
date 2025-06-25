@@ -69,7 +69,7 @@ class OutfitService:
         Be specific in your item descriptions so they can be matched to real products.
         """
 
-    def generate_outfit(self, request: OutfitGenerateRequest) -> OutfitGenerateResponse:
+    async def generate_outfit(self, request: OutfitGenerateRequest) -> OutfitGenerateResponse:
         """
         Generate an outfit based on the user's request.
         
@@ -107,7 +107,7 @@ class OutfitService:
             outfit_data = self._get_mock_outfit(request.prompt, request.gender)
             
         # Process the outfit data to get real products and create a collage
-        return self._process_outfit_data(outfit_data, request)
+        return await self._process_outfit_data(outfit_data, request)
     
     def _extract_json(self, text: str) -> Dict[str, Any]:
         """
@@ -134,7 +134,7 @@ class OutfitService:
             logger.error(f"Failed to extract JSON from API response: {e}")
             return {}
     
-    def _process_outfit_data(self, outfit_data: Dict[str, Any], request: OutfitGenerateRequest) -> OutfitGenerateResponse:
+    async def _process_outfit_data(self, outfit_data: Dict[str, Any], request: OutfitGenerateRequest) -> OutfitGenerateResponse:
         """
         Process outfit data, search for real products, and create a collage.
         
@@ -176,34 +176,17 @@ class OutfitService:
             
             # Search for real products
             try:
-                price_range = None
-                if request.budget:
-                    # Adjust per-item budget based on category importance
-                    category_budget_factors = {
-                        "Top": 0.3,
-                        "Bottom": 0.3,
-                        "Dress": 0.6,
-                        "Shoes": 0.25,
-                        "Accessory": 0.15,
-                        "Outerwear": 0.4
-                    }
-                    factor = category_budget_factors.get(category, 0.25)
-                    max_item_price = request.budget * factor
-                    price_range = (0, max_item_price)
+                products = await self.serpapi_service.search_products(
+                    query=search_query,
+                    category=category,
+                    num_results=1
+                )
                 
-                product = self.serpapi_service.search_products(
-                    query=search_query,
-                    category=category,
-                    gender=request.gender,
-                    min_price=price_range[0] if price_range else None,
-                    max_price=price_range[1] if price_range else None,
-                    limit=1
-                )[0] if price_range else self.serpapi_service.search_products(
-                    query=search_query,
-                    category=category,
-                    gender=request.gender,
-                    limit=1
-                )[0]
+                if products:
+                    product = products[0]
+                else:
+                    # No products found, skip this item
+                    continue
                 
                 # Create OutfitItem from product
                 item = OutfitItem(

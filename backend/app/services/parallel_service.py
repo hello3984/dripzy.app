@@ -35,7 +35,7 @@ class ParallelSearchService:
     """
     
     def __init__(self):
-        self.serpapi_service = SerpAPIService(settings)
+        self.serpapi_service = SerpAPIService(api_key=settings.SERPAPI_API_KEY)
         self.semaphore = asyncio.Semaphore(5)  # Limit concurrent requests to 5
         self._cache = {}
         self._cache_ttl = 3600  # 1 hour cache TTL
@@ -112,7 +112,7 @@ class ParallelSearchService:
                 products = await self.serpapi_service.search_products(
                     query=query,
                     category=item.get("category"),
-                    num_products=1  # We only need the best match
+                    num_results=1  # We only need the best match
                 )
                 
                 if products and len(products) > 0:
