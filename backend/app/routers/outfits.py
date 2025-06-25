@@ -983,18 +983,48 @@ async def _find_products_for_item(query: str, category: str,
             cleaned_brand = clean_brand_field(raw_source)
             cleaned_product_name = clean_product_name(raw_title)
             
+            # ENHANCED URL CONSTRUCTION with better fallbacks
             final_url = None
             source_lower = raw_source.lower() if raw_source else ""
+            
+            # Priority 1: Direct product URLs with product ID
             if product_id:
-                if "farfetch.com" in source_lower: final_url = f"https://www.farfetch.com/shopping/item-{product_id}.aspx"; logger.info(f"Found FF ID: {product_id}")
-                elif "nordstrom.com" in source_lower: final_url = f"https://www.nordstrom.com/s/id/{product_id}"; logger.info(f"Found Nordstrom ID: {product_id}")
+                if "farfetch.com" in source_lower: 
+                    final_url = f"https://www.farfetch.com/shopping/item-{product_id}.aspx"
+                    logger.info(f"Found FF ID: {product_id}")
+                elif "nordstrom.com" in source_lower: 
+                    final_url = f"https://www.nordstrom.com/s/id/{product_id}"
+                    logger.info(f"Found Nordstrom ID: {product_id}")
+            
+            # Priority 2: Validate existing links
             if final_url is None and link:
                 is_search = "/sr?" in link or "/search?" in link
                 is_prod = ("farfetch.com" in source_lower and ("/shopping/item-" in link or "/shopping/men/" in link or "/shopping/women/" in link)) or \
                           ("nordstrom.com" in source_lower and "/s/" in link)
-                if is_prod and not is_search: final_url = link; logger.info(f"Validated Link: {link}")
-                else: logger.debug(f"Rejected Link: {link}")
-            if final_url is None: logger.info(f"No direct URL found for '{cleaned_product_name}'.")
+                if is_prod and not is_search: 
+                    final_url = link
+                    logger.info(f"Validated Link: {link}")
+                else: 
+                    logger.debug(f"Rejected Link: {link}")
+            
+            # Priority 3: ENHANCED FALLBACK - Create smart search URLs when no direct URL
+            if final_url is None:
+                logger.info(f"No direct URL found for '{cleaned_product_name}', creating smart search URL")
+                # Create targeted search URLs for better user experience
+                search_terms = f"{cleaned_brand} {cleaned_product_name}".replace(" ", "+")
+                
+                if "farfetch" in source_lower or not source_lower:
+                    # Default to Farfetch for luxury items
+                    final_url = f"https://www.farfetch.com/shopping/search/items.aspx?q={search_terms}&storeid=9359"
+                    logger.info(f"Created Farfetch search URL: {search_terms}")
+                elif "nordstrom" in source_lower:
+                    # Use Nordstrom search
+                    final_url = f"https://www.nordstrom.com/sr?keyword={search_terms}&origin=keywordsearch"
+                    logger.info(f"Created Nordstrom search URL: {search_terms}")
+                else:
+                    # Generic fallback to Farfetch (best luxury selection)
+                    final_url = f"https://www.farfetch.com/shopping/search/items.aspx?q={search_terms}&storeid=9359"
+                    logger.info(f"Created fallback Farfetch URL: {search_terms}")
             
             product_data = { # Assemble using cleaned data
                 "product_id": best_match.get("product_id", f"gen-{uuid.uuid4()}"),
