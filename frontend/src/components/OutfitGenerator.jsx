@@ -60,12 +60,12 @@ const OutfitGenerator = () => {
     setError(null);
     
     console.log("Sending request to backend with prompt:", prompt);
-    console.log("Using API endpoint:", `${API_BASE_URL}/outfits/generate`);
+    console.log("Using Enhanced API endpoint:", `${API_BASE_URL}/outfits/ultra-fast-generate`);
     console.log("Request params:", { prompt, gender, budget });
 
     try {
-      // First attempt - POST to /outfits/generate
-      const response = await fetch(`${API_BASE_URL}/outfits/generate`, {
+      // ENHANCED: Use ultra-fast endpoint with smart Farfetch/Nordstrom routing
+      const response = await fetch(`${API_BASE_URL}/outfits/ultra-fast-generate`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

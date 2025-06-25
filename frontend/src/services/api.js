@@ -40,9 +40,9 @@ export const generateOutfit = async (preferences) => {
     console.log('Generating outfit with preferences:', preferences);
     
     try {
-      // Log the full URL being used
-      const url = `${API_CONFIG.baseURL}/outfits/generate`;
-      console.log('API Request URL:', url);
+      // ENHANCEMENT: Use ultra-fast endpoint with smart retailer selection
+      const url = `${API_CONFIG.baseURL}/outfits/ultra-fast-generate`;
+      console.log('API Request URL (Enhanced):', url);
       console.log('Request body:', JSON.stringify(preferences));
       
       const response = await fetch(url, {

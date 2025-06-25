@@ -43,7 +43,7 @@ const ThemeCollage = () => {
     setGeneratedPrompt(prompt);
 
     try {
-      const response = await fetch(`${API_CONFIG.baseURL}/outfits/generate`, {
+      const response = await fetch(`${API_CONFIG.baseURL}/outfits/ultra-fast-generate`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
