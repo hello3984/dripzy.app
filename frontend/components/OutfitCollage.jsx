@@ -1,6 +1,34 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import Image from 'next/image';
+
+// Add ImageWithFallback component
+const ImageWithFallback = ({ src, alt, width, height, className }) => {
+  const [hasError, setHasError] = useState(false);
+  
+  // Block placeholder images and invalid URLs
+  const isPlaceholder = typeof src === 'string' && 
+    (src.includes('placeholder') || src.includes('via.placeholder') || !src.startsWith('http'));
+  
+  if (isPlaceholder || hasError) {
+    return (
+      <div className="placeholder-image">
+        <span>{alt?.charAt(0) || '?'}</span>
+      </div>
+    );
+  }
+  
+  return (
+    <Image 
+      src={src}
+      alt={alt}
+      width={width}
+      height={height}
+      className={className}
+      onError={() => setHasError(true)}
+    />
+  );
+};
 
 const OutfitCollage = ({ outfit, prompt }) => {
   if (!outfit || !outfit.items || outfit.items.length === 0) {
@@ -65,19 +93,14 @@ const OutfitCollage = ({ outfit, prompt }) => {
             >
               <div className="product-card">
                 <div className="image-container">
-                  {item.image_url ? (
-                    <Image 
-                      src={item.image_url}
-                      alt={item.product_name || `Fashion item ${index + 1}`}
-                      width={300}
-                      height={400}
-                      className="product-image"
-                    />
-                  ) : (
-                    <div className="placeholder-image">
-                      <span>{item.category?.charAt(0) || '?'}</span>
-                    </div>
-                  )}
+                  {/* Replace Image with ImageWithFallback */}
+                  <ImageWithFallback 
+                    src={item.image_url}
+                    alt={item.product_name || `Fashion item ${index + 1}`}
+                    width={300}
+                    height={400}
+                    className="product-image"
+                  />
                 </div>
                 
                 <div className="product-details">

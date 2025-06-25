@@ -7,6 +7,8 @@ import logging
 import os
 import random
 import re
+import time
+import asyncio
 from typing import List, Dict, Any, Optional, Tuple
 
 from anthropic import Anthropic
@@ -154,14 +156,14 @@ class OutfitService:
         color_palette = outfit_data.get("color_palette", [])
         style_tags = outfit_data.get("style_tags", [])
         
-        # Process each item to get real product suggestions
-        processed_items = []
-        image_map = {}
+        # Prepare parallel search tasks
+        search_tasks = []
+        valid_items_data = []
         
         for item_data in items_data:
             category = self._standardize_category(item_data.get("category", ""))
             name = item_data.get("name", "")
-            description = item_data.get("description", "")
+            description_text = item_data.get("description", "")
             
             # Skip if category is not recognized
             if not category:
@@ -170,44 +172,39 @@ class OutfitService:
             # Create search query based on item details and gender
             search_query = self._create_search_query(
                 category=category,
-                details=f"{name} {description}",
+                details=f"{name} {description_text}",
                 gender=request.gender
             )
             
-            # Search for real products
-            try:
-                products = await self.serpapi_service.search_products(
-                    query=search_query,
-                    category=category,
-                    num_results=1
-                )
-                
-                if products:
-                    product = products[0]
-                else:
-                    # No products found, skip this item
-                    continue
-                
-                # Create OutfitItem from product
+            # Create async task for product search
+            task = self._search_single_product(search_query, category, item_data)
+            search_tasks.append(task)
+            valid_items_data.append(item_data)
+        
+        # Execute all product searches in parallel
+        logger.info(f"Starting parallel search for {len(search_tasks)} products")
+        start_time = time.time()
+        
+        search_results = await asyncio.gather(*search_tasks, return_exceptions=True)
+        
+        search_time = time.time() - start_time
+        logger.info(f"Parallel product search completed in {search_time:.2f} seconds")
+        
+        # Process search results
+        processed_items = []
+        for i, result in enumerate(search_results):
+            if isinstance(result, Exception):
+                logger.error(f"Error searching for product {i}: {result}")
+                # Add fallback item
+                item_data = valid_items_data[i]
                 item = OutfitItem(
-                    category=category,
-                    name=product.get("title", name),
-                    description=description,
-                    image_url=product.get("image"),
-                    purchase_url=product.get("link"),
-                    price=product.get("price"),
-                    brand=product.get("brand")
+                    category=self._standardize_category(item_data.get("category", "")),
+                    name=item_data.get("name", f"Item {i+1}"),
+                    description=item_data.get("description", "")
                 )
                 processed_items.append(item)
-            except Exception as e:
-                logger.error(f"Error searching for product: {e}")
-                # Add fallback item without real product data
-                item = OutfitItem(
-                    category=category,
-                    name=name,
-                    description=description
-                )
-                processed_items.append(item)
+            elif result:
+                processed_items.append(result)
         
         # Apply budget filter if specified
         if request.budget:
@@ -228,6 +225,7 @@ class OutfitService:
         
         # Create collage if item images are available
         collage_image = None
+        image_map = {}
         if all(item.image_url for item in processed_items):
             try:
                 collage_result = self.collage_service.create_collage(
@@ -246,6 +244,47 @@ class OutfitService:
             collage_image=collage_image,
             image_map=image_map
         )
+    
+    async def _search_single_product(self, search_query: str, category: str, item_data: Dict[str, Any]) -> Optional[OutfitItem]:
+        """
+        Search for a single product asynchronously.
+        
+        Args:
+            search_query: Search query for the product
+            category: Product category
+            item_data: Original item data from AI
+            
+        Returns:
+            OutfitItem or None if not found
+        """
+        try:
+            products = await self.serpapi_service.search_products(
+                query=search_query,
+                category=category,
+                num_results=1
+            )
+            
+            if products:
+                product = products[0]
+                
+                # Create OutfitItem from product with enhanced data
+                item = OutfitItem(
+                    category=category,
+                    name=product.get("product_name", item_data.get("name", "")),
+                    description=item_data.get("description", ""),
+                    image_url=product.get("image_url", ""),
+                    purchase_url=product.get("product_url", ""),
+                    price=product.get("price", 0),
+                    brand=product.get("brand", ""),
+                    retailer=product.get("retailer", "Online Store")
+                )
+                return item
+            else:
+                return None
+                
+        except Exception as e:
+            logger.error(f"Error in single product search: {e}")
+            return None
     
     def _standardize_category(self, category: str) -> str:
         """

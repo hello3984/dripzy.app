@@ -6,7 +6,7 @@ export const API_CONFIG = {
   // Base URL for API calls - changes based on environment
   baseURL: process.env.NODE_ENV === 'production' 
     ? 'https://dripzy-app.onrender.com' 
-    : 'http://localhost:9999',
+    : 'http://localhost:8000',
   
   timeout: 30000 // 30 seconds timeout for image processing
 };
@@ -190,78 +190,42 @@ async function enhanceOutfitsWithRealUrls(outfits) {
         };
       }
       
-      // Replace placeholder or missing image URLs with better defaults based on category
+      // For items without valid image_url, exclude them rather than using a placeholder
       if (!item.image_url || 
           item.image_url.includes('placeholder.com') || 
-          item.image_url.includes('example.com')) {
+          item.image_url.includes('example.com') ||
+          item.image_url.includes('unsplash.com')) {
+        // Mark items with invalid images to be filtered out
         item = {
           ...item,
-          image_url: getDefaultImageForCategory(item.category)
+          invalid_image: true
         };
       }
       
       return item;
     });
     
-    // Replace placeholder collage URL with better default or first item image
+    // Filter out items with invalid images
+    const validItems = enhancedItems.filter(item => !item.invalid_image);
+    
+    // Only use a real collage image, don't add placeholder
+    let outputOutfit = {
+      ...outfit,
+      items: validItems
+    };
+    
     if (!outfit.collage_url || 
         outfit.collage_url.includes('placeholder.com') || 
         outfit.collage_url.includes('example.com') ||
+        outfit.collage_url.includes('unsplash.com') ||
         outfit.collage_url === '') {
-      // Use first item image or a default image for the collage
-      const collageImage = enhancedItems.length > 0 && enhancedItems[0].image_url ? 
-        enhancedItems[0].image_url : 
-        'https://via.placeholder.com/800x400?text=Fashion+Outfit';
-      
-      outfit = {
-        ...outfit,
-        collage_url: collageImage
-      };
+      // Only use actual collage images from real sources, not fallbacks
+      // The UI will handle missing collage displays appropriately
+      delete outputOutfit.collage_url;
     }
     
-    return {
-      ...outfit,
-      items: enhancedItems
-    };
+    return outputOutfit;
   });
-}
-
-// Helper function to get default images by category
-function getDefaultImageForCategory(category) {
-  if (!category) return 'https://via.placeholder.com/300x400?text=Fashion+Item';
-  
-  const categoryLower = category.toLowerCase();
-  
-  // Map of category keywords to default images
-  const defaultImages = {
-    'top': 'https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?ixlib=rb-1.2.1&auto=format&fit=crop&w=500&q=80',
-    'shirt': 'https://images.unsplash.com/photo-1596755094514-f87e34085b2c?ixlib=rb-1.2.1&auto=format&fit=crop&w=500&q=80',
-    'bottom': 'https://images.unsplash.com/photo-1542272604-787c3835535d?ixlib=rb-1.2.1&auto=format&fit=crop&w=500&q=80',
-    'jeans': 'https://images.unsplash.com/photo-1582552938357-32b906df40cb?ixlib=rb-1.2.1&auto=format&fit=crop&w=500&q=80',
-    'pants': 'https://images.unsplash.com/photo-1541099649105-f69ad21f3246?ixlib=rb-1.2.1&auto=format&fit=crop&w=500&q=80',
-    'shoes': 'https://images.unsplash.com/photo-1560343090-f0409e92791a?ixlib=rb-1.2.1&auto=format&fit=crop&w=500&q=80',
-    'sneakers': 'https://images.unsplash.com/photo-1552346154-21d32810aba3?ixlib=rb-1.2.1&auto=format&fit=crop&w=500&q=80',
-    'dress': 'https://images.unsplash.com/photo-1539008835657-9e8e9680c956?ixlib=rb-1.2.1&auto=format&fit=crop&w=500&q=80',
-    'accessory': 'https://images.unsplash.com/photo-1599643478518-a784e5dc4c8f?ixlib=rb-1.2.1&auto=format&fit=crop&w=500&q=80',
-    'accessorize': 'https://images.unsplash.com/photo-1599643478518-a784e5dc4c8f?ixlib=rb-1.2.1&auto=format&fit=crop&w=500&q=80',
-    'accessories': 'https://images.unsplash.com/photo-1599643478518-a784e5dc4c8f?ixlib=rb-1.2.1&auto=format&fit=crop&w=500&q=80',
-    'hat': 'https://images.unsplash.com/photo-1521369909029-2afed882baee?ixlib=rb-1.2.1&auto=format&fit=crop&w=500&q=80',
-    'bag': 'https://images.unsplash.com/photo-1584917865442-de89df76afd3?ixlib=rb-1.2.1&auto=format&fit=crop&w=500&q=80',
-    'jewelry': 'https://images.unsplash.com/photo-1599643477877-57446cade961?ixlib=rb-1.2.1&auto=format&fit=crop&w=500&q=80',
-    'jacket': 'https://images.unsplash.com/photo-1551028719-00167b16eac5?ixlib=rb-1.2.1&auto=format&fit=crop&w=500&q=80',
-    'coat': 'https://images.unsplash.com/photo-1539533018447-63fcce2678e3?ixlib=rb-1.2.1&auto=format&fit=crop&w=500&q=80',
-    'outerwear': 'https://images.unsplash.com/photo-1551488831-00ddcb6c6bd3?ixlib=rb-1.2.1&auto=format&fit=crop&w=500&q=80'
-  };
-  
-  // Find matching category
-  for (const [key, url] of Object.entries(defaultImages)) {
-    if (categoryLower.includes(key)) {
-      return url;
-    }
-  }
-  
-  // Default fallback image
-  return 'https://images.unsplash.com/photo-1562157873-818bc0726f68?ixlib=rb-1.2.1&auto=format&fit=crop&w=500&q=80';
 }
 
 // Create outfits from real product data

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import OutfitCollage from './OutfitCollage';
+import OutfitCollage from './OutfitCollage.jsx';
 import LoadingIndicator from './LoadingIndicator';
 
 // Import the API configuration

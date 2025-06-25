@@ -14,7 +14,7 @@ const OutfitGenerator = () => {
 
   // Define API base URL based on environment
   const API_BASE_URL = process.env.NODE_ENV === 'development' 
-    ? 'http://localhost:8003' // Local development backend (updated to correct running port)
+    ? 'http://localhost:8000' // Local development backend (updated to correct running port)
     : 'https://dripzy-app.onrender.com'; // Production backend
 
   const handlePromptChange = (e) => {
@@ -207,11 +207,21 @@ const OutfitGenerator = () => {
               {generatedOutfit.items.map((item, index) => (
                 <div key={index} className="outfit-item">
                   <div className="item-image">
-                    {item.image_url ? (
-                      <img src={item.image_url} alt={item.product_name || item.type} />
+                    {item.image_url && !item.image_url.includes('placeholder') && 
+                     !item.image_url.includes('unsplash') && 
+                     !item.image_url.includes('via.placeholder') ? (
+                      <img 
+                        src={item.image_url} 
+                        alt={item.product_name || item.type} 
+                        onError={(e) => {
+                          console.log(`Image failed to load: ${item.image_url}`);
+                          e.target.style.display = 'none';
+                          e.target.parentNode.innerHTML = '<div class="missing-image-note">Image unavailable</div>';
+                        }}
+                      />
                     ) : (
-                      <div className="placeholder-image">
-                        {item.category} Image
+                      <div className="missing-image-note">
+                        Image for {item.product_name} will be available soon
                       </div>
                     )}
                   </div>

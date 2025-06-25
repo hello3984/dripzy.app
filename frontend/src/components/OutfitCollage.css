@@ -40,10 +40,19 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background-color: #f5f5f5;
+  background-color: #f8f8f8;
   border-radius: 8px;
-  color: #888;
-  font-style: italic;
+  color: #555;
+  font-weight: 500;
+  padding: 20px;
+  text-align: center;
+  animation: pulse 2s infinite ease-in-out;
+}
+
+@keyframes pulse {
+  0% { background-color: #f8f8f8; }
+  50% { background-color: #f0f0f0; }
+  100% { background-color: #f8f8f8; }
 }
 
 .outfit-collage-hover-overlay {
@@ -354,4 +363,22 @@
   .outfit-brands {
     font-size: 0.9rem;
   }
+}
+
+.image-load-error {
+  position: relative;
+  background-color: #f8f8f8;
+  min-height: 150px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.image-load-error::after {
+  content: "Image unavailable";
+  position: absolute;
+  color: #666;
+  font-size: 0.85rem;
+  font-style: italic;
 } 

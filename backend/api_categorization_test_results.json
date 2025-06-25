@@ -1,0 +1,67 @@
+{
+  "black dress for date night": {
+    "detected_category": "dress",
+    "targeted_websites": [
+      "revolve.com",
+      "anthropologie.com",
+      "nordstrom.com",
+      "asos.com",
+      "freepeople.com",
+      "zara.com",
+      "nastygal.com"
+    ],
+    "optimized_query": "black dress for date night (site:revolve.com OR site:anthropologie.com OR site:nordstrom.com OR site:asos.com OR site:freepeople.com)",
+    "implementation": "website_categories.py"
+  },
+  "men's blue suit for office": {
+    "detected_category": "suit",
+    "targeted_websites": [
+      "macys.com",
+      "bananarepublic.com",
+      "nordstrom.com",
+      "suitsupply.com",
+      "zara.com",
+      "jcrew.com"
+    ],
+    "optimized_query": "men's blue suit for office (site:macys.com OR site:bananarepublic.com OR site:nordstrom.com OR site:suitsupply.com OR site:zara.com)",
+    "implementation": "website_categories.py"
+  },
+  "comfortable running shoes": {
+    "detected_category": "shoes",
+    "targeted_websites": [
+      "nike.com",
+      "zappos.com",
+      "footlocker.com",
+      "nordstrom.com",
+      "dsw.com",
+      "adidas.com"
+    ],
+    "optimized_query": "comfortable running shoes (site:nike.com OR site:zappos.com OR site:footlocker.com OR site:nordstrom.com OR site:dsw.com)",
+    "implementation": "website_categories.py"
+  },
+  "casual jeans for weekend": {
+    "detected_category": "jeans",
+    "targeted_websites": [
+      "gap.com",
+      "levis.com",
+      "abercrombie.com",
+      "asos.com",
+      "madewell.com",
+      "zara.com"
+    ],
+    "optimized_query": "casual jeans for weekend (site:gap.com OR site:levis.com OR site:abercrombie.com OR site:asos.com OR site:madewell.com)",
+    "implementation": "website_categories.py"
+  },
+  "red high heels for formal event": {
+    "detected_category": "heels",
+    "targeted_websites": [
+      "stevemadden.com",
+      "zappos.com",
+      "nordstrom.com",
+      "dsw.com",
+      "ninewest.com"
+    ],
+    "optimized_query": "red high heels for formal event (site:stevemadden.com OR site:zappos.com OR site:nordstrom.com OR site:dsw.com OR site:ninewest.com)",
+    "implementation": "website_categories.py"
+  }
+}

@@ -1,0 +1,9 @@
+[2025-04-18 02:10:05] [0;33mCleaning up zombie processes...[0m
+[2025-04-18 02:10:07] [0;32m✓ Zombie processes cleaned[0m
+[2025-04-18 02:10:07] [0;33mStarting backend on port 8000...[0m
+[2025-04-18 02:10:07] [0;32m✓ Backend started (PID: 83425)[0m
+[2025-04-18 02:10:07] [0;33mStarting frontend on port 3010...[0m
+[2025-04-18 02:10:07] [0;32m✓ Frontend started (PID: 83432)[0m
+[2025-04-18 02:10:07] [0;32mCommand 'restart' completed successfully[0m
+[2025-04-18 02:10:07] Backend URL: http://localhost:8000
+[2025-04-18 02:10:07] Frontend URL: http://localhost:3010

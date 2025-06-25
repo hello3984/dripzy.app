@@ -1,0 +1,150 @@
+2025-04-20 03:34:42: 
+2025-04-20 03:34:42: > frontend@0.1.0 start
+2025-04-20 03:34:42: > react-scripts start
+2025-04-20 03:34:42: 
+2025-04-20 03:34:43: Attempting to bind to HOST environment variable: 0.0.0.0
+2025-04-20 03:34:43: If this was unintentional, check that you haven't mistakenly set it in your shell.
+2025-04-20 03:34:43: Learn more here: https://cra.link/advanced-config
+2025-04-20 03:34:43: 
+2025-04-20 03:34:44: Starting the development server...
+2025-04-20 03:34:44: 
+2025-04-20 03:34:48: Compiled successfully!
+2025-04-20 03:34:48: 
+2025-04-20 03:34:48: You can now view frontend in the browser.
+2025-04-20 03:34:48: 
+2025-04-20 03:34:48:   Local:            http://localhost:3006
+2025-04-20 03:34:48:   On Your Network:  http://192.168.0.155:3006
+2025-04-20 03:34:48: 
+2025-04-20 03:34:48: Note that the development build is not optimized.
+2025-04-20 03:34:48: To create a production build, use npm run build.
+2025-04-20 03:34:48: 
+2025-04-20 03:34:48: webpack compiled successfully
+2025-04-20 12:30:50: 
+2025-04-20 12:30:50: > frontend@0.1.0 start
+2025-04-20 12:30:50: > react-scripts start
+2025-04-20 12:30:50: 
+2025-04-20 12:30:51: Attempting to bind to HOST environment variable: 0.0.0.0
+2025-04-20 12:30:51: If this was unintentional, check that you haven't mistakenly set it in your shell.
+2025-04-20 12:30:51: Learn more here: https://cra.link/advanced-config
+2025-04-20 12:30:51: 
+2025-04-20 12:30:52: Starting the development server...
+2025-04-20 12:30:52: 
+2025-04-20 12:30:57: Compiled successfully!
+2025-04-20 12:30:57: 
+2025-04-20 12:30:57: You can now view frontend in the browser.
+2025-04-20 12:30:57: 
+2025-04-20 12:30:57:   Local:            http://localhost:3006
+2025-04-20 12:30:57:   On Your Network:  http://192.168.0.155:3006
+2025-04-20 12:30:57: 
+2025-04-20 12:30:57: Note that the development build is not optimized.
+2025-04-20 12:30:57: To create a production build, use npm run build.
+2025-04-20 12:30:57: 
+2025-04-20 12:30:57: webpack compiled successfully
+2025-04-29 15:13:41: 
+2025-04-29 15:13:41: > frontend@0.1.0 start
+2025-04-29 15:13:41: > react-scripts start
+2025-04-29 15:13:41: 
+2025-04-29 15:13:42: Attempting to bind to HOST environment variable: 0.0.0.0
+2025-04-29 15:13:42: If this was unintentional, check that you haven't mistakenly set it in your shell.
+2025-04-29 15:13:42: Learn more here: https://cra.link/advanced-config
+2025-04-29 15:13:42: 
+2025-04-29 15:13:43: Starting the development server...
+2025-04-29 15:13:43: 
+2025-04-29 15:13:44: Compiled successfully!
+2025-04-29 15:13:44: 
+2025-04-29 15:13:44: You can now view frontend in the browser.
+2025-04-29 15:13:44: 
+2025-04-29 15:13:44:   Local:            http://localhost:3006
+2025-04-29 15:13:44:   On Your Network:  http://172.20.10.2:3006
+2025-04-29 15:13:44: 
+2025-04-29 15:13:44: Note that the development build is not optimized.
+2025-04-29 15:13:44: To create a production build, use npm run build.
+2025-04-29 15:13:44: 
+2025-04-29 15:13:44: webpack compiled successfully
+2025-04-29 15:53:45: 
+2025-04-29 15:53:45: > frontend@0.1.0 start
+2025-04-29 15:53:45: > react-scripts start
+2025-04-29 15:53:45: 
+2025-04-29 15:53:46: Attempting to bind to HOST environment variable: 0.0.0.0
+2025-04-29 15:53:46: If this was unintentional, check that you haven't mistakenly set it in your shell.
+2025-04-29 15:53:46: Learn more here: https://cra.link/advanced-config
+2025-04-29 15:53:46: 
+2025-04-29 15:53:47: Starting the development server...
+2025-04-29 15:53:47: 
+2025-04-29 15:53:48: Compiled successfully!
+2025-04-29 15:53:48: 
+2025-04-29 15:53:48: You can now view frontend in the browser.
+2025-04-29 15:53:48: 
+2025-04-29 15:53:48:   Local:            http://localhost:3006
+2025-04-29 15:53:48:   On Your Network:  http://172.20.10.2:3006
+2025-04-29 15:53:48: 
+2025-04-29 15:53:48: Note that the development build is not optimized.
+2025-04-29 15:53:48: To create a production build, use npm run build.
+2025-04-29 15:53:48: 
+2025-04-29 15:53:48: webpack compiled successfully
+2025-04-30 12:43:25: 
+2025-04-30 12:43:25: > frontend@0.1.0 start
+2025-04-30 12:43:25: > react-scripts start
+2025-04-30 12:43:25: 
+2025-04-30 12:43:26: Attempting to bind to HOST environment variable: 0.0.0.0
+2025-04-30 12:43:26: If this was unintentional, check that you haven't mistakenly set it in your shell.
+2025-04-30 12:43:26: Learn more here: https://cra.link/advanced-config
+2025-04-30 12:43:26: 
+2025-04-30 12:43:27: Starting the development server...
+2025-04-30 12:43:27: 
+2025-04-30 12:43:28: Compiled successfully!
+2025-04-30 12:43:28: 
+2025-04-30 12:43:28: You can now view frontend in the browser.
+2025-04-30 12:43:28: 
+2025-04-30 12:43:28:   Local:            http://localhost:3006
+2025-04-30 12:43:28:   On Your Network:  http://172.20.10.2:3006
+2025-04-30 12:43:28: 
+2025-04-30 12:43:28: Note that the development build is not optimized.
+2025-04-30 12:43:28: To create a production build, use npm run build.
+2025-04-30 12:43:28: 
+2025-04-30 12:43:28: webpack compiled successfully
+2025-04-30 13:45:07: 
+2025-04-30 13:45:07: > frontend@0.1.0 start
+2025-04-30 13:45:07: > react-scripts start
+2025-04-30 13:45:07: 
+2025-04-30 13:45:08: Attempting to bind to HOST environment variable: 0.0.0.0
+2025-04-30 13:45:08: If this was unintentional, check that you haven't mistakenly set it in your shell.
+2025-04-30 13:45:08: Learn more here: https://cra.link/advanced-config
+2025-04-30 13:45:08: 
+2025-04-30 13:45:08: Starting the development server...
+2025-04-30 13:45:08: 
+2025-04-30 13:45:10: Compiled successfully!
+2025-04-30 13:45:10: 
+2025-04-30 13:45:10: You can now view frontend in the browser.
+2025-04-30 13:45:10: 
+2025-04-30 13:45:10:   Local:            http://localhost:3006
+2025-04-30 13:45:10:   On Your Network:  http://172.20.10.2:3006
+2025-04-30 13:45:10: 
+2025-04-30 13:45:10: Note that the development build is not optimized.
+2025-04-30 13:45:10: To create a production build, use npm run build.
+2025-04-30 13:45:10: 
+2025-04-30 13:45:10: webpack compiled successfully
+2025-04-30 13:48:45: Compiling...
+2025-04-30 13:48:48: Compiled successfully!
+2025-04-30 13:48:48: webpack compiled successfully
+2025-04-30 13:51:15: Compiling...
+2025-04-30 13:51:15: Compiled successfully!
+2025-04-30 13:51:15: webpack compiled successfully
+2025-06-25 13:07:04: Compiling...
+2025-06-25 13:07:06: Compiled successfully!
+2025-06-25 13:07:06: webpack compiled successfully
+2025-06-25 13:07:14: Compiling...
+2025-06-25 13:07:15: Compiled successfully!
+2025-06-25 13:07:15: webpack compiled successfully
+2025-06-25 13:07:16: Compiling...
+2025-06-25 13:07:16: Compiled successfully!
+2025-06-25 13:07:16: webpack compiled successfully
+2025-06-25 13:21:49: Compiling...
+2025-06-25 13:21:50: Compiled successfully!
+2025-06-25 13:21:50: webpack compiled successfully
+2025-06-25 13:22:16: Compiling...
+2025-06-25 13:22:16: Compiled successfully!
+2025-06-25 13:22:16: webpack compiled successfully
+2025-06-25 13:22:17: Compiling...
+2025-06-25 13:22:17: Compiled successfully!
+2025-06-25 13:22:17: webpack compiled successfully

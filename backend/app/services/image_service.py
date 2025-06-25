@@ -381,33 +381,64 @@ def create_outfit_collage(image_urls, outfit_id=None):
         
         # Ensure outfit_id is always a string if provided
         outfit_id = str(outfit_id) if outfit_id is not None else str(uuid.uuid4())
+        
+        # Import the collage service to use its implementation
+        from app.services.collage_service import collage_service
             
         # Determine the input type - list of URLs or list of item dictionaries
         if isinstance(image_urls, list):
             # Check if it's a simple list of URL strings
             if all(isinstance(url, str) for url in image_urls):
                 logger.info(f"Creating collage from {len(image_urls)} image URLs")
-                # Return a placeholder URL with the outfit ID
-                collage_url = f"https://via.placeholder.com/800x600?text=Outfit+{outfit_id[:8]}"
-                logger.info(f"Created placeholder collage URL: {collage_url}")
-                return collage_url
+                
+                # Convert to the format expected by collage_service
+                items = [{"image_url": url, "category": f"Item{i+1}"} for i, url in enumerate(image_urls)]
+                collage_result = collage_service.create_outfit_collage(items)
+                
+                # For backwards compatibility when a string URL is expected
+                if "image" in collage_result and collage_result["image"]:
+                    # Create a URL for this base64 image
+                    result_url = f"data:image/png;base64,{collage_result['image']}"
+                    logger.info(f"Created collage URL with base64 data")
+                    return result_url
+                else:
+                    # Fallback to placeholder if collage creation failed
+                    fallback_url = f"https://via.placeholder.com/800x600?text=Outfit+{outfit_id[:8]}"
+                    logger.warning(f"Collage creation failed, using fallback: {fallback_url}")
+                    return fallback_url
             else:
                 # It's a list of items with more complex structure
                 logger.info(f"Creating collage from {len(image_urls)} complex items")
-                outfit_items = image_urls
-                # Return a placeholder result with the outfit ID
-                result = {
-                    "image": f"https://via.placeholder.com/800x600?text=Outfit+{outfit_id[:8]}",
-                    "map": []
-                }
-                logger.info(f"Created placeholder collage result: {result}")
-                return result
+                
+                # Format items for collage_service if needed
+                collage_items = []
+                for item in image_urls:
+                    if isinstance(item, dict) and "image_url" in item:
+                        collage_items.append(item)
+                    elif isinstance(item, dict) and "image" in item:
+                        # Handle different item formats
+                        collage_items.append({
+                            "image_url": item["image"],
+                            "category": item.get("category", "Item")
+                        })
+                
+                if collage_items:
+                    collage_result = collage_service.create_outfit_collage(collage_items)
+                    logger.info(f"Created collage with {len(collage_items)} items")
+                    return collage_result
+                else:
+                    # No valid items found
+                    logger.warning("No valid items found for collage")
+                    return {
+                        "image": None,
+                        "map": []
+                    }
         else:
             # Handle unexpected input type
             logger.warning(f"Unexpected input type for collage: {type(image_urls)}")
             # Return a generic placeholder
             return {
-                "image": f"https://via.placeholder.com/800x600?text=Error",
+                "image": None,
                 "map": []
             }
                 
@@ -418,4 +449,4 @@ def create_outfit_collage(image_urls, outfit_id=None):
         if isinstance(image_urls, list) and all(isinstance(url, str) for url in image_urls):
             return "https://via.placeholder.com/800x600?text=Error"
         else:
-            return {"image": "https://via.placeholder.com/800x600?text=Error", "map": []} 
+            return {"image": None, "map": []} 

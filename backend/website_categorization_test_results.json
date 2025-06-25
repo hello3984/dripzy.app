@@ -1,0 +1,135 @@
+{
+  "original_module": {
+    "I need a black dress for a date night": {
+      "detected_gender": "general",
+      "detected_theme": "Date Night",
+      "standardized_category": "dresses",
+      "websites": [
+        "amazon.com",
+        "nordstrom.com",
+        "farfetch.com",
+        "ssense.com"
+      ],
+      "optimized_query": "I need a black dress for a date night (site:amazon.com OR site:nordstrom.com OR site:farfetch.com OR site:ssense.com)"
+    },
+    "Men's blue suit for office": {
+      "detected_gender": "men",
+      "detected_theme": "Office Chic",
+      "standardized_category": "suits",
+      "websites": [
+        "suitsupply.com",
+        "brooksbrothers.com",
+        "indochino.com",
+        "nordstrom.com"
+      ],
+      "optimized_query": "Men's blue suit for office (site:suitsupply.com OR site:brooksbrothers.com OR site:indochino.com OR site:nordstrom.com)"
+    },
+    "Comfortable running shoes": {
+      "detected_gender": "general",
+      "detected_theme": "general",
+      "standardized_category": "shoes",
+      "websites": [
+        "amazon.com",
+        "nordstrom.com",
+        "farfetch.com",
+        "ssense.com"
+      ],
+      "optimized_query": "Comfortable running shoes (site:amazon.com OR site:nordstrom.com OR site:farfetch.com OR site:ssense.com)"
+    },
+    "Casual jeans for weekend": {
+      "detected_gender": "general",
+      "detected_theme": "general",
+      "standardized_category": "bottoms",
+      "websites": [
+        "amazon.com",
+        "nordstrom.com",
+        "farfetch.com",
+        "ssense.com"
+      ],
+      "optimized_query": "Casual jeans for weekend (site:amazon.com OR site:nordstrom.com OR site:farfetch.com OR site:ssense.com)"
+    },
+    "High heels for formal event": {
+      "detected_gender": "women",
+      "detected_theme": "Office Chic",
+      "standardized_category": "shoes",
+      "websites": [
+        "nordstrom.com",
+        "asos.com",
+        "revolve.com",
+        "shopbop.com"
+      ],
+      "optimized_query": "High heels for formal event (site:nordstrom.com OR site:asos.com OR site:revolve.com OR site:shopbop.com)"
+    }
+  },
+  "new_module": {
+    "I need a black dress for a date night": {
+      "detected_category": "dress",
+      "websites": [
+        "anthropologie.com",
+        "zara.com",
+        "freepeople.com",
+        "revolve.com",
+        "asos.com",
+        "nastygal.com",
+        "nordstrom.com"
+      ],
+      "optimized_query": "I need a black dress for a date night (site:anthropologie.com OR site:zara.com OR site:freepeople.com OR site:revolve.com OR site:asos.com)"
+    },
+    "Men's blue suit for office": {
+      "detected_category": "suit",
+      "websites": [
+        "jcrew.com",
+        "suitsupply.com",
+        "jackthreads.com",
+        "zara.com",
+        "macys.com",
+        "mrporter.com",
+        "endclothing.com",
+        "asos.com",
+        "nordstrom.com",
+        "bananarepublic.com"
+      ],
+      "optimized_query": "Men's blue suit for office (site:jcrew.com OR site:suitsupply.com OR site:jackthreads.com OR site:zara.com OR site:macys.com)"
+    },
+    "Comfortable running shoes": {
+      "detected_category": "shoes",
+      "websites": [
+        "dsw.com",
+        "nike.com",
+        "adidas.com",
+        "footlocker.com",
+        "nordstrom.com",
+        "zappos.com"
+      ],
+      "optimized_query": "Comfortable running shoes (site:dsw.com OR site:nike.com OR site:adidas.com OR site:footlocker.com OR site:nordstrom.com)"
+    },
+    "Casual jeans for weekend": {
+      "detected_category": "jeans",
+      "websites": [
+        "levis.com",
+        "madewell.com",
+        "zara.com",
+        "asos.com",
+        "gap.com",
+        "abercrombie.com"
+      ],
+      "optimized_query": "Casual jeans for weekend (site:levis.com OR site:madewell.com OR site:zara.com OR site:asos.com OR site:gap.com)"
+    },
+    "High heels for formal event": {
+      "detected_category": "heels",
+      "websites": [
+        "ninewest.com",
+        "nastygal.com",
+        "dsw.com",
+        "zara.com",
+        "freepeople.com",
+        "asos.com",
+        "revolve.com",
+        "stevemadden.com",
+        "anthropologie.com",
+        "nordstrom.com"
+      ],
+      "optimized_query": "High heels for formal event (site:ninewest.com OR site:nastygal.com OR site:dsw.com OR site:zara.com OR site:freepeople.com)"
+    }
+  }
+}

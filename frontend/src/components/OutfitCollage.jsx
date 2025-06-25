@@ -46,54 +46,120 @@ const OutfitCollage = ({ outfit, prompt }) => {
 
       <div className="collage-grid">
         {outfit.items.map((item, index) => {
-          // Generate product URL
-          const productUrl = item.product_url || item.url || '';
-          const searchQuery = encodeURIComponent(`${item.brand || ''} ${item.product_name || ''} ${item.category || ''}`).trim();
-          const fallbackUrl = `https://www.google.com/search?tbm=shop&q=${searchQuery}`;
-          const finalUrl = productUrl || fallbackUrl;
+          // Use the real product URL from the backend API
+          const productUrl = item.purchase_url || item.product_url || '';
           
-          console.log(`Item ${index} URL:`, finalUrl);
+          // Create enhanced search URLs if no direct URL provided
+          let finalUrl = productUrl;
           
+          if (!productUrl) {
+            // Create precise search terms from product details
+            const productName = item.product_name || item.name || '';
+            const brand = item.brand || '';
+            const category = item.category || '';
+            
+            // Create targeted search query
+            const searchTerms = [brand, productName, category].filter(term => 
+              term && term !== 'Fashion Brand' && term !== 'Unknown'
+            );
+            const searchQuery = encodeURIComponent(searchTerms.join(' ')).trim();
+            
+            // Enhanced retailer selection based on brand
+            const brandLower = brand.toLowerCase();
+            
+            // Luxury brands -> Farfetch (matches competitor approach)
+            if (brandLower.includes('cinq') || brandLower.includes('sept') || 
+                ['gucci', 'prada', 'versace', 'balenciaga'].some(luxury => brandLower.includes(luxury))) {
+              finalUrl = `https://www.farfetch.com/shopping/search/items.aspx?q=${searchQuery}&storeid=9359`;
+            }
+            // Contemporary/accessible brands -> Nordstrom
+            else {
+              finalUrl = `https://www.nordstrom.com/sr?keyword=${searchQuery}&origin=keywordsearch`;
+            }
+          }
+          
+          // Enhanced click handler
+          const handleProductClick = (e) => {
+            e.preventDefault();
+            
+            if (finalUrl) {
+              // Add analytics tracking if needed
+              console.log(`Clicking product: ${item.product_name || item.name} -> ${finalUrl}`);
+              
+              // Open in new tab (like competitor)
+              window.open(finalUrl, '_blank', 'noopener,noreferrer');
+            } else {
+              console.warn('No URL available for product:', item);
+            }
+          };
+
           return (
-            <motion.div 
-              key={item.product_id || index}
-              className={`collage-item item-${index}`}
-              initial={{ opacity: 0, scale: 0.8 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ duration: 0.4, delay: index * 0.1 }}
-            >
-              <div className="product-card">
-                <div className="image-container">
-                  {item.image_url ? (
-                    <img 
-                      src={item.image_url}
-                      alt={item.product_name || `Fashion item ${index + 1}`}
-                      className="product-image"
-                    />
-                  ) : (
-                    <div className="placeholder-image">
-                      <span>{item.category?.charAt(0) || '?'}</span>
-                    </div>
-                  )}
-                </div>
+            <div key={index} className="outfit-item">
+              <div 
+                className="product-image-container"
+                onClick={handleProductClick}
+                style={{ cursor: finalUrl ? 'pointer' : 'default' }}
+              >
+                <img
+                  src={item.image_url || item.image || '/placeholder-image.jpg'}
+                  alt={item.product_name || item.name || 'Product'}
+                  className="product-image clickable-image"
+                  style={{
+                    border: finalUrl ? '2px solid transparent' : '2px solid #ddd',
+                    transition: 'all 0.2s ease'
+                  }}
+                  onMouseEnter={(e) => {
+                    if (finalUrl) {
+                      e.target.style.border = '2px solid #4a56e2';
+                      e.target.style.transform = 'scale(1.02)';
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (finalUrl) {
+                      e.target.style.border = '2px solid transparent';
+                      e.target.style.transform = 'scale(1)';
+                    }
+                  }}
+                />
                 
-                <div className="product-details">
-                  <h3 className="product-name">{item.product_name || `Item ${index + 1}`}</h3>
-                  {item.brand && <p className="product-brand">{item.brand}</p>}
-                  {item.price && <p className="product-price">${parseFloat(item.price).toFixed(2)}</p>}
-                  
-                  <a 
-                    href={finalUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="shop-button"
-                    onClick={() => console.log("Link clicked for:", item.product_name)}
-                  >
-                    Shop Now
-                  </a>
-                </div>
+                {/* Click indicator overlay */}
+                {finalUrl && (
+                  <div className="click-overlay">
+                    <span className="click-text">Click to Shop</span>
+                  </div>
+                )}
               </div>
-            </motion.div>
+              
+              <div className="product-details">
+                {item.brand && (
+                  <p className="product-brand">{item.brand}</p>
+                )}
+                
+                <h4 className="product-name">
+                  {item.product_name || item.name || 'Stylish Item'}
+                </h4>
+                
+                {item.retailer && (
+                  <p className="product-retailer">Available at {item.retailer}</p>
+                )}
+                
+                {item.price && (
+                  <p className="product-price">
+                    ${typeof item.price === 'number' ? item.price.toFixed(2) : item.price}
+                  </p>
+                )}
+                
+                {/* Enhanced click button like competitor */}
+                {finalUrl && (
+                  <button 
+                    className="shop-button"
+                    onClick={handleProductClick}
+                  >
+                    Visit Site
+                  </button>
+                )}
+              </div>
+            </div>
           );
         })}
       </div>
@@ -102,6 +168,48 @@ const OutfitCollage = ({ outfit, prompt }) => {
         <p>{outfit.description || "A stylish outfit perfect for your occasion."}</p>
         <p className="stylist-rationale">{outfit.stylist_rationale || ""}</p>
         <p className="total-price">Total Price: ${outfit.total_price?.toFixed(2) || "N/A"}</p>
+      </div>
+      
+      {/* Use direct HTML for links to ensure they're clickable */}
+      <div className="product-sources-wrapper">
+        {(() => {
+          // Build HTML string directly
+          let sourceHtml = '';
+          
+          outfit.items.forEach((item, index) => {
+            // Get the item details
+            const category = item.category ? 
+              item.category.charAt(0).toUpperCase() + item.category.slice(1) : 
+              '';
+            
+            // Get retailer name from item
+            const originalRetailerName = item.brand || '';
+            
+            // Create search query using original product details
+            const productName = item.product_name || '';
+            const searchQuery = encodeURIComponent(`${originalRetailerName} ${productName}`).trim();
+            
+            // Always use only Nordstrom and Farfetch (alternating)
+            const nordstromUrl = `https://www.nordstrom.com/sr?keyword=${searchQuery}`;
+            const farfetchUrl = `https://www.farfetch.com/search?q=${searchQuery}`;
+            
+            // Alternate between Nordstrom and Farfetch
+            const retailerUrl = index % 2 === 0 ? nordstromUrl : farfetchUrl;
+            const retailerName = index % 2 === 0 ? "Nordstrom" : "Farfetch";
+            
+            // Add the proper separator based on position
+            const separator = index === 0 ? '' : ', ';
+            
+            // Add this item to the HTML string
+            sourceHtml += `${separator}${category} <a href="${retailerUrl}" target="_blank" rel="noopener noreferrer" class="retailer-link">${retailerName}</a>`;
+          });
+          
+          return (
+            <div className="product-sources">
+              <div dangerouslySetInnerHTML={{ __html: sourceHtml }} />
+            </div>
+          );
+        })()}
       </div>
 
       <div className="style-tags">
@@ -148,7 +256,7 @@ const OutfitCollage = ({ outfit, prompt }) => {
           margin-bottom: 2rem;
         }
 
-        .product-card {
+        .outfit-item {
           background: white;
           border-radius: 12px;
           overflow: hidden;
@@ -159,74 +267,123 @@ const OutfitCollage = ({ outfit, prompt }) => {
           flex-direction: column;
         }
 
-        .product-card:hover {
+        .outfit-item:hover {
           transform: translateY(-5px);
           box-shadow: 0 12px 25px rgba(0, 0, 0, 0.15);
         }
 
-        .image-container {
+        .product-image-container {
+          position: relative;
           height: 300px;
           overflow: hidden;
+          border-radius: 8px;
+          cursor: pointer;
         }
 
         .product-image {
           width: 100%;
           height: 100%;
           object-fit: cover;
+          transition: all 0.3s ease;
         }
 
-        .placeholder-image {
+        .product-image:hover {
+          transform: scale(1.05);
+        }
+
+        .clickable-image {
+          cursor: pointer;
+        }
+
+        .click-overlay {
+          position: absolute;
+          top: 0;
+          left: 0;
+          width: 100%;
           height: 100%;
+          background: rgba(0, 0, 0, 0.6);
           display: flex;
           align-items: center;
           justify-content: center;
-          background: linear-gradient(45deg, #f0f0f0, #e0e0e0);
-          font-size: 3rem;
-          color: #a0aec0;
+          opacity: 0;
+          transition: opacity 0.3s ease;
+          border-radius: 8px;
+        }
+
+        .product-image-container:hover .click-overlay {
+          opacity: 1;
+        }
+
+        .click-text {
+          color: white;
+          font-size: 1.2rem;
           font-weight: 600;
+          text-transform: uppercase;
+          letter-spacing: 1px;
+          text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
         }
 
         .product-details {
-          padding: 1.5rem;
-          display: flex;
-          flex-direction: column;
-          flex-grow: 1;
-        }
-
-        .product-name {
-          font-size: 1.2rem;
-          margin: 0 0 0.5rem;
-          font-weight: 500;
+          padding: 20px;
+          text-align: center;
         }
 
         .product-brand {
           color: #666;
-          margin: 0 0 0.5rem;
+          margin: 0 0 8px;
           font-size: 0.9rem;
+          font-weight: 500;
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
+        }
+
+        .product-name {
+          margin: 0 0 8px;
+          font-size: 1.1rem;
+          font-weight: 600;
+          color: #2d3748;
+          line-height: 1.4;
+        }
+
+        .product-retailer {
+          color: #4a56e2;
+          margin: 0 0 8px;
+          font-size: 0.85rem;
+          font-weight: 500;
         }
 
         .product-price {
-          font-weight: 600;
-          font-size: 1.1rem;
-          margin: 0 0 1rem;
+          font-weight: 700;
+          font-size: 1.3rem;
+          margin: 0 0 15px;
+          color: #e53e3e;
         }
 
         .shop-button {
-          background-color: #4a56e2;
+          background: linear-gradient(45deg, #4a56e2, #667eea);
           color: white;
-          padding: 0.8rem 1rem;
+          border: none;
+          padding: 12px 24px;
           border-radius: 8px;
-          text-align: center;
-          font-weight: 500;
-          margin-top: auto;
-          text-decoration: none;
-          transition: background-color 0.2s ease;
+          font-weight: 600;
           cursor: pointer;
-          display: block;
+          transition: all 0.3s ease;
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
+          font-size: 0.9rem;
+          width: 100%;
+          margin-top: 10px;
         }
 
         .shop-button:hover {
-          background-color: #3a46d2;
+          background: linear-gradient(45deg, #3a46d2, #5570da);
+          transform: translateY(-2px);
+          box-shadow: 0 8px 20px rgba(74, 86, 226, 0.4);
+        }
+
+        .shop-button:active {
+          transform: translateY(0);
+          box-shadow: 0 4px 12px rgba(74, 86, 226, 0.3);
         }
 
         .outfit-description {
@@ -300,6 +457,30 @@ const OutfitCollage = ({ outfit, prompt }) => {
           .collage-grid {
             grid-template-columns: 1fr;
           }
+        }
+
+        .product-sources-wrapper {
+          margin: 1.5rem 0;
+        }
+        
+        .product-sources {
+          text-align: center;
+          line-height: 1.8;
+          color: #333;
+          font-size: 1rem;
+          padding: 0 1rem;
+          font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        }
+        
+        .retailer-link {
+          color: #0066cc;
+          text-decoration: underline;
+          cursor: pointer;
+        }
+        
+        .retailer-link:hover {
+          color: #0044aa;
+          background-color: rgba(0,0,0,0.05);
         }
       `}</style>
     </div>

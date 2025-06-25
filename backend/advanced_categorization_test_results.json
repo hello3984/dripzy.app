@@ -1,0 +1,328 @@
+{
+  "basic_queries": {
+    "black dress for date night": {
+      "detected_category": "dress",
+      "targeted_websites": [
+        "asos.com",
+        "zara.com",
+        "revolve.com",
+        "nordstrom.com",
+        "nastygal.com",
+        "freepeople.com",
+        "anthropologie.com",
+        "amazon.com"
+      ],
+      "optimized_query": "black dress for date night (site:asos.com OR site:zara.com OR site:revolve.com OR site:nordstrom.com OR site:nastygal.com)",
+      "implementation": "website_categories.py",
+      "relevance_score": 5
+    },
+    "men's blue suit for office": {
+      "detected_category": "suit",
+      "targeted_websites": [
+        "macys.com",
+        "nordstrom.com",
+        "zara.com",
+        "suitsupply.com",
+        "jcrew.com",
+        "bananarepublic.com",
+        "amazon.com",
+        "brooksbrothers.com"
+      ],
+      "optimized_query": "men's blue suit for office (site:macys.com OR site:nordstrom.com OR site:zara.com OR site:suitsupply.com OR site:jcrew.com)",
+      "implementation": "website_categories.py",
+      "relevance_score": 5
+    },
+    "comfortable running shoes": {
+      "detected_category": "shoes",
+      "targeted_websites": [
+        "zappos.com",
+        "dsw.com",
+        "nordstrom.com",
+        "nike.com",
+        "adidas.com",
+        "footlocker.com",
+        "amazon.com"
+      ],
+      "optimized_query": "comfortable running shoes (site:zappos.com OR site:dsw.com OR site:nordstrom.com OR site:nike.com OR site:adidas.com)",
+      "implementation": "website_categories.py",
+      "relevance_score": 5
+    }
+  },
+  "brand_specific_queries": {
+    "nike running shoes": {
+      "detected_category": "shoes",
+      "targeted_websites": [
+        "nike.com",
+        "footlocker.com",
+        "dickssportinggoods.com",
+        "zappos.com",
+        "finishline.com",
+        "dsw.com",
+        "nordstrom.com",
+        "adidas.com",
+        "amazon.com"
+      ],
+      "optimized_query": "nike running shoes (site:nike.com OR site:footlocker.com OR site:dickssportinggoods.com OR site:zappos.com OR site:finishline.com)",
+      "implementation": "website_categories.py",
+      "relevance_score": 6
+    },
+    "levi's jeans": {
+      "detected_category": "jeans",
+      "targeted_websites": [
+        "levis.com",
+        "macys.com",
+        "nordstrom.com",
+        "zappos.com",
+        "amazon.com",
+        "zara.com",
+        "asos.com",
+        "abercrombie.com",
+        "gap.com",
+        "madewell.com"
+      ],
+      "optimized_query": "levi's jeans (site:levis.com OR site:macys.com OR site:nordstrom.com OR site:zappos.com OR site:amazon.com)",
+      "implementation": "website_categories.py",
+      "relevance_score": 6
+    },
+    "zara summer dress": {
+      "detected_category": "dress",
+      "targeted_websites": [
+        "zara.com",
+        "inditex.com",
+        "nordstrom.com",
+        "asos.com",
+        "revolve.com",
+        "nastygal.com",
+        "freepeople.com",
+        "anthropologie.com",
+        "amazon.com"
+      ],
+      "optimized_query": "zara summer dress (site:zara.com OR site:inditex.com OR site:nordstrom.com OR site:asos.com OR site:revolve.com)",
+      "implementation": "website_categories.py",
+      "relevance_score": 6
+    }
+  },
+  "style_specific_queries": {
+    "bohemian maxi dress": {
+      "detected_category": "dress",
+      "targeted_websites": [
+        "asos.com",
+        "zara.com",
+        "revolve.com",
+        "nordstrom.com",
+        "nastygal.com",
+        "freepeople.com",
+        "anthropologie.com",
+        "urbanoutfitters.com",
+        "amazon.com"
+      ],
+      "optimized_query": "bohemian maxi dress (site:asos.com OR site:zara.com OR site:revolve.com OR site:nordstrom.com OR site:nastygal.com)",
+      "implementation": "website_categories.py",
+      "style": "bohemian",
+      "relevance_score": 5
+    },
+    "minimalist black blazer": {
+      "detected_category": "blazer",
+      "targeted_websites": [
+        "zara.com",
+        "nordstrom.com",
+        "jcrew.com",
+        "bananarepublic.com",
+        "hugoboss.com",
+        "uniqlo.com",
+        "cos.com",
+        "everlane.com",
+        "arket.com",
+        "muji.com"
+      ],
+      "optimized_query": "minimalist black blazer (site:zara.com OR site:nordstrom.com OR site:jcrew.com OR site:bananarepublic.com OR site:hugoboss.com)",
+      "implementation": "website_categories.py",
+      "style": "minimalist",
+      "relevance_score": 5
+    },
+    "vintage leather jacket": {
+      "detected_category": "jacket",
+      "targeted_websites": [
+        "asos.com",
+        "zara.com",
+        "nordstrom.com",
+        "revolve.com",
+        "macys.com",
+        "etsy.com",
+        "depop.com",
+        "thredup.com",
+        "poshmark.com",
+        "urbanoutfitters.com"
+      ],
+      "optimized_query": "vintage leather jacket (site:asos.com OR site:zara.com OR site:nordstrom.com OR site:revolve.com OR site:macys.com)",
+      "implementation": "website_categories.py",
+      "style": "vintage",
+      "relevance_score": 5
+    }
+  },
+  "price_range_queries": {
+    "affordable casual shoes": {
+      "detected_category": "shoes",
+      "targeted_websites": [
+        "amazon.com",
+        "oldnavy.com",
+        "hm.com",
+        "forever21.com",
+        "target.com",
+        "gap.com",
+        "zappos.com",
+        "dsw.com",
+        "nordstrom.com",
+        "nike.com"
+      ],
+      "optimized_query": "affordable casual shoes (site:amazon.com OR site:oldnavy.com OR site:hm.com OR site:forever21.com OR site:target.com)",
+      "implementation": "website_categories.py",
+      "budget": "low",
+      "relevance_score": 7
+    },
+    "luxury handbag": {
+      "detected_category": "bag",
+      "targeted_websites": [
+        "neimanmarcus.com",
+        "saksfifthavenue.com",
+        "bloomingdales.com",
+        "farfetch.com",
+        "net-a-porter.com",
+        "nordstrom.com",
+        "macys.com",
+        "coach.com",
+        "rebeccaminkoff.com",
+        "zappos.com"
+      ],
+      "optimized_query": "luxury handbag (site:neimanmarcus.com OR site:saksfifthavenue.com OR site:bloomingdales.com OR site:farfetch.com OR site:net-a-porter.com)",
+      "implementation": "website_categories.py",
+      "budget": "luxury",
+      "relevance_score": 7
+    },
+    "mid-range women's watch": {
+      "detected_category": "watch",
+      "targeted_websites": [
+        "gap.com",
+        "asos.com",
+        "zara.com",
+        "uniqlo.com",
+        "abercrombie.com",
+        "jcrew.com",
+        "nordstrom.com",
+        "macys.com",
+        "fossil.com",
+        "timex.com"
+      ],
+      "optimized_query": "mid-range women's watch (site:gap.com OR site:asos.com OR site:zara.com OR site:uniqlo.com OR site:abercrombie.com)",
+      "implementation": "website_categories.py",
+      "budget": "medium",
+      "relevance_score": 7
+    }
+  },
+  "multi_feature_queries": {
+    "affordable bohemian summer dress": {
+      "detected_category": "dress",
+      "targeted_websites": [
+        "amazon.com",
+        "oldnavy.com",
+        "hm.com",
+        "forever21.com",
+        "target.com",
+        "gap.com",
+        "asos.com",
+        "zara.com",
+        "revolve.com",
+        "nordstrom.com"
+      ],
+      "optimized_query": "affordable bohemian summer dress (site:amazon.com OR site:oldnavy.com OR site:hm.com OR site:forever21.com OR site:target.com)",
+      "implementation": "website_categories.py",
+      "style": "bohemian",
+      "budget": "low",
+      "relevance_score": 7
+    },
+    "high-end men's suit for wedding": {
+      "detected_category": "suit",
+      "targeted_websites": [
+        "nordstrom.com",
+        "bananarepublic.com",
+        "jcrew.com",
+        "anthropologie.com",
+        "revolve.com",
+        "macys.com",
+        "zara.com",
+        "suitsupply.com",
+        "asos.com",
+        "endclothing.com"
+      ],
+      "optimized_query": "high-end men's suit for wedding (site:nordstrom.com OR site:bananarepublic.com OR site:jcrew.com OR site:anthropologie.com OR site:revolve.com)",
+      "implementation": "website_categories.py",
+      "budget": "high",
+      "relevance_score": 7
+    },
+    "casual nike sneakers under $100": {
+      "detected_category": "sneakers",
+      "targeted_websites": [
+        "nike.com",
+        "footlocker.com",
+        "dickssportinggoods.com",
+        "zappos.com",
+        "finishline.com",
+        "gap.com",
+        "asos.com",
+        "zara.com",
+        "uniqlo.com",
+        "abercrombie.com"
+      ],
+      "optimized_query": "casual nike sneakers under $100 (site:nike.com OR site:footlocker.com OR site:dickssportinggoods.com OR site:zappos.com OR site:finishline.com)",
+      "implementation": "website_categories.py",
+      "style": "casual",
+      "budget": "medium",
+      "relevance_score": 6
+    }
+  },
+  "edge_cases": {
+    "unique outfit for music festival": {
+      "detected_category": null,
+      "targeted_websites": [
+        "freepeople.com",
+        "urbanoutfitters.com",
+        "asos.com",
+        "revolve.com",
+        "amazon.com"
+      ],
+      "optimized_query": "unique outfit for music festival (site:freepeople.com OR site:urbanoutfitters.com OR site:asos.com OR site:revolve.com OR site:amazon.com)",
+      "implementation": "website_categories.py",
+      "relevance_score": 5
+    },
+    "something blue to wear": {
+      "detected_category": null,
+      "targeted_websites": [
+        "amazon.com",
+        "nordstrom.com",
+        "macys.com",
+        "zappos.com",
+        "target.com",
+        "urbanoutfitters.com"
+      ],
+      "optimized_query": "something blue to wear (site:amazon.com OR site:nordstrom.com OR site:macys.com OR site:zappos.com OR site:target.com)",
+      "implementation": "website_categories.py",
+      "relevance_score": 5
+    },
+    "trendy accessories": {
+      "detected_category": "accessories",
+      "targeted_websites": [
+        "asos.com",
+        "zara.com",
+        "urbanoutfitters.com",
+        "mango.com",
+        "nordstrom.com",
+        "amazon.com",
+        "shopbop.com",
+        "revolve.com"
+      ],
+      "optimized_query": "trendy accessories (site:asos.com OR site:zara.com OR site:urbanoutfitters.com OR site:mango.com OR site:nordstrom.com)",
+      "implementation": "website_categories.py",
+      "relevance_score": 5
+    }
+  }
+}
