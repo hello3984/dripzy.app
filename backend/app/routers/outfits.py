@@ -2667,6 +2667,8 @@ def _determine_retailer_choice(prompt: str, style: str, budget: float, brand: st
         "confidence": confidence,
         "score": farfetch_score,
         "reasoning": f"{retailer_reasoning}. " + "; ".join(reasons),
+        "original_prompt": prompt.lower(),  # ADD: Original prompt for theme detection
+        "style_context": style.lower(),     # ADD: Style context for URL generation
         "factors": {
             "keyword_score": keyword_score,
             "style_score": style_score, 
@@ -2678,96 +2680,283 @@ def _determine_retailer_choice(prompt: str, style: str, budget: float, brand: st
 
 def _generate_smart_product_url(brand: str, product_name: str, description: str, retailer_choice: Dict[str, Any]) -> str:
     """
-    Generate optimized product URLs based on retailer choice and product details.
-    Uses realistic search terms that will actually return results on retail sites.
+    Generate THEME-AWARE, BUDGET-CONSCIOUS product URLs that match context and user intent.
+    Creates search terms that reflect the actual style, occasion, and sophistication level.
     
     Args:
         brand: Product brand
         product_name: Product name  
         description: Product description
-        retailer_choice: Output from _determine_retailer_choice
+        retailer_choice: Output from _determine_retailer_choice (contains prompt context)
         
     Returns:
-        Optimized product URL with realistic search terms
+        Contextual product URL with theme-aware search terms
     """
     
-    # SMART URL GENERATION: Use general terms that will find real products
-    # Extract key category terms from description
-    description_lower = description.lower() if description else ""
+    # EXTRACT CONTEXT from retailer choice (contains original prompt)
+    original_prompt = retailer_choice.get("original_prompt", "").lower()
+    style_context = retailer_choice.get("style_context", "").lower()
+    prompt_context = f"{original_prompt} {style_context}".strip()
+    is_luxury_context = retailer_choice["retailer"] == "farfetch"
+    budget_level = "high" if retailer_choice.get("score", 0) > 10 else "mid" if retailer_choice.get("score", 0) > -5 else "accessible"
     
-    # Map specific descriptions to general search terms that work
-    category_mapping = {
-        # Tops
-        "shirt": "shirt", "blouse": "blouse", "top": "top", "tee": "tee", 
-        "t-shirt": "tshirt", "crop": "crop top", "tank": "tank top",
+    # THEME-AWARE SEARCH TERM MAPPING
+    # Maps themes to contextual search terms that find relevant products
+    theme_context_mapping = {
+        # Beach/Vacation Themes
+        "beach": {
+            "dress": ["sundress", "beach dress", "vacation dress", "resort wear"],
+            "top": ["beach top", "vacation shirt", "resort blouse", "summer top"],
+            "shorts": ["beach shorts", "vacation shorts", "resort shorts", "summer shorts"],
+            "sandals": ["beach sandals", "vacation sandals", "resort sandals", "summer sandals"],
+            "bag": ["beach bag", "vacation tote", "resort bag", "summer purse"],
+            "swimwear": ["swimsuit", "bikini", "beach wear", "swim wear"]
+        },
         
-        # Bottoms  
-        "jeans": "jeans", "pants": "pants", "shorts": "shorts", "skirt": "skirt",
-        "trousers": "trousers", "leggings": "leggings",
+        # Professional/Office Themes  
+        "office": {
+            "dress": ["work dress", "office dress", "professional dress", "business dress"],
+            "blazer": ["work blazer", "office jacket", "professional blazer", "business jacket"],
+            "shirt": ["work shirt", "office blouse", "professional top", "business shirt"],
+            "pants": ["work pants", "office trousers", "professional pants", "business pants"],
+            "shoes": ["work shoes", "office heels", "professional pumps", "business shoes"],
+            "bag": ["work bag", "office tote", "professional handbag", "business bag"]
+        },
         
-        # Dresses
-        "dress": "dress", "midi": "midi dress", "maxi": "maxi dress",
+        # Evening/Formal Themes
+        "evening": {
+            "dress": ["evening dress", "cocktail dress", "formal dress", "party dress"],
+            "top": ["evening top", "cocktail blouse", "formal shirt", "party top"],
+            "shoes": ["evening heels", "cocktail shoes", "formal pumps", "party heels"],
+            "bag": ["evening bag", "cocktail purse", "formal clutch", "party bag"],
+            "jewelry": ["evening jewelry", "cocktail earrings", "formal necklace", "party accessories"]
+        },
         
-        # Shoes
-        "sandals": "sandals", "heels": "heels", "boots": "boots", 
-        "sneakers": "sneakers", "flats": "flats", "pumps": "pumps",
+        # Casual/Weekend Themes
+        "casual": {
+            "dress": ["casual dress", "weekend dress", "everyday dress", "relaxed dress"],
+            "top": ["casual top", "weekend shirt", "everyday tee", "relaxed blouse"],
+            "jeans": ["casual jeans", "weekend denim", "everyday jeans", "relaxed pants"],
+            "sneakers": ["casual sneakers", "weekend shoes", "everyday sneakers", "comfortable shoes"],
+            "bag": ["casual bag", "weekend tote", "everyday purse", "relaxed bag"]
+        },
         
-        # Outerwear
-        "jacket": "jacket", "blazer": "blazer", "coat": "coat", 
-        "cardigan": "cardigan", "sweater": "sweater",
-        
-        # Accessories
-        "bag": "bag", "handbag": "handbag", "necklace": "necklace",
-        "earrings": "earrings", "watch": "watch", "bracelet": "bracelet"
+        # Festival/Event Themes
+        "festival": {
+            "dress": ["festival dress", "boho dress", "music festival dress", "event dress"],
+            "top": ["festival top", "boho blouse", "music festival shirt", "event top"],
+            "shorts": ["festival shorts", "boho shorts", "music festival shorts", "event shorts"],
+            "boots": ["festival boots", "boho boots", "music festival shoes", "event boots"],
+            "accessories": ["festival accessories", "boho jewelry", "music festival bag", "event accessories"]
+        }
     }
     
-    # Find the most relevant category term
-    search_category = ""
-    for key, value in category_mapping.items():
-        if key in description_lower:
-            search_category = value
+    # DETECT THEME from context
+    detected_theme = "casual"  # default
+    if any(word in prompt_context for word in ["beach", "vacation", "resort", "summer"]):
+        detected_theme = "beach"
+    elif any(word in prompt_context for word in ["office", "work", "professional", "business"]):
+        detected_theme = "office"  
+    elif any(word in prompt_context for word in ["evening", "cocktail", "formal", "party"]):
+        detected_theme = "evening"
+    elif any(word in prompt_context for word in ["festival", "boho", "music", "coachella"]):
+        detected_theme = "festival"
+    
+    # EXTRACT CATEGORY from description/product_name
+    category_detected = "clothing"  # default
+    search_text = f"{description} {product_name}".lower()
+    
+    category_keywords = {
+        "dress": ["dress", "midi", "maxi", "gown"],
+        "top": ["top", "shirt", "blouse", "tee", "tank", "crop"],
+        "shorts": ["shorts"], 
+        "pants": ["pants", "trousers", "jeans"],
+        "shoes": ["shoes", "heels", "boots", "sandals", "sneakers", "flats", "pumps"],
+        "bag": ["bag", "handbag", "purse", "tote", "clutch"],
+        "blazer": ["blazer", "jacket", "coat"],
+        "jewelry": ["jewelry", "necklace", "earrings", "bracelet", "watch"],
+        "swimwear": ["swimsuit", "bikini", "swim"]
+    }
+    
+    for category, keywords in category_keywords.items():
+        if any(keyword in search_text for keyword in keywords):
+            category_detected = category
             break
     
-    # If no specific category found, extract from product_name
-    if not search_category:
-        product_lower = product_name.lower() if product_name else ""
-        for key, value in category_mapping.items():
-            if key in product_lower:
-                search_category = value
-                break
+    # BUILD CONTEXTUAL SEARCH TERMS
+    theme_terms = theme_context_mapping.get(detected_theme, {})
+    contextual_terms = theme_terms.get(category_detected, [])
     
-    # Build realistic search terms
     retailer = retailer_choice["retailer"]
     
     if retailer == "farfetch":
-        # Farfetch: Focus on brand + general category for luxury items
-        if search_category and brand:
-            search_terms = f"{brand} {search_category}"
-        elif brand:
-            search_terms = brand
+        # FARFETCH: Luxury/Designer focus with sophisticated terms
+        if contextual_terms and is_luxury_context:
+            # Use most sophisticated term + brand for luxury context
+            base_term = contextual_terms[0] if contextual_terms else category_detected
+            if brand and brand not in ["H&M", "Zara", "Gap"]:  # Skip basic brands on luxury sites
+                search_terms = f"designer {base_term} {brand}"
+            else:
+                search_terms = f"designer {base_term}"
         else:
-            search_terms = search_category or "designer"
+            # Fallback for luxury context
+            search_terms = f"designer {category_detected}"
             
-        # Clean for URL
-        search_query = search_terms.replace(" ", "+")
-        return f"https://www.farfetch.com/shopping/search/items.aspx?q={search_query}&storeid=9359"
-        
     else:
-        # Nordstrom: Focus on general category + brand for broader results
-        if search_category and brand:
-            # For accessible brands, lead with category for better results
-            search_terms = f"{search_category} {brand}"
-        elif search_category:
-            search_terms = search_category
-        elif brand:
-            search_terms = brand
+        # NORDSTROM: Accessible with theme-aware terms
+        if contextual_terms:
+            # Use contextual term + brand for better results
+            base_term = contextual_terms[1] if len(contextual_terms) > 1 else contextual_terms[0]
+            if brand:
+                search_terms = f"{base_term} {brand}"
+            else:
+                search_terms = base_term
         else:
-            search_terms = "clothing"
-            
-        # Clean for URL  
-        search_query = search_terms.replace(" ", "+")
+            # Fallback with basic terms
+            if brand:
+                search_terms = f"{category_detected} {brand}"  
+            else:
+                search_terms = category_detected
+    
+    # ADD BUDGET-LEVEL QUALIFIERS
+    if budget_level == "high" and retailer == "nordstrom":
+        search_terms = f"premium {search_terms}"
+    elif budget_level == "accessible" and retailer == "farfetch":
+        search_terms = f"contemporary {search_terms}"
+    
+    # CLEAN AND BUILD FINAL URL
+    search_query = search_terms.replace(" ", "+").replace("++", "+")
+    
+    if retailer == "farfetch":
+        return f"https://www.farfetch.com/shopping/search/items.aspx?q={search_query}&storeid=9359"
+    else:
         return f"https://www.nordstrom.com/sr?keyword={search_query}&origin=keywordsearch"
 
+
+@router.get("/debug/theme-aware-search-terms")
+async def debug_theme_aware_search_terms():
+    """
+    Test endpoint to demonstrate THEME-AWARE, BUDGET-CONSCIOUS search term generation.
+    Shows how different themes, budgets, and contexts create appropriate search terms.
+    """
+    try:
+        test_scenarios = [
+            {
+                "name": "Beach Vacation - Luxury Budget",
+                "prompt": "Beach vacation elegant resort wear", 
+                "style": "resort",
+                "budget": 800,
+                "items": [
+                    {"category": "dress", "description": "flowy maxi dress", "brand": "Zimmermann"},
+                    {"category": "sandals", "description": "leather sandals", "brand": "Ancient Greek Sandals"}
+                ]
+            },
+            {
+                "name": "Beach Vacation - Accessible Budget",
+                "prompt": "Beach vacation casual summer fun",
+                "style": "casual", 
+                "budget": 200,
+                "items": [
+                    {"category": "top", "description": "crop top", "brand": "H&M"},
+                    {"category": "shorts", "description": "denim shorts", "brand": "Gap"}
+                ]
+            },
+            {
+                "name": "Office Professional",
+                "prompt": "Professional office business attire",
+                "style": "business",
+                "budget": 500,
+                "items": [
+                    {"category": "blazer", "description": "tailored blazer", "brand": "Theory"},
+                    {"category": "dress", "description": "midi dress", "brand": "Ann Taylor"}
+                ]
+            },
+            {
+                "name": "Evening Cocktail Party",
+                "prompt": "Elegant evening cocktail party sophisticated",
+                "style": "evening",
+                "budget": 1000,
+                "items": [
+                    {"category": "dress", "description": "cocktail dress", "brand": "Self-Portrait"},
+                    {"category": "shoes", "description": "heels", "brand": "Jimmy Choo"}
+                ]
+            },
+            {
+                "name": "Festival Boho",
+                "prompt": "Coachella festival boho vibes music",
+                "style": "festival",
+                "budget": 300,
+                "items": [
+                    {"category": "dress", "description": "boho dress", "brand": "Free People"},
+                    {"category": "boots", "description": "ankle boots", "brand": "Steve Madden"}
+                ]
+            }
+        ]
+        
+        results = []
+        for scenario in test_scenarios:
+            # Get retailer choice for this scenario
+            retailer_choice = _determine_retailer_choice(
+                prompt=scenario["prompt"],
+                style=scenario["style"], 
+                budget=scenario["budget"],
+                brand="",
+                category=""
+            )
+            
+            # Generate URLs for each item
+            item_results = []
+            for item in scenario["items"]:
+                smart_url = _generate_smart_product_url(
+                    brand=item["brand"],
+                    product_name=f"{item['category']} item",
+                    description=item["description"],
+                    retailer_choice=retailer_choice
+                )
+                
+                # Extract just the search query for display
+                if "nordstrom.com" in smart_url:
+                    search_query = smart_url.split("keyword=")[1].split("&")[0].replace("+", " ")
+                elif "farfetch.com" in smart_url:
+                    search_query = smart_url.split("q=")[1].split("&")[0].replace("+", " ")
+                else:
+                    search_query = "unknown"
+                
+                item_results.append({
+                    "item": f"{item['brand']} {item['description']}",
+                    "retailer": retailer_choice["retailer_name"],
+                    "search_term": search_query,
+                    "url_preview": smart_url[:80] + "..."
+                })
+            
+            results.append({
+                "scenario": scenario["name"],
+                "context": {
+                    "prompt": scenario["prompt"],
+                    "style": scenario["style"],
+                    "budget": scenario["budget"]
+                },
+                "retailer_analysis": {
+                    "chosen_retailer": retailer_choice["retailer_name"],
+                    "confidence": f"{retailer_choice['confidence']:.1%}",
+                    "score": retailer_choice["score"]
+                },
+                "search_terms": item_results
+            })
+        
+        return {
+            "description": "THEME-AWARE & BUDGET-CONSCIOUS Search Term Generation",
+            "improvement": "Instead of generic 'brand category' terms, we now generate contextual search terms that match the user's actual intent and theme",
+            "examples": {
+                "old_approach": "shorts Gap → generic results",
+                "new_approach": "beach vacation shorts → relevant summer/resort results"
+            },
+            "test_results": results
+        }
+        
+    except Exception as e:
+        logger.error(f"Error in theme-aware search terms debug: {e}")
+        return {"error": str(e)}
 
 @router.get("/debug/smart-retailer-logic")
 async def debug_smart_retailer_logic():
