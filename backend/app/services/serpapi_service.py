@@ -287,10 +287,15 @@ class SerpAPIService:
             # Extract price as a float
             price = self._extract_price(result.get("price", "0"))
             
-            # Get direct product URL with better extraction
-            product_url = self._extract_product_url(result)
+            # ENHANCED URL STRATEGY: Always create retailer search URLs
+            # SerpAPI often doesn't provide direct product URLs, so we create our own
+            product_url = self._create_direct_retailer_product_url(result, category)
             
-            # If no direct URL available, create smart retailer URLs
+            # Fallback: Try to extract from SerpAPI if direct creation fails
+            if not product_url:
+                product_url = self._extract_product_url(result)
+            
+            # Final fallback: Create smart retailer search URLs
             if not product_url:
                 product_url = self._create_smart_retailer_url(result, category)
             
@@ -446,18 +451,643 @@ class SerpAPIService:
         return False
     
     def _get_best_image_url(self, result: Dict[str, Any]) -> str:
-        """Get the best quality image URL from the result."""
-        # Try different image fields in order of preference
+        """Get the highest quality product image URL - prioritizing actual retailer images."""
+        
+        # PRIORITY 1: Try to extract actual retailer product images
+        product_url = self._extract_product_url(result)
+        if product_url and self._is_real_retailer_url(product_url):
+            actual_image = self._extract_retailer_product_image(product_url, result)
+            if actual_image:
+                logger.info(f"✅ Found actual retailer image: {actual_image[:60]}...")
+                return actual_image
+        
+        # PRIORITY 2: Look for high-quality images in SerpAPI data
+        high_quality_image = self._find_high_quality_serpapi_image(result)
+        if high_quality_image:
+            logger.info(f"✅ Found high-quality SerpAPI image: {high_quality_image[:60]}...")
+            return high_quality_image
+        
+        # PRIORITY 3: Standard SerpAPI thumbnails as fallback
         image_fields = ["thumbnail", "image", "images"]
         
         for field in image_fields:
             if field in result and result[field]:
                 image_url = result[field]
-                # If it's a list, take the first one
                 if isinstance(image_url, list) and image_url:
+                    logger.info(f"🔄 Using SerpAPI thumbnail: {image_url[0][:60]}...")
                     return image_url[0]
                 elif isinstance(image_url, str):
+                    logger.info(f"🔄 Using SerpAPI thumbnail: {image_url[:60]}...")
                     return image_url
+        
+        # PRIORITY 4: Generate high-quality placeholder
+        title = result.get("title", "Product")
+        category = result.get("category", "Fashion")
+        placeholder_url = f"https://via.placeholder.com/400x500/f8f9fa/333333?text={urllib.parse.quote(title[:20])}"
+        logger.warning(f"⚠️ No images found, using placeholder: {placeholder_url}")
+        return placeholder_url
+    
+    def _extract_retailer_product_image(self, product_url: str, result: Dict[str, Any]) -> str:
+        """Extract actual product image from retailer website using real-time scraping."""
+        try:
+            url_domain = self._extract_domain(product_url)
+            
+            # PRIORITY 1: Try to scrape actual product image from retailer page
+            scraped_image = self._scrape_product_image_from_url(product_url, url_domain)
+            if scraped_image:
+                logger.info(f"🔥 SCRAPED ACTUAL RETAILER IMAGE: {scraped_image[:60]}...")
+                return scraped_image
+            
+            # PRIORITY 2: Look for better images in SerpAPI result linked to retailer
+            all_images = []
+            
+            # Collect all possible image URLs
+            for field in ["thumbnail", "image", "images", "rich_snippet"]:
+                field_data = result.get(field)
+                if field_data:
+                    if isinstance(field_data, list):
+                        all_images.extend([img for img in field_data if isinstance(img, str)])
+                    elif isinstance(field_data, str):
+                        all_images.append(field_data)
+                    elif isinstance(field_data, dict):
+                        # Sometimes images are nested in objects
+                        for key, value in field_data.items():
+                            if key in ["image", "thumbnail", "url"] and isinstance(value, str):
+                                all_images.append(value)
+            
+            # Filter for high-quality images (larger dimensions or better domains)
+            for image_url in all_images:
+                if self._is_high_quality_image(image_url, url_domain):
+                    logger.info(f"📸 FOUND HIGH-QUALITY SERPAPI IMAGE: {image_url[:60]}...")
+                    return image_url
+            
+            # PRIORITY 3: Construct direct retailer image URL using patterns
+            constructed_image = self._construct_retailer_image_url(product_url, result)
+            if constructed_image:
+                logger.info(f"🔧 CONSTRUCTED RETAILER IMAGE: {constructed_image[:60]}...")
+                return constructed_image
+            
+            return ""
+            
+        except Exception as e:
+            logger.error(f"Error extracting retailer image from {product_url}: {str(e)}")
+            return ""
+    
+    def _scrape_product_image_from_url(self, product_url: str, domain: str) -> str:
+        """Scrape actual product image from retailer website."""
+        try:
+            # Quick implementation for major retailers
+            # In production, you'd want more robust scraping with proper headers, delays, etc.
+            
+            import httpx
+            import re
+            from bs4 import BeautifulSoup
+            
+            # Set up headers to mimic a real browser
+            headers = {
+                'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+                'Accept-Language': 'en-US,en;q=0.5',
+                'Accept-Encoding': 'gzip, deflate',
+                'Connection': 'keep-alive',
+                'Upgrade-Insecure-Requests': '1'
+            }
+            
+            # Quick scrape with timeout to avoid blocking the API
+            with httpx.Client(timeout=5.0, headers=headers) as client:
+                response = client.get(product_url)
+                if response.status_code == 200:
+                    soup = BeautifulSoup(response.text, 'html.parser')
+                    
+                    # Retailer-specific image selectors
+                    image_selectors = {
+                        "nordstrom.com": [
+                            'img[data-testid="product-image"]',
+                            'img[class*="product-image"]',
+                            'img[class*="ProductImage"]',
+                            'img[alt*="product"]'
+                        ],
+                        "farfetch.com": [
+                            'img[data-testid="product-image"]',
+                            'img[class*="ProductImage"]',
+                            'img[class*="product-shot"]',
+                            'picture img'
+                        ],
+                        "amazon.com": [
+                            '#landingImage',
+                            'img[data-a-image-name="landingImage"]',
+                            'img[class*="product-image"]',
+                            'img[id*="product"]'
+                        ],
+                        "zara.com": [
+                            'img[class*="product-detail-image"]',
+                            'img[class*="media-image"]',
+                            'picture img'
+                        ]
+                    }
+                    
+                    # Try retailer-specific selectors
+                    for retailer_domain, selectors in image_selectors.items():
+                        if retailer_domain in domain:
+                            for selector in selectors:
+                                img_element = soup.select_one(selector)
+                                if img_element:
+                                    img_src = img_element.get('src') or img_element.get('data-src')
+                                    if img_src:
+                                        # Make sure it's a full URL
+                                        if img_src.startswith('//'):
+                                            img_src = 'https:' + img_src
+                                        elif img_src.startswith('/'):
+                                            img_src = f"https://{domain}{img_src}"
+                                        
+                                        # Validate it's a good image URL
+                                        if self._is_valid_product_image_url(img_src):
+                                            return img_src
+                    
+                    # Fallback: look for any high-quality product images
+                    all_imgs = soup.find_all('img')
+                    for img in all_imgs:
+                        img_src = img.get('src') or img.get('data-src')
+                        if img_src and self._is_valid_product_image_url(img_src):
+                            alt_text = img.get('alt', '').lower()
+                            # Check if it looks like a product image
+                            if any(keyword in alt_text for keyword in ['product', 'item', 'clothing', 'shirt', 'dress', 'shoes', 'bag']):
+                                if img_src.startswith('//'):
+                                    img_src = 'https:' + img_src
+                                elif img_src.startswith('/'):
+                                    img_src = f"https://{domain}{img_src}"
+                                return img_src
+                                
+        except Exception as e:
+            logger.warning(f"Could not scrape image from {product_url}: {str(e)}")
+        
+        return ""
+    
+    def _is_valid_product_image_url(self, img_src: str) -> bool:
+        """Check if an image URL looks like a valid product image."""
+        if not img_src or not isinstance(img_src, str):
+            return False
+        
+        img_lower = img_src.lower()
+        
+        # Must be a proper image URL
+        if not any(ext in img_lower for ext in ['.jpg', '.jpeg', '.png', '.webp']):
+            return False
+        
+        # Exclude obvious non-product images
+        exclude_indicators = [
+            'logo', 'icon', 'banner', 'header', 'footer', 'nav', 'menu',
+            'social', 'facebook', 'twitter', 'instagram', 'pinterest',
+            'newsletter', 'email', 'search', 'cart', 'checkout',
+            'placeholder', '1x1', 'tracking', 'pixel'
+        ]
+        
+        if any(indicator in img_lower for indicator in exclude_indicators):
+            return False
+        
+        # Prefer larger images
+        size_indicators = ['large', 'xl', '800', '1000', '1200', 'main', 'primary']
+        has_size_indicator = any(indicator in img_lower for indicator in size_indicators)
+        
+        # Must have reasonable dimensions (not tiny icons)
+        if any(tiny in img_lower for tiny in ['16x16', '32x32', '50x50', 'small', 'thumb']):
+            return False
+        
+        return True
+    
+    def _find_high_quality_serpapi_image(self, result: Dict[str, Any]) -> str:
+        """Find the highest quality image from SerpAPI data."""
+        all_images = []
+        
+        # Collect all images from different fields
+        image_sources = [
+            result.get("thumbnail"),
+            result.get("image"), 
+            result.get("images"),
+            result.get("rich_snippet", {}).get("image") if isinstance(result.get("rich_snippet"), dict) else None
+        ]
+        
+        for source in image_sources:
+            if source:
+                if isinstance(source, list):
+                    all_images.extend([img for img in source if isinstance(img, str)])
+                elif isinstance(source, str):
+                    all_images.append(source)
+        
+        # Score images by quality indicators
+        best_image = ""
+        best_score = 0
+        
+        for image_url in all_images:
+            score = self._score_image_quality(image_url)
+            if score > best_score:
+                best_score = score
+                best_image = image_url
+        
+        return best_image
+    
+    def _is_high_quality_image(self, image_url: str, retailer_domain: str = "") -> bool:
+        """Check if an image URL appears to be high quality."""
+        if not image_url:
+            return False
+        
+        url_lower = image_url.lower()
+        
+        # Prefer images from known retailers
+        if retailer_domain and retailer_domain in url_lower:
+            return True
+        
+        # Look for high-quality image indicators
+        quality_indicators = [
+            "_large", "_big", "_xl", "_high", "_hd", "_main", 
+            "/large/", "/big/", "/xl/", "/high/", "/hd/", "/main/",
+            "1200x", "800x", "600x", "original"
+        ]
+        
+        return any(indicator in url_lower for indicator in quality_indicators)
+    
+    def _score_image_quality(self, image_url: str) -> int:
+        """Score an image URL based on quality indicators."""
+        if not image_url:
+            return 0
+        
+        score = 0
+        url_lower = image_url.lower()
+        
+        # Higher score for retail domains
+        retail_domains = ["nordstrom", "farfetch", "zara", "hm", "uniqlo", "amazon", "asos"]
+        for domain in retail_domains:
+            if domain in url_lower:
+                score += 50
+                break
+        
+        # Score based on size indicators
+        size_indicators = {
+            "_xl": 40, "_large": 35, "_big": 30, "_medium": 20, "_small": 10,
+            "/xl/": 40, "/large/": 35, "/big/": 30, "/medium/": 20, "/small/": 10,
+            "1200x": 45, "800x": 35, "600x": 25, "400x": 15, "200x": 5
+        }
+        
+        for indicator, points in size_indicators.items():
+            if indicator in url_lower:
+                score += points
+                break
+        
+        # Bonus for HTTPS
+        if image_url.startswith("https://"):
+            score += 10
+        
+        # Penalty for obvious thumbnails
+        thumbnail_indicators = ["thumb", "small", "tiny", "mini", "preview"]
+        for indicator in thumbnail_indicators:
+            if indicator in url_lower:
+                score -= 20
+        
+        return score
+    
+    def _extract_domain(self, url: str) -> str:
+        """Extract domain from URL."""
+        try:
+            from urllib.parse import urlparse
+            parsed = urlparse(url)
+            return parsed.netloc.lower()
+        except:
+            return ""
+    
+    def _construct_retailer_image_url(self, product_url: str, result: Dict[str, Any]) -> str:
+        """Extract actual retailer product images using advanced techniques."""
+        try:
+            domain = self._extract_domain(product_url)
+            title = result.get("title", "").lower()
+            
+            # STRATEGY 1: Look for high-res images in SerpAPI rich data
+            rich_snippet = result.get("rich_snippet", {})
+            if isinstance(rich_snippet, dict):
+                # Check for product gallery or main images
+                for key in ["image", "images", "main_image", "product_image"]:
+                    if key in rich_snippet and rich_snippet[key]:
+                        image_candidate = rich_snippet[key]
+                        if isinstance(image_candidate, str) and self._is_high_quality_image(image_candidate, domain):
+                            logger.info(f"✅ Found rich snippet image: {image_candidate[:60]}...")
+                            return image_candidate
+            
+            # STRATEGY 2: Extract from known retailer image patterns
+            retailer_image = self._extract_known_retailer_image(product_url, result, domain)
+            if retailer_image:
+                return retailer_image
+            
+            # STRATEGY 3: Use product ID to construct retailer image URLs
+            return self._construct_retailer_specific_image_url(product_url, result, domain)
+            
+        except Exception as e:
+            logger.error(f"Error constructing retailer image URL: {str(e)}")
+            return ""
+    
+    def _extract_known_retailer_image(self, product_url: str, result: Dict[str, Any], domain: str) -> str:
+        """Extract images using known retailer URL patterns."""
+        
+        # Known high-quality image patterns for major retailers
+        retailer_patterns = {
+            "nordstrom.com": {
+                "indicators": ["_images", "_img", "/images/", "/img/"],
+                "quality_params": ["?$pdp$", "?$large$", "?$zoom$", "_large", "_xl"]
+            },
+            "farfetch.com": {
+                "indicators": ["cdn-images", "image", "/images/"],
+                "quality_params": ["_large", "_xl", "_main", "?w=800", "?w=600"]
+            },
+            "amazon.com": {
+                "indicators": ["images-amazon", "m.media-amazon", "images/I/"],
+                "quality_params": ["._SL1000_", "._SL800_", "._SL600_", "._AC_"]
+            },
+            "zara.com": {
+                "indicators": ["/images/", "/static/"],
+                "quality_params": ["_large", "_xl", "_main", "?w=800"]
+            }
+        }
+        
+        # Check if we have patterns for this retailer
+        for retailer_domain, patterns in retailer_patterns.items():
+            if retailer_domain in domain:
+                # Look through all available images for ones matching this retailer's patterns
+                all_images = self._collect_all_images_from_result(result)
+                
+                for image_url in all_images:
+                    # Check if image URL contains retailer indicators
+                    if any(indicator in image_url.lower() for indicator in patterns["indicators"]):
+                        # Try to enhance the image URL with quality parameters
+                        enhanced_url = self._enhance_image_url_quality(image_url, patterns["quality_params"])
+                        if enhanced_url:
+                            logger.info(f"✅ Enhanced {retailer_domain} image: {enhanced_url[:60]}...")
+                            return enhanced_url
+                        else:
+                            logger.info(f"✅ Found {retailer_domain} image: {image_url[:60]}...")
+                            return image_url
+        
+        return ""
+    
+    def _collect_all_images_from_result(self, result: Dict[str, Any]) -> List[str]:
+        """Collect all possible image URLs from SerpAPI result."""
+        all_images = []
+        
+        # Standard image fields
+        for field in ["thumbnail", "image", "images"]:
+            field_data = result.get(field)
+            if field_data:
+                if isinstance(field_data, list):
+                    all_images.extend([img for img in field_data if isinstance(img, str)])
+                elif isinstance(field_data, str):
+                    all_images.append(field_data)
+        
+        # Rich snippet images
+        rich_snippet = result.get("rich_snippet", {})
+        if isinstance(rich_snippet, dict):
+            for key, value in rich_snippet.items():
+                if "image" in key.lower() and isinstance(value, str):
+                    all_images.append(value)
+        
+        # Product gallery or additional images
+        for field in ["product_images", "gallery", "media"]:
+            if field in result and result[field]:
+                field_data = result[field]
+                if isinstance(field_data, list):
+                    all_images.extend([img for img in field_data if isinstance(img, str)])
+        
+        return list(set(all_images))  # Remove duplicates
+    
+    def _create_direct_retailer_product_url(self, result: Dict[str, Any], category: str) -> str:
+        """Create direct retailer product URLs that can be scraped for images."""
+        try:
+            title = result.get("title", "")
+            brand = self._extract_brand(result)
+            
+            # Extract key product details for search
+            product_keywords = self._extract_search_keywords(title, brand, category)
+            search_query = " ".join(product_keywords)
+            
+            # Choose retailer based on brand and category (like competitor does)
+            chosen_retailer = self._choose_optimal_retailer(brand, category, search_query)
+            
+            # Create search URL that leads to actual product pages
+            if chosen_retailer == "nordstrom":
+                search_url = f"https://www.nordstrom.com/sr?keyword={urllib.parse.quote_plus(search_query)}&origin=keywordsearch"
+            elif chosen_retailer == "farfetch":
+                search_url = f"https://www.farfetch.com/shopping/search/items.aspx?q={urllib.parse.quote_plus(search_query)}&storeid=9359"
+            elif chosen_retailer == "amazon":
+                search_url = f"https://www.amazon.com/s?k={urllib.parse.quote_plus(search_query)}&ref=sr_pg_1"
+            else:
+                return ""
+            
+            # Try to get the first product from the search results
+            actual_product_url = self._extract_first_product_from_search(search_url, chosen_retailer)
+            
+            if actual_product_url:
+                logger.info(f"🎯 CREATED DIRECT RETAILER URL: {actual_product_url[:60]}...")
+                return actual_product_url
+            else:
+                # Return the search URL as fallback (still better than nothing)
+                logger.info(f"🔍 USING RETAILER SEARCH URL: {search_url[:60]}...")
+                return search_url
+                
+        except Exception as e:
+            logger.error(f"Error creating direct retailer URL: {str(e)}")
+            return ""
+    
+    def _extract_search_keywords(self, title: str, brand: str, category: str) -> List[str]:
+        """Extract optimal search keywords for retailer search."""
+        keywords = []
+        
+        # Add brand if it's a real brand (not generic)
+        if brand and brand not in ["Fashion Brand", "Amazon.com - Seller", "API Unavailable", "Shopping"]:
+            # Clean up brand name
+            clean_brand = brand.replace("Amazon.com - Seller", "").replace("'s", "").strip()
+            if clean_brand:
+                keywords.append(clean_brand)
+        
+        # Extract descriptive words from title
+        title_words = title.lower().split()
+        
+        # Important fashion descriptors
+        fashion_descriptors = [
+            "linen", "cotton", "silk", "wool", "cashmere", "denim", "leather",
+            "casual", "formal", "short", "long", "sleeve", "sleeveless",
+            "button", "down", "polo", "crew", "neck", "v-neck", "round",
+            "slim", "regular", "relaxed", "fitted", "oversized",
+            "high", "low", "waisted", "rise", "boot", "cut", "straight",
+            "skinny", "wide", "leg", "crop", "ankle", "knee", "length"
+        ]
+        
+        # Add relevant descriptors from title
+        for word in title_words:
+            clean_word = word.strip(".,!?()[]\"'")
+            if clean_word in fashion_descriptors or len(clean_word) > 4:
+                if clean_word not in keywords and clean_word not in ["women", "men", "womens", "mens"]:
+                    keywords.append(clean_word)
+                    
+                # Limit to most relevant keywords
+                if len(keywords) >= 5:
+                    break
+        
+        # Add category-specific terms
+        category_terms = {
+            "Top": ["shirt"],
+            "Bottom": ["pants"],
+            "Dress": ["dress"],
+            "Shoes": ["shoes"],
+            "Outerwear": ["jacket"]
+        }
+        
+        if category in category_terms and category_terms[category][0] not in " ".join(keywords).lower():
+            keywords.append(category_terms[category][0])
+        
+        return keywords[:4]  # Limit to 4 most relevant keywords
+    
+    def _choose_optimal_retailer(self, brand: str, category: str, search_query: str) -> str:
+        """Choose the optimal retailer based on brand positioning (like competitor)."""
+        brand_lower = brand.lower() if brand else ""
+        query_lower = search_query.lower()
+        
+        # High-end brands → Farfetch (matches competitor strategy)
+        luxury_indicators = [
+            "designer", "luxury", "premium", "collection", "couture",
+            "saint laurent", "gucci", "prada", "balenciaga", "jacquemus"
+        ]
+        
+        if any(indicator in brand_lower or indicator in query_lower for indicator in luxury_indicators):
+            return "farfetch"
+        
+        # Mid-tier brands → Nordstrom (good selection and image quality)
+        mid_tier_indicators = [
+            "theory", "j.crew", "banana republic", "everlane", "cos"
+        ]
+        
+        if any(indicator in brand_lower for indicator in mid_tier_indicators):
+            return "nordstrom"
+        
+        # Amazon sellers → Use Amazon directly for better images
+        if "amazon" in brand_lower or "seller" in brand_lower:
+            return "amazon"
+        
+        # Default strategy: Nordstrom for best general selection
+        return "nordstrom"
+    
+    def _extract_first_product_from_search(self, search_url: str, retailer: str) -> str:
+        """Extract the first actual product URL from retailer search results."""
+        try:
+            import httpx
+            from bs4 import BeautifulSoup
+            
+            headers = {
+                'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+            }
+            
+            with httpx.Client(timeout=3.0, headers=headers) as client:
+                response = client.get(search_url)
+                if response.status_code == 200:
+                    soup = BeautifulSoup(response.text, 'html.parser')
+                    
+                    # Retailer-specific product link selectors
+                    product_selectors = {
+                        "nordstrom": [
+                            'a[data-testid="product-card-link"]',
+                            'a[href*="/p/"]',
+                            'a[href*="/product/"]'
+                        ],
+                        "farfetch": [
+                            'a[href*="/shopping/"]',
+                            'a[data-testid="product-card"]'
+                        ],
+                        "amazon": [
+                            'a[href*="/dp/"]',
+                            'a[href*="/gp/product/"]',
+                            'h2 a[href*="/dp/"]'
+                        ]
+                    }
+                    
+                    selectors = product_selectors.get(retailer, [])
+                    for selector in selectors:
+                        link_element = soup.select_one(selector)
+                        if link_element:
+                            href = link_element.get('href')
+                            if href:
+                                # Make sure it's a full URL
+                                if href.startswith('/'):
+                                    domain_map = {
+                                        "nordstrom": "https://www.nordstrom.com",
+                                        "farfetch": "https://www.farfetch.com",
+                                        "amazon": "https://www.amazon.com"
+                                    }
+                                    href = domain_map.get(retailer, "") + href
+                                
+                                if href.startswith("http"):
+                                    return href
+                                    
+        except Exception as e:
+            logger.warning(f"Could not extract product from search results: {str(e)}")
+        
+        return ""
+    
+    def _enhance_image_url_quality(self, image_url: str, quality_params: List[str]) -> str:
+        """Enhance image URL with quality parameters."""
+        base_url = image_url
+        
+        # Try to add quality parameters that don't already exist
+        for param in quality_params:
+            if param not in image_url:
+                if "?" in param:
+                    # Query parameter
+                    separator = "&" if "?" in base_url else "?"
+                    enhanced_url = f"{base_url}{separator}{param.lstrip('?')}"
+                    return enhanced_url
+                else:
+                    # URL modification (replace existing size indicators)
+                    if "_small" in base_url or "_thumb" in base_url:
+                        enhanced_url = base_url.replace("_small", param).replace("_thumb", param)
+                        return enhanced_url
+                    elif "." in base_url:
+                        # Insert before file extension
+                        parts = base_url.rsplit(".", 1)
+                        if len(parts) == 2:
+                            enhanced_url = f"{parts[0]}{param}.{parts[1]}"
+                            return enhanced_url
+        
+        return ""
+    
+    def _construct_retailer_specific_image_url(self, product_url: str, result: Dict[str, Any], domain: str) -> str:
+        """Construct retailer-specific image URLs using product patterns."""
+        
+        # Extract potential product ID from URL
+        import re
+        
+        # Common product ID patterns
+        id_patterns = [
+            r'/product/([A-Za-z0-9\-_]+)',
+            r'/p/([A-Za-z0-9\-_]+)',
+            r'/item/([A-Za-z0-9\-_]+)',
+            r'product[_-]?id[=:]([A-Za-z0-9\-_]+)',
+            r'/([A-Za-z0-9]{8,})'  # Long alphanumeric strings
+        ]
+        
+        product_id = None
+        for pattern in id_patterns:
+            match = re.search(pattern, product_url)
+            if match:
+                product_id = match.group(1)
+                break
+        
+        if not product_id:
+            return ""
+        
+        # Retailer-specific image URL construction
+        if "nordstrom.com" in domain:
+            # Nordstrom image pattern
+            return f"https://n.nordstrommedia.com/id/{product_id}_images/crop/large.jpg"
+        elif "farfetch.com" in domain:
+            # Farfetch image pattern
+            return f"https://cdn-images.farfetch-contents.com/{product_id}_large.jpg"
+        elif "amazon.com" in domain:
+            # Amazon image pattern
+            return f"https://m.media-amazon.com/images/I/{product_id}._AC_SL1000_.jpg"
         
         return ""
     
