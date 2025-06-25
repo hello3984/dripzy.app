@@ -311,28 +311,100 @@ def _get_mock_product(category, description, color, prompt_context="", budget=30
         brand_type = "LUXURY" if is_luxury_prompt else "ACCESSIBLE"
         logger.info(f"[_get_mock_product] Selected {brand_type} brand: {brand} from category: {category_key}")
     
-    # Create realistic product names that exist on retail sites
-    # Remove overly specific details and use general terms
-    if "crop top" in description.lower():
+    # ENHANCED: Create realistic product names using AI-generated descriptions
+    desc_lower = description.lower()
+    
+    # WINTER ITEMS
+    if any(term in desc_lower for term in ["turtleneck", "sweater", "pullover", "knit"]):
+        if "chunky" in desc_lower or "cable" in desc_lower:
+            name = "Chunky Knit Sweater"
+        elif "turtleneck" in desc_lower:
+            name = "Turtleneck Sweater"
+        else:
+            name = "Knit Sweater"
+    elif any(term in desc_lower for term in ["coat", "parka", "outerwear", "fur trim", "wool-blend"]):
+        if "wool" in desc_lower:
+            name = "Wool Coat"
+        elif "fur" in desc_lower:
+            name = "Faux Fur Coat"
+        elif "puffer" in desc_lower or "down" in desc_lower:
+            name = "Puffer Jacket"
+        else:
+            name = "Winter Coat"
+    elif any(term in desc_lower for term in ["leggings", "leather pants", "faux leather"]):
+        if "leather" in desc_lower:
+            name = "Faux Leather Leggings"
+        else:
+            name = "Leggings"
+    elif any(term in desc_lower for term in ["boots", "ankle boots", "knee boots"]):
+        if "ankle" in desc_lower:
+            name = "Ankle Boots"
+        elif "knee" in desc_lower:
+            name = "Knee Boots"
+        else:
+            name = "Leather Boots"
+    
+    # SUMMER/GENERAL ITEMS  
+    elif "crop top" in desc_lower:
         name = "Crop Top"
-    elif "shorts" in description.lower():
+    elif "shorts" in desc_lower:
         name = "High-Waisted Shorts" 
-    elif "sandals" in description.lower():
+    elif "sandals" in desc_lower:
         name = "Leather Sandals"
-    elif "dress" in description.lower():
-        name = "Summer Dress"
-    elif "jacket" in description.lower():
-        name = "Denim Jacket"
-    elif "jeans" in description.lower():
+    elif "dress" in desc_lower:
+        if "maxi" in desc_lower:
+            name = "Maxi Dress"
+        elif "midi" in desc_lower:
+            name = "Midi Dress"
+        else:
+            name = "Summer Dress"
+    elif "jacket" in desc_lower:
+        if "denim" in desc_lower:
+            name = "Denim Jacket"
+        elif "blazer" in desc_lower:
+            name = "Blazer"
+        else:
+            name = "Light Jacket"
+    elif "jeans" in desc_lower:
         name = "Straight Leg Jeans"
-    elif "shirt" in description.lower() or "blouse" in description.lower():
-        name = "Button Down Shirt"
-    elif "top" in description.lower():
-        name = "Cotton Top"
+    elif any(term in desc_lower for term in ["shirt", "blouse", "button-down"]):
+        if "button" in desc_lower:
+            name = "Button Down Shirt"
+        else:
+            name = "Blouse"
+    elif any(term in desc_lower for term in ["top", "tee", "t-shirt"]):
+        if "tank" in desc_lower:
+            name = "Tank Top"
+        elif "graphic" in desc_lower:
+            name = "Graphic Tee"
+        else:
+            name = "Cotton Top"
+    
+    # ACCESSORIES
+    elif any(term in desc_lower for term in ["scarf", "wrap", "shawl"]):
+        name = "Scarf"
+    elif any(term in desc_lower for term in ["bag", "purse", "handbag", "clutch"]):
+        if "clutch" in desc_lower:
+            name = "Clutch Bag"
+        else:
+            name = "Handbag"
+    elif any(term in desc_lower for term in ["hat", "beanie", "cap"]):
+        if "beanie" in desc_lower:
+            name = "Beanie"
+        else:
+            name = "Hat"
+    elif any(term in desc_lower for term in ["jewelry", "necklace", "earrings", "bracelet"]):
+        if "necklace" in desc_lower:
+            name = "Necklace"
+        elif "earrings" in desc_lower:
+            name = "Earrings"
+        else:
+            name = "Jewelry"
+    
     else:
-        # Default to category-based naming
+        # ENHANCED: Use more descriptive fallbacks based on category
         category_names = {
-            "Top": "Basic Tee",
+            "Top": "Casual Top",
             "Bottom": "Casual Pants", 
             "Dress": "Midi Dress",
             "Shoes": "Casual Shoes",
