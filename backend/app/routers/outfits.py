@@ -311,9 +311,40 @@ def _get_mock_product(category, description, color, prompt_context="", budget=30
         brand_type = "LUXURY" if is_luxury_prompt else "ACCESSIBLE"
         logger.info(f"[_get_mock_product] Selected {brand_type} brand: {brand} from category: {category_key}")
     
-    # Create a product name
-    color_prefix = f"{color} " if color else ""
-    name = f"{color_prefix}{description if description else category}"
+    # Create realistic product names that exist on retail sites
+    # Remove overly specific details and use general terms
+    if "crop top" in description.lower():
+        name = "Crop Top"
+    elif "shorts" in description.lower():
+        name = "High-Waisted Shorts" 
+    elif "sandals" in description.lower():
+        name = "Leather Sandals"
+    elif "dress" in description.lower():
+        name = "Summer Dress"
+    elif "jacket" in description.lower():
+        name = "Denim Jacket"
+    elif "jeans" in description.lower():
+        name = "Straight Leg Jeans"
+    elif "shirt" in description.lower() or "blouse" in description.lower():
+        name = "Button Down Shirt"
+    elif "top" in description.lower():
+        name = "Cotton Top"
+    else:
+        # Default to category-based naming
+        category_names = {
+            "Top": "Basic Tee",
+            "Bottom": "Casual Pants", 
+            "Dress": "Midi Dress",
+            "Shoes": "Casual Shoes",
+            "Accessory": "Fashion Accessory",
+            "Outerwear": "Light Jacket"
+        }
+        name = category_names.get(category, "Fashion Item")
+    
+    # Add color only if it's a basic color
+    basic_colors = ["black", "white", "blue", "red", "green", "gray", "navy", "brown", "tan"]
+    if color and color.lower() in basic_colors:
+        name = f"{color.title()} {name}"
     
     # Default fallback image URLs by category
     default_images = {
@@ -2648,31 +2679,94 @@ def _determine_retailer_choice(prompt: str, style: str, budget: float, brand: st
 def _generate_smart_product_url(brand: str, product_name: str, description: str, retailer_choice: Dict[str, Any]) -> str:
     """
     Generate optimized product URLs based on retailer choice and product details.
+    Uses realistic search terms that will actually return results on retail sites.
     
     Args:
         brand: Product brand
-        product_name: Product name
+        product_name: Product name  
         description: Product description
         retailer_choice: Output from _determine_retailer_choice
         
     Returns:
-        Optimized product URL
+        Optimized product URL with realistic search terms
     """
     
-    # Clean and optimize search terms
-    search_terms = f"{brand} {product_name} {description}".strip()
-    # Remove extra spaces and special characters
-    search_terms = " ".join(search_terms.split())
-    search_terms = search_terms.replace(" ", "+").replace("++", "+")
+    # SMART URL GENERATION: Use general terms that will find real products
+    # Extract key category terms from description
+    description_lower = description.lower() if description else ""
     
+    # Map specific descriptions to general search terms that work
+    category_mapping = {
+        # Tops
+        "shirt": "shirt", "blouse": "blouse", "top": "top", "tee": "tee", 
+        "t-shirt": "tshirt", "crop": "crop top", "tank": "tank top",
+        
+        # Bottoms  
+        "jeans": "jeans", "pants": "pants", "shorts": "shorts", "skirt": "skirt",
+        "trousers": "trousers", "leggings": "leggings",
+        
+        # Dresses
+        "dress": "dress", "midi": "midi dress", "maxi": "maxi dress",
+        
+        # Shoes
+        "sandals": "sandals", "heels": "heels", "boots": "boots", 
+        "sneakers": "sneakers", "flats": "flats", "pumps": "pumps",
+        
+        # Outerwear
+        "jacket": "jacket", "blazer": "blazer", "coat": "coat", 
+        "cardigan": "cardigan", "sweater": "sweater",
+        
+        # Accessories
+        "bag": "bag", "handbag": "handbag", "necklace": "necklace",
+        "earrings": "earrings", "watch": "watch", "bracelet": "bracelet"
+    }
+    
+    # Find the most relevant category term
+    search_category = ""
+    for key, value in category_mapping.items():
+        if key in description_lower:
+            search_category = value
+            break
+    
+    # If no specific category found, extract from product_name
+    if not search_category:
+        product_lower = product_name.lower() if product_name else ""
+        for key, value in category_mapping.items():
+            if key in product_lower:
+                search_category = value
+                break
+    
+    # Build realistic search terms
     retailer = retailer_choice["retailer"]
     
     if retailer == "farfetch":
-        # Farfetch: Best for luxury items, designer brands
-        return f"https://www.farfetch.com/shopping/search/items.aspx?q={search_terms}&storeid=9359"
+        # Farfetch: Focus on brand + general category for luxury items
+        if search_category and brand:
+            search_terms = f"{brand} {search_category}"
+        elif brand:
+            search_terms = brand
+        else:
+            search_terms = search_category or "designer"
+            
+        # Clean for URL
+        search_query = search_terms.replace(" ", "+")
+        return f"https://www.farfetch.com/shopping/search/items.aspx?q={search_query}&storeid=9359"
+        
     else:
-        # Nordstrom: Best for accessible brands, wide selection
-        return f"https://www.nordstrom.com/sr?keyword={search_terms}&origin=keywordsearch"
+        # Nordstrom: Focus on general category + brand for broader results
+        if search_category and brand:
+            # For accessible brands, lead with category for better results
+            search_terms = f"{search_category} {brand}"
+        elif search_category:
+            search_terms = search_category
+        elif brand:
+            search_terms = brand
+        else:
+            search_terms = "clothing"
+            
+        # Clean for URL  
+        search_query = search_terms.replace(" ", "+")
+        return f"https://www.nordstrom.com/sr?keyword={search_query}&origin=keywordsearch"
 
 
 @router.get("/debug/smart-retailer-logic")
