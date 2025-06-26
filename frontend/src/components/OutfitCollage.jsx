@@ -6,17 +6,17 @@ const OutfitCollage = ({ outfit, prompt }) => {
     return <div className="empty-state">No outfit items available</div>;
   }
 
-  // Extract emoji from prompt if it exists
-  const promptTitle = prompt || outfit.name || 'Stylish Outfit';
-  const hasEmoji = /[\p{Emoji}]/u.test(promptTitle);
+  // Create prompt title with emoji if needed
+  const promptTitle = prompt || outfit.name || "Your Style";
+  const hasEmoji = /[\u{1F600}-\u{1F64F}]|[\u{1F300}-\u{1F5FF}]|[\u{1F680}-\u{1F6FF}]|[\u{1F1E0}-\u{1F1FF}]|[\u{2600}-\u{26FF}]|[\u{2700}-\u{27BF}]/u.test(promptTitle);
   
   // Log outfit data to help debug
   // Outfit data for collage display
 
-  // Categorize items by type
+  // Group items by category for better display
   const categories = {};
-  outfit.items.forEach(item => {
-    const category = item.category?.toLowerCase() || 'other';
+  outfit.items.forEach((item) => {
+    const category = item.category || 'items';
     if (!categories[category]) {
       categories[category] = [];
     }
@@ -46,44 +46,34 @@ const OutfitCollage = ({ outfit, prompt }) => {
 
       <div className="collage-grid">
         {outfit.items.map((item, index) => {
-          // Use the real product URL from the backend API
-          const productUrl = item.purchase_url || item.product_url || '';
+          // 🔧 FIX: Always use the backend URL first (correct Amazon/Farfetch/Nordstrom URLs)
+          let finalUrl = item.url || item.purchase_url || item.product_url || '';
           
-          // Create enhanced search URLs if no direct URL provided
-          let finalUrl = productUrl;
-          
-          if (!productUrl) {
-            // Create precise search terms from product details
+          // Only create fallback URLs if backend didn't provide one
+          if (!finalUrl) {
             const productName = item.product_name || item.name || '';
             const brand = item.brand || '';
             const category = item.category || '';
             
-            // Create targeted search query
-            const searchTerms = [brand, productName, category].filter(term => 
-              term && term !== 'Fashion Brand' && term !== 'Unknown'
+            // Clean the brand name - remove Amazon seller prefixes
+            const cleanBrand = brand.replace(/^amazon\.com\s*-\s*seller\s*/i, '').trim();
+            
+            // Create clean search terms
+            const searchTerms = [cleanBrand, productName, category].filter(term => 
+              term && term !== 'Fashion Brand' && term !== 'Unknown' && term !== 'API Unavailable'
             );
             const searchQuery = encodeURIComponent(searchTerms.join(' ')).trim();
             
-            // Enhanced retailer selection based on brand
-            const brandLower = brand.toLowerCase();
-            
-            // Luxury brands -> Farfetch (matches competitor approach)
-            if (brandLower.includes('cinq') || brandLower.includes('sept') || 
-                ['gucci', 'prada', 'versace', 'balenciaga'].some(luxury => brandLower.includes(luxury))) {
-              finalUrl = `https://www.farfetch.com/shopping/search/items.aspx?q=${searchQuery}&storeid=9359`;
-            }
-            // Contemporary/accessible brands -> Nordstrom
-            else {
-              finalUrl = `https://www.nordstrom.com/sr?keyword=${searchQuery}&origin=keywordsearch`;
-            }
+            // Simple fallback logic - use Farfetch as default
+            finalUrl = `https://www.farfetch.com/shopping/search/items.aspx?q=${searchQuery}&storeid=9359`;
           }
-          
+
           // Enhanced click handler
           const handleProductClick = (e) => {
             e.preventDefault();
             
             if (finalUrl) {
-              // Open in new tab (like competitor)
+              // Open in new tab
               window.open(finalUrl, '_blank', 'noopener,noreferrer');
             }
           };
@@ -144,7 +134,7 @@ const OutfitCollage = ({ outfit, prompt }) => {
                   </p>
                 )}
                 
-                {/* Enhanced click button like competitor */}
+                {/* Enhanced click button */}
                 {finalUrl && (
                   <button 
                     className="shop-button"
@@ -165,48 +155,41 @@ const OutfitCollage = ({ outfit, prompt }) => {
         <p className="total-price">Total Price: ${outfit.total_price?.toFixed(2) || "N/A"}</p>
       </div>
       
-      {/* Use direct HTML for links to ensure they're clickable */}
+      {/* 🔧 FIX: Use actual retailer from backend instead of override logic */}
       <div className="product-sources-wrapper">
-        {(() => {
-          // Build HTML string directly
-          let sourceHtml = '';
-          
-          outfit.items.forEach((item, index) => {
-            // Get the item details
+        <div className="product-sources">
+          {outfit.items.map((item, index) => {
+            // Get category for display
             const category = item.category ? 
               item.category.charAt(0).toUpperCase() + item.category.slice(1) : 
-              '';
+              'Item';
             
-            // Get retailer name from item
-            const originalRetailerName = item.brand || '';
+            // 🔧 FIX: Use actual retailer info from backend
+            const retailerName = item.retailer || 'Online Store';
+            const itemUrl = item.url || item.purchase_url || item.product_url || '';
             
-            // Create search query using original product details
-            const productName = item.product_name || '';
-            const searchQuery = encodeURIComponent(`${originalRetailerName} ${productName}`).trim();
-            
-            // FARFETCH-FIRST: Use Farfetch as primary option
-            const farfetchUrl = `https://www.farfetch.com/search?q=${searchQuery}`;
-            const nordstromUrl = `https://www.nordstrom.com/sr?keyword=${searchQuery}`;
-            
-            // FARFETCH-FIRST: Use Farfetch for all items, only exception for athletic brands
-            const brand = (originalRetailerName || '').toLowerCase();
-            const isAthletic = ['nike', 'adidas', 'under armour', 'lululemon', 'athleta'].some(b => brand.includes(b));
-            const retailerUrl = isAthletic ? nordstromUrl : farfetchUrl;
-            const retailerName = isAthletic ? "Nordstrom" : "Farfetch";
-            
-            // Add the proper separator based on position
+            // Add separator
             const separator = index === 0 ? '' : ', ';
             
-            // Add this item to the HTML string
-            sourceHtml += `${separator}${category} <a href="${retailerUrl}" target="_blank" rel="noopener noreferrer" class="retailer-link">${retailerName}</a>`;
-          });
-          
-          return (
-            <div className="product-sources">
-              <div dangerouslySetInnerHTML={{ __html: sourceHtml }} />
-            </div>
-          );
-        })()}
+            // Create the link using actual backend data
+            return (
+              <span key={index}>
+                {separator}{category} {itemUrl ? (
+                  <a 
+                    href={itemUrl} 
+                    target="_blank" 
+                    rel="noopener noreferrer" 
+                    className="retailer-link"
+                  >
+                    {retailerName}
+                  </a>
+                ) : (
+                  <span className="retailer-text">{retailerName}</span>
+                )}
+              </span>
+            );
+          })}
+        </div>
       </div>
 
       <div className="style-tags">
@@ -478,6 +461,11 @@ const OutfitCollage = ({ outfit, prompt }) => {
         .retailer-link:hover {
           color: #0044aa;
           background-color: rgba(0,0,0,0.05);
+        }
+        
+        .retailer-text {
+          color: #666;
+          font-style: italic;
         }
       `}</style>
     </div>
