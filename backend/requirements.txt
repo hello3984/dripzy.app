@@ -48,3 +48,7 @@ uritemplate==4.1.1
 urllib3==2.3.0
 uvicorn==0.24.0
 aiohttp==3.9.3
+# Virtual Try-On AI Dependencies
+opencv-python==4.10.0.84
+numpy==1.24.3
+mediapipe==0.10.7

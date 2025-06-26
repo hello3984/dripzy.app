@@ -8551,3 +8551,177 @@
 2025-06-25 22:10:20:   Line 423:7:  'getTagIcon' is assigned a value but never used  no-unused-vars
 2025-06-25 22:10:20: 
 2025-06-25 22:10:20: webpack compiled with 1 warning
+2025-06-26 11:31:08: Compiling...
+2025-06-26 11:31:10: Compiled with warnings.
+2025-06-26 11:31:10: 
+2025-06-26 11:31:10: [eslint] 
+2025-06-26 11:31:10: src/components/OutfitCollage.jsx
+2025-06-26 11:31:10:   Line 423:7:  'getTagIcon' is assigned a value but never used  no-unused-vars
+2025-06-26 11:31:10: 
+2025-06-26 11:31:10: Search for the keywords to learn more about each warning.
+2025-06-26 11:31:10: To ignore, add // eslint-disable-next-line to the line before.
+2025-06-26 11:31:10: 
+2025-06-26 11:31:10: WARNING in [eslint] 
+2025-06-26 11:31:10: src/components/OutfitCollage.jsx
+2025-06-26 11:31:10:   Line 423:7:  'getTagIcon' is assigned a value but never used  no-unused-vars
+2025-06-26 11:31:10: 
+2025-06-26 11:31:10: webpack compiled with 1 warning
+2025-06-26 11:31:10: Compiling...
+2025-06-26 11:31:10: Compiled with warnings.
+2025-06-26 11:31:10: 
+2025-06-26 11:31:10: [eslint] 
+2025-06-26 11:31:10: src/components/OutfitCollage.jsx
+2025-06-26 11:31:10:   Line 423:7:  'getTagIcon' is assigned a value but never used  no-unused-vars
+2025-06-26 11:31:10: 
+2025-06-26 11:31:10: Search for the keywords to learn more about each warning.
+2025-06-26 11:31:10: To ignore, add // eslint-disable-next-line to the line before.
+2025-06-26 11:31:10: 
+2025-06-26 11:31:10: WARNING in [eslint] 
+2025-06-26 11:31:10: src/components/OutfitCollage.jsx
+2025-06-26 11:31:10:   Line 423:7:  'getTagIcon' is assigned a value but never used  no-unused-vars
+2025-06-26 11:31:10: 
+2025-06-26 11:31:10: webpack compiled with 1 warning
+2025-06-26 11:31:10: Compiling...
+2025-06-26 11:31:10: Compiled with warnings.
+2025-06-26 11:31:10: 
+2025-06-26 11:31:10: [eslint] 
+2025-06-26 11:31:10: src/components/OutfitCollage.jsx
+2025-06-26 11:31:10:   Line 423:7:  'getTagIcon' is assigned a value but never used  no-unused-vars
+2025-06-26 11:31:10: 
+2025-06-26 11:31:10: Search for the keywords to learn more about each warning.
+2025-06-26 11:31:10: To ignore, add // eslint-disable-next-line to the line before.
+2025-06-26 11:31:10: 
+2025-06-26 11:31:10: WARNING in [eslint] 
+2025-06-26 11:31:10: src/components/OutfitCollage.jsx
+2025-06-26 11:31:10:   Line 423:7:  'getTagIcon' is assigned a value but never used  no-unused-vars
+2025-06-26 11:31:10: 
+2025-06-26 11:31:10: webpack compiled with 1 warning
+2025-06-26 11:31:20: Compiling...
+2025-06-26 11:31:20: Compiled with warnings.
+2025-06-26 11:31:20: 
+2025-06-26 11:31:20: [eslint] 
+2025-06-26 11:31:20: src/components/OutfitCollage.jsx
+2025-06-26 11:31:20:   Line 423:7:  'getTagIcon' is assigned a value but never used  no-unused-vars
+2025-06-26 11:31:20: 
+2025-06-26 11:31:20: Search for the keywords to learn more about each warning.
+2025-06-26 11:31:20: To ignore, add // eslint-disable-next-line to the line before.
+2025-06-26 11:31:20: 
+2025-06-26 11:31:20: WARNING in [eslint] 
+2025-06-26 11:31:20: src/components/OutfitCollage.jsx
+2025-06-26 11:31:20:   Line 423:7:  'getTagIcon' is assigned a value but never used  no-unused-vars
+2025-06-26 11:31:20: 
+2025-06-26 11:31:20: webpack compiled with 1 warning
+2025-06-26 11:31:20: Compiling...
+2025-06-26 11:31:20: Compiled with warnings.
+2025-06-26 11:31:20: 
+2025-06-26 11:31:20: [eslint] 
+2025-06-26 11:31:20: src/components/OutfitCollage.jsx
+2025-06-26 11:31:20:   Line 423:7:  'getTagIcon' is assigned a value but never used  no-unused-vars
+2025-06-26 11:31:20: 
+2025-06-26 11:31:20: Search for the keywords to learn more about each warning.
+2025-06-26 11:31:20: To ignore, add // eslint-disable-next-line to the line before.
+2025-06-26 11:31:20: 
+2025-06-26 11:31:20: WARNING in [eslint] 
+2025-06-26 11:31:20: src/components/OutfitCollage.jsx
+2025-06-26 11:31:20:   Line 423:7:  'getTagIcon' is assigned a value but never used  no-unused-vars
+2025-06-26 11:31:20: 
+2025-06-26 11:31:20: webpack compiled with 1 warning
+2025-06-26 12:07:08: Compiling...
+2025-06-26 12:07:11: Compiled with warnings.
+2025-06-26 12:07:11: 
+2025-06-26 12:07:11: [eslint] 
+2025-06-26 12:07:11: src/components/OutfitCollage.jsx
+2025-06-26 12:07:11:   Line 423:7:  'getTagIcon' is assigned a value but never used  no-unused-vars
+2025-06-26 12:07:11: 
+2025-06-26 12:07:11: Search for the keywords to learn more about each warning.
+2025-06-26 12:07:11: To ignore, add // eslint-disable-next-line to the line before.
+2025-06-26 12:07:11: 
+2025-06-26 12:07:11: WARNING in [eslint] 
+2025-06-26 12:07:11: src/components/OutfitCollage.jsx
+2025-06-26 12:07:11:   Line 423:7:  'getTagIcon' is assigned a value but never used  no-unused-vars
+2025-06-26 12:07:11: 
+2025-06-26 12:07:11: webpack compiled with 1 warning
+2025-06-26 12:07:11: Compiling...
+2025-06-26 12:07:11: Compiled with warnings.
+2025-06-26 12:07:11: 
+2025-06-26 12:07:11: [eslint] 
+2025-06-26 12:07:11: src/components/OutfitCollage.jsx
+2025-06-26 12:07:11:   Line 423:7:  'getTagIcon' is assigned a value but never used  no-unused-vars
+2025-06-26 12:07:11: 
+2025-06-26 12:07:11: Search for the keywords to learn more about each warning.
+2025-06-26 12:07:11: To ignore, add // eslint-disable-next-line to the line before.
+2025-06-26 12:07:11: 
+2025-06-26 12:07:11: WARNING in [eslint] 
+2025-06-26 12:07:11: src/components/OutfitCollage.jsx
+2025-06-26 12:07:11:   Line 423:7:  'getTagIcon' is assigned a value but never used  no-unused-vars
+2025-06-26 12:07:11: 
+2025-06-26 12:07:11: webpack compiled with 1 warning
+2025-06-26 15:10:18: Compiling...
+2025-06-26 15:10:19: Compiled with warnings.
+2025-06-26 15:10:19: 
+2025-06-26 15:10:19: [eslint] 
+2025-06-26 15:10:19: src/components/OutfitCollage.jsx
+2025-06-26 15:10:19:   Line 423:7:  'getTagIcon' is assigned a value but never used  no-unused-vars
+2025-06-26 15:10:19: 
+2025-06-26 15:10:19: src/components/VirtualTryOn.js
+2025-06-26 15:10:19:   Line 19:6:   React Hook useEffect has a missing dependency: 'initializeFaceDetection'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+2025-06-26 15:10:19:   Line 100:5:  Expected a default case                                                                                                     default-case
+2025-06-26 15:10:19: 
+2025-06-26 15:10:19: Search for the keywords to learn more about each warning.
+2025-06-26 15:10:19: To ignore, add // eslint-disable-next-line to the line before.
+2025-06-26 15:10:19: 
+2025-06-26 15:10:19: WARNING in [eslint] 
+2025-06-26 15:10:19: src/components/OutfitCollage.jsx
+2025-06-26 15:10:19:   Line 423:7:  'getTagIcon' is assigned a value but never used  no-unused-vars
+2025-06-26 15:10:19: 
+2025-06-26 15:10:19: src/components/VirtualTryOn.js
+2025-06-26 15:10:19:   Line 19:6:   React Hook useEffect has a missing dependency: 'initializeFaceDetection'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+2025-06-26 15:10:19:   Line 100:5:  Expected a default case                                                                                                     default-case
+2025-06-26 15:10:19: 
+2025-06-26 15:10:19: webpack compiled with 1 warning
+2025-06-26 15:11:56: Compiling...
+2025-06-26 15:11:56: Compiled with warnings.
+2025-06-26 15:11:56: 
+2025-06-26 15:11:56: [eslint] 
+2025-06-26 15:11:56: src/components/OutfitCollage.jsx
+2025-06-26 15:11:56:   Line 423:7:  'getTagIcon' is assigned a value but never used  no-unused-vars
+2025-06-26 15:11:56: 
+2025-06-26 15:11:56: src/components/VirtualTryOn.js
+2025-06-26 15:11:56:   Line 19:6:   React Hook useEffect has a missing dependency: 'initializeFaceDetection'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+2025-06-26 15:11:56:   Line 100:5:  Expected a default case                                                                                                     default-case
+2025-06-26 15:11:56: 
+2025-06-26 15:11:56: Search for the keywords to learn more about each warning.
+2025-06-26 15:11:56: To ignore, add // eslint-disable-next-line to the line before.
+2025-06-26 15:11:56: 
+2025-06-26 15:11:56: WARNING in [eslint] 
+2025-06-26 15:11:56: src/components/OutfitCollage.jsx
+2025-06-26 15:11:56:   Line 423:7:  'getTagIcon' is assigned a value but never used  no-unused-vars
+2025-06-26 15:11:56: 
+2025-06-26 15:11:56: src/components/VirtualTryOn.js
+2025-06-26 15:11:56:   Line 19:6:   React Hook useEffect has a missing dependency: 'initializeFaceDetection'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+2025-06-26 15:11:56:   Line 100:5:  Expected a default case                                                                                                     default-case
+2025-06-26 15:11:56: 
+2025-06-26 15:11:56: webpack compiled with 1 warning
+2025-06-26 15:11:59: Compiling...
+2025-06-26 15:11:59: Compiled with warnings.
+2025-06-26 15:11:59: 
+2025-06-26 15:11:59: [eslint] 
+2025-06-26 15:11:59: src/components/OutfitCollage.jsx
+2025-06-26 15:11:59:   Line 423:7:  'getTagIcon' is assigned a value but never used  no-unused-vars
+2025-06-26 15:11:59: 
+2025-06-26 15:11:59: src/components/VirtualTryOn.js
+2025-06-26 15:11:59:   Line 19:6:   React Hook useEffect has a missing dependency: 'initializeFaceDetection'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+2025-06-26 15:11:59:   Line 100:5:  Expected a default case                                                                                                     default-case
+2025-06-26 15:11:59: 
+2025-06-26 15:11:59: Search for the keywords to learn more about each warning.
+2025-06-26 15:11:59: To ignore, add // eslint-disable-next-line to the line before.
+2025-06-26 15:11:59: 
+2025-06-26 15:11:59: WARNING in [eslint] 
+2025-06-26 15:11:59: src/components/OutfitCollage.jsx
+2025-06-26 15:11:59:   Line 423:7:  'getTagIcon' is assigned a value but never used  no-unused-vars
+2025-06-26 15:11:59: 
+2025-06-26 15:11:59: src/components/VirtualTryOn.js
+2025-06-26 15:11:59:   Line 19:6:   React Hook useEffect has a missing dependency: 'initializeFaceDetection'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+2025-06-26 15:11:59:   Line 100:5:  Expected a default case                                                                                                     default-case
+2025-06-26 15:11:59: 
+2025-06-26 15:11:59: webpack compiled with 1 warning

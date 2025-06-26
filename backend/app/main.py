@@ -22,6 +22,8 @@ from app.core.monitoring import performance_monitor
 from app.routers.outfits import router as outfits_router
 # Import monitoring router
 from app.routers.monitoring import router as monitoring_router
+# Import virtual try-on router
+from app.routers.tryons import router as tryons_router
 
 # Configure logging
 logging.basicConfig(
@@ -145,6 +147,8 @@ async def monitoring_middleware(request: Request, call_next):
 app.include_router(outfits_router)
 # Include monitoring router
 app.include_router(monitoring_router)
+# Include try-on router
+app.include_router(tryons_router)
 
 # Handle OPTIONS requests for CORS preflight
 @app.options("/{rest_of_path:path}")
