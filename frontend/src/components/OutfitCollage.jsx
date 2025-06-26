@@ -10,31 +10,45 @@ const OutfitCollage = ({ outfit, prompt }) => {
   const promptTitle = prompt || outfit.name || "Your Style";
   const hasEmoji = /[\u{1F600}-\u{1F64F}]|[\u{1F300}-\u{1F5FF}]|[\u{1F680}-\u{1F6FF}]|[\u{1F1E0}-\u{1F1FF}]|[\u{2600}-\u{26FF}]|[\u{2700}-\u{27BF}]/u.test(promptTitle);
   
-  // Log outfit data to help debug
-  // Outfit data for collage display
-
-  // Group items by category for better display
-  const categories = {};
-  outfit.items.forEach((item) => {
-    const category = item.category || 'items';
-    if (!categories[category]) {
-      categories[category] = [];
+  // Artistic positioning configurations for different numbers of items
+  const getItemPositions = (itemCount) => {
+    switch(itemCount) {
+      case 1:
+        return [{ top: '20%', left: '35%', width: '300px', rotation: 0, zIndex: 1 }];
+      case 2:
+        return [
+          { top: '15%', left: '20%', width: '280px', rotation: -5, zIndex: 2 },
+          { top: '35%', left: '55%', width: '260px', rotation: 8, zIndex: 1 }
+        ];
+      case 3:
+        return [
+          { top: '10%', left: '15%', width: '250px', rotation: -8, zIndex: 3 },
+          { top: '25%', left: '45%', width: '280px', rotation: 2, zIndex: 2 },
+          { top: '45%', left: '25%', width: '240px', rotation: 12, zIndex: 1 }
+        ];
+      case 4:
+        return [
+          { top: '8%', left: '10%', width: '220px', rotation: -12, zIndex: 4 },
+          { top: '20%', left: '40%', width: '260px', rotation: 5, zIndex: 3 },
+          { top: '40%', left: '15%', width: '240px', rotation: -3, zIndex: 2 },
+          { top: '35%', left: '65%', width: '200px', rotation: 15, zIndex: 1 }
+        ];
+      default:
+        // For 5+ items, create dynamic positions
+        return outfit.items.map((_, index) => ({
+          top: `${10 + (index * 15) % 60}%`,
+          left: `${5 + (index * 20) % 70}%`,
+          width: `${200 + (index % 3) * 40}px`,
+          rotation: (index % 2 === 0 ? -1 : 1) * (5 + (index % 3) * 5),
+          zIndex: itemCount - index
+        }));
     }
-    categories[category].push(item);
-  });
+  };
 
-  // Get unique categories for tags
-  const uniqueCategories = Object.keys(categories);
-  
-  // Get style tags from outfit
-  const styleTags = [
-    outfit.style || 'Fashion',
-    outfit.occasion || 'Casual',
-    ...uniqueCategories
-  ].filter(Boolean);
+  const positions = getItemPositions(outfit.items.length);
 
   return (
-    <div className="collage-container">
+    <div className="artistic-collage-container">
       <motion.h1 
         className="collage-title"
         initial={{ opacity: 0, y: -20 }}
@@ -44,7 +58,7 @@ const OutfitCollage = ({ outfit, prompt }) => {
         {promptTitle} {!hasEmoji && '✨'}
       </motion.h1>
 
-      <div className="collage-grid">
+      <div className="collage-canvas">
         {outfit.items.map((item, index) => {
           // 🔧 FIX: Always use the backend URL first (correct Amazon/Farfetch/Nordstrom URLs)
           let finalUrl = item.url || item.purchase_url || item.product_url || '';
@@ -78,394 +92,327 @@ const OutfitCollage = ({ outfit, prompt }) => {
             }
           };
 
+          const position = positions[index] || positions[0];
+
           return (
-            <div key={index} className="outfit-item">
+            <motion.div 
+              key={index} 
+              className="artistic-item"
+              style={{
+                position: 'absolute',
+                top: position.top,
+                left: position.left,
+                width: position.width,
+                transform: `rotate(${position.rotation}deg)`,
+                zIndex: position.zIndex
+              }}
+              initial={{ opacity: 0, scale: 0.8, rotate: position.rotation - 10 }}
+              animate={{ opacity: 1, scale: 1, rotate: position.rotation }}
+              transition={{ 
+                duration: 0.6, 
+                delay: index * 0.2,
+                type: "spring",
+                stiffness: 100
+              }}
+              whileHover={{ 
+                scale: 1.05, 
+                zIndex: 999,
+                transition: { duration: 0.2 }
+              }}
+            >
               <div 
-                className="product-image-container"
+                className="artistic-card"
                 onClick={handleProductClick}
                 style={{ cursor: finalUrl ? 'pointer' : 'default' }}
               >
-                <img
-                  src={item.image_url || item.image || '/placeholder-image.jpg'}
-                  alt={item.product_name || item.name || 'Product'}
-                  className="product-image clickable-image"
-                  style={{
-                    border: finalUrl ? '2px solid transparent' : '2px solid #ddd',
-                    transition: 'all 0.2s ease'
-                  }}
-                  onMouseEnter={(e) => {
-                    if (finalUrl) {
-                      e.target.style.border = '2px solid #4a56e2';
-                      e.target.style.transform = 'scale(1.02)';
-                    }
-                  }}
-                  onMouseLeave={(e) => {
-                    if (finalUrl) {
-                      e.target.style.border = '2px solid transparent';
-                      e.target.style.transform = 'scale(1)';
-                    }
-                  }}
-                />
-                
-                {/* Click indicator overlay */}
-                {finalUrl && (
-                  <div className="click-overlay">
-                    <span className="click-text">Click to Shop</span>
+                <div className="image-frame">
+                  <img
+                    src={item.image_url || item.image || '/placeholder-image.jpg'}
+                    alt={item.product_name || item.name || 'Product'}
+                    className="artistic-image"
+                  />
+                  
+                  {/* Polaroid-style info strip */}
+                  <div className="info-strip">
+                    <div className="item-info">
+                      {item.brand && (
+                        <p className="mini-brand">{item.brand}</p>
+                      )}
+                      <p className="mini-name">
+                        {(item.product_name || item.name || 'Stylish Item').substring(0, 30)}
+                        {(item.product_name || item.name || '').length > 30 ? '...' : ''}
+                      </p>
+                      {item.price && (
+                        <p className="mini-price">
+                          ${typeof item.price === 'number' ? item.price.toFixed(2) : item.price}
+                        </p>
+                      )}
+                    </div>
                   </div>
-                )}
+                  
+                  {/* Click indicator overlay */}
+                  {finalUrl && (
+                    <div className="hover-overlay">
+                      <div className="shop-icon">🛍️</div>
+                      <span className="shop-text">Shop Now</span>
+                    </div>
+                  )}
+                </div>
               </div>
-              
-              <div className="product-details">
-                {item.brand && (
-                  <p className="product-brand">{item.brand}</p>
-                )}
-                
-                <h4 className="product-name">
-                  {item.product_name || item.name || 'Stylish Item'}
-                </h4>
-                
-                {item.retailer && (
-                  <p className="product-retailer">Available at {item.retailer}</p>
-                )}
-                
-                {item.price && (
-                  <p className="product-price">
-                    ${typeof item.price === 'number' ? item.price.toFixed(2) : item.price}
-                  </p>
-                )}
-                
-                {/* Enhanced click button */}
-                {finalUrl && (
-                  <button 
-                    className="shop-button"
-                    onClick={handleProductClick}
-                  >
-                    Visit Site
-                  </button>
-                )}
-              </div>
-            </div>
+            </motion.div>
           );
         })}
       </div>
 
-      <div className="outfit-description">
-        <p>{outfit.description || "A stylish outfit perfect for your occasion."}</p>
-        <p className="stylist-rationale">{outfit.stylist_rationale || ""}</p>
-        <p className="total-price">Total Price: ${outfit.total_price?.toFixed(2) || "N/A"}</p>
-      </div>
-      
-      {/* 🔧 FIX: Use actual retailer from backend instead of override logic */}
-      <div className="product-sources-wrapper">
-        <div className="product-sources">
-          {outfit.items.map((item, index) => {
-            // Get category for display
-            const category = item.category ? 
-              item.category.charAt(0).toUpperCase() + item.category.slice(1) : 
-              'Item';
-            
-            // 🔧 FIX: Use actual retailer info from backend
-            const retailerName = item.retailer || 'Online Store';
-            const itemUrl = item.url || item.purchase_url || item.product_url || '';
-            
-            // Add separator
-            const separator = index === 0 ? '' : ', ';
-            
-            // Create the link using actual backend data
-            return (
-              <span key={index}>
-                {separator}{category} {itemUrl ? (
-                  <a 
-                    href={itemUrl} 
-                    target="_blank" 
-                    rel="noopener noreferrer" 
-                    className="retailer-link"
-                  >
-                    {retailerName}
-                  </a>
-                ) : (
-                  <span className="retailer-text">{retailerName}</span>
-                )}
-              </span>
-            );
-          })}
+      {/* Outfit description at bottom */}
+      <motion.div 
+        className="outfit-summary"
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5, delay: 1 }}
+      >
+        <p className="description-text">{outfit.description || "A stylish outfit perfect for your occasion."}</p>
+        {outfit.stylist_rationale && (
+          <p className="rationale-text">{outfit.stylist_rationale}</p>
+        )}
+        <div className="price-section">
+          <span className="total-label">Complete Look:</span>
+          <span className="total-amount">${outfit.total_price?.toFixed(2) || "N/A"}</span>
         </div>
-      </div>
+      </motion.div>
 
-      <div className="style-tags">
-        {styleTags.map((tag, index) => (
-          <motion.div 
-            key={index} 
-            className="style-tag"
-            initial={{ opacity: 0, scale: 0.8 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.3, delay: 0.5 + (index * 0.1) }}
-          >
-            <div className="tag-icon">
-              {getTagIcon(tag)}
-            </div>
-            <span>{tag.charAt(0).toUpperCase() + tag.slice(1)}</span>
-          </motion.div>
+      {/* Navigation dots indicator */}
+      <div className="nav-dots">
+        {outfit.items.map((_, index) => (
+          <div key={index} className="nav-dot" />
         ))}
       </div>
 
       <style jsx>{`
-        .collage-container {
-          background-color: #f9f9f9;
+        .artistic-collage-container {
+          background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
           border-radius: 24px;
           padding: 2rem;
           width: 100%;
           max-width: 1200px;
           margin: 0 auto;
-          box-shadow: 0 8px 30px rgba(0, 0, 0, 0.05);
+          box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+          position: relative;
+          overflow: hidden;
         }
 
         .collage-title {
           font-family: 'Playfair Display', serif;
-          font-size: 2.5rem;
+          font-size: 2.8rem;
           text-align: center;
           margin-bottom: 2rem;
-          color: #1a1a1a;
-          font-weight: 600;
+          color: #2d3748;
+          font-weight: 700;
+          text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
         }
 
-        .collage-grid {
-          display: grid;
-          grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-          gap: 2rem;
-          margin-bottom: 2rem;
-        }
-
-        .outfit-item {
-          background: white;
-          border-radius: 12px;
-          overflow: hidden;
-          box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
-          transition: transform 0.3s ease, box-shadow 0.3s ease;
-          height: 100%;
-          display: flex;
-          flex-direction: column;
-        }
-
-        .outfit-item:hover {
-          transform: translateY(-5px);
-          box-shadow: 0 12px 25px rgba(0, 0, 0, 0.15);
-        }
-
-        .product-image-container {
+        .collage-canvas {
           position: relative;
-          height: 300px;
-          overflow: hidden;
-          border-radius: 8px;
+          width: 100%;
+          height: 600px;
+          margin: 2rem 0;
+        }
+
+        .artistic-item {
           cursor: pointer;
         }
 
-        .product-image {
+        .artistic-card {
           width: 100%;
-          height: 100%;
-          object-fit: cover;
+          height: auto;
           transition: all 0.3s ease;
         }
 
-        .product-image:hover {
-          transform: scale(1.05);
+        .image-frame {
+          background: white;
+          border-radius: 12px;
+          padding: 12px;
+          box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
+          position: relative;
+          overflow: hidden;
+          border: 3px solid white;
         }
 
-        .clickable-image {
-          cursor: pointer;
+        .artistic-image {
+          width: 100%;
+          height: 250px;
+          object-fit: cover;
+          border-radius: 8px;
+          transition: all 0.3s ease;
         }
 
-        .click-overlay {
+        .info-strip {
+          background: white;
+          padding: 12px;
+          margin-top: 8px;
+          border-radius: 6px;
+          border-top: 1px solid #e2e8f0;
+        }
+
+        .item-info {
+          text-align: center;
+        }
+
+        .mini-brand {
+          font-size: 0.75rem;
+          color: #718096;
+          margin: 0 0 4px;
+          font-weight: 600;
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
+        }
+
+        .mini-name {
+          font-size: 0.85rem;
+          color: #2d3748;
+          margin: 0 0 4px;
+          font-weight: 600;
+          line-height: 1.2;
+        }
+
+        .mini-price {
+          font-size: 0.9rem;
+          color: #e53e3e;
+          margin: 0;
+          font-weight: 700;
+        }
+
+        .hover-overlay {
           position: absolute;
           top: 0;
           left: 0;
-          width: 100%;
-          height: 100%;
-          background: rgba(0, 0, 0, 0.6);
+          right: 0;
+          bottom: 0;
+          background: rgba(0, 0, 0, 0.7);
           display: flex;
+          flex-direction: column;
           align-items: center;
           justify-content: center;
           opacity: 0;
           transition: opacity 0.3s ease;
-          border-radius: 8px;
+          border-radius: 12px;
         }
 
-        .product-image-container:hover .click-overlay {
+        .artistic-card:hover .hover-overlay {
           opacity: 1;
         }
 
-        .click-text {
+        .shop-icon {
+          font-size: 2rem;
+          margin-bottom: 0.5rem;
+        }
+
+        .shop-text {
           color: white;
-          font-size: 1.2rem;
+          font-size: 1rem;
           font-weight: 600;
           text-transform: uppercase;
           letter-spacing: 1px;
-          text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
         }
 
-        .product-details {
-          padding: 20px;
-          text-align: center;
-        }
-
-        .product-brand {
-          color: #666;
-          margin: 0 0 8px;
-          font-size: 0.9rem;
-          font-weight: 500;
-          text-transform: uppercase;
-          letter-spacing: 0.5px;
-        }
-
-        .product-name {
-          margin: 0 0 8px;
-          font-size: 1.1rem;
-          font-weight: 600;
-          color: #2d3748;
-          line-height: 1.4;
-        }
-
-        .product-retailer {
-          color: #4a56e2;
-          margin: 0 0 8px;
-          font-size: 0.85rem;
-          font-weight: 500;
-        }
-
-        .product-price {
-          font-weight: 700;
-          font-size: 1.3rem;
-          margin: 0 0 15px;
-          color: #e53e3e;
-        }
-
-        .shop-button {
-          background: linear-gradient(45deg, #4a56e2, #667eea);
-          color: white;
-          border: none;
-          padding: 12px 24px;
-          border-radius: 8px;
-          font-weight: 600;
-          cursor: pointer;
-          transition: all 0.3s ease;
-          text-transform: uppercase;
-          letter-spacing: 0.5px;
-          font-size: 0.9rem;
-          width: 100%;
-          margin-top: 10px;
-        }
-
-        .shop-button:hover {
-          background: linear-gradient(45deg, #3a46d2, #5570da);
-          transform: translateY(-2px);
-          box-shadow: 0 8px 20px rgba(74, 86, 226, 0.4);
-        }
-
-        .shop-button:active {
-          transform: translateY(0);
-          box-shadow: 0 4px 12px rgba(74, 86, 226, 0.3);
-        }
-
-        .outfit-description {
+        .outfit-summary {
+          background: rgba(255, 255, 255, 0.9);
+          border-radius: 16px;
+          padding: 2rem;
           text-align: center;
           margin-top: 2rem;
+          backdrop-filter: blur(10px);
+          border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .description-text {
           font-size: 1.1rem;
-          color: #444;
+          color: #4a5568;
+          margin: 0 0 1rem;
           line-height: 1.6;
         }
 
-        .stylist-rationale {
+        .rationale-text {
           font-style: italic;
-          color: #666;
-          margin-top: 1rem;
+          color: #718096;
+          margin: 0 0 1.5rem;
+          font-size: 0.95rem;
         }
 
-        .total-price {
-          font-weight: 600;
-          margin-top: 1rem;
-          color: #333;
-        }
-
-        .style-tags {
+        .price-section {
           display: flex;
-          flex-wrap: wrap;
           justify-content: center;
+          align-items: center;
           gap: 1rem;
-          margin-top: 2rem;
         }
 
-        .style-tag {
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          gap: 0.5rem;
-          padding: 0.5rem;
-          min-width: 80px;
-        }
-
-        .tag-icon {
-          background-color: white;
-          width: 50px;
-          height: 50px;
-          border-radius: 50%;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          font-size: 1.5rem;
-          box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
-        }
-
-        .style-tag span {
-          font-size: 0.8rem;
+        .total-label {
+          font-size: 1.1rem;
+          color: #2d3748;
           font-weight: 500;
-          color: #555;
         }
 
-        @media (min-width: 768px) {
-          .collage-grid {
-            grid-template-columns: repeat(3, 1fr);
+        .total-amount {
+          font-size: 1.5rem;
+          color: #e53e3e;
+          font-weight: 700;
+        }
+
+        .nav-dots {
+          display: flex;
+          justify-content: center;
+          gap: 0.5rem;
+          margin-top: 1.5rem;
+        }
+
+        .nav-dot {
+          width: 8px;
+          height: 8px;
+          border-radius: 50%;
+          background: #cbd5e0;
+          transition: all 0.3s ease;
+        }
+
+        .nav-dot:first-child {
+          background: #4a56e2;
+        }
+
+        @media (max-width: 768px) {
+          .collage-canvas {
+            height: 500px;
           }
-        }
-
-        @media (max-width: 767px) {
-          .collage-grid {
-            grid-template-columns: repeat(2, 1fr);
+          
+          .collage-title {
+            font-size: 2.2rem;
+          }
+          
+          .artistic-item {
+            position: relative !important;
+            top: auto !important;
+            left: auto !important;
+            width: 280px !important;
+            transform: none !important;
+            margin: 1rem auto;
+            display: block;
+          }
+          
+          .collage-canvas {
+            height: auto;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 1.5rem;
           }
         }
 
         @media (max-width: 480px) {
-          .collage-grid {
-            grid-template-columns: 1fr;
+          .artistic-item {
+            width: 250px !important;
           }
-        }
-
-        .product-sources-wrapper {
-          margin: 1.5rem 0;
-        }
-        
-        .product-sources {
-          text-align: center;
-          line-height: 1.8;
-          color: #333;
-          font-size: 1rem;
-          padding: 0 1rem;
-          font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-        }
-        
-        .retailer-link {
-          color: #0066cc;
-          text-decoration: underline;
-          cursor: pointer;
-        }
-        
-        .retailer-link:hover {
-          color: #0044aa;
-          background-color: rgba(0,0,0,0.05);
-        }
-        
-        .retailer-text {
-          color: #666;
-          font-style: italic;
+          
+          .collage-title {
+            font-size: 1.8rem;
+          }
         }
       `}</style>
     </div>
@@ -498,13 +445,10 @@ const getTagIcon = (tag) => {
     'party': '🎉',
     'vintage': '📻',
     'streetwear': '🛹',
-    'minimalist': '✨',
-    'luxury': '💎',
-    'fashion': '👒'
+    'fashion': '✨'
   };
-
-  const lowercaseTag = tag.toLowerCase();
-  return tagMap[lowercaseTag] || '✨';
+  
+  return tagMap[tag.toLowerCase()] || '✨';
 };
 
 export default OutfitCollage; 
