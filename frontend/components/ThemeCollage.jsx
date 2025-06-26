@@ -1,7 +1,10 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { getBestRetailUrl } from '../utils/retailUrlHelper';
 
 const ThemeCollage = ({ title, items = [], style }) => {
+  // Layout state - toggle between 'overlapping' and 'scattered'
+  const [layoutStyle, setLayoutStyle] = useState('scattered'); // Default to cleaner layout
+  
   // Handle clicking on an item - open the product URL in a new tab
   const handleItemClick = (product) => {
     const url = getBestRetailUrl(product);
@@ -22,6 +25,74 @@ const ThemeCollage = ({ title, items = [], style }) => {
   
   // Determine outfit name
   const outfitName = title?.replace('👑', '').trim() || "Stylish Outfit";
+  
+  // IMPROVED: Better positioning logic to prevent excessive overlapping
+  const generateBetterPositions = (items) => {
+    if (!items || items.length === 0) return [];
+    
+    const containerWidth = 800;
+    const containerHeight = 600;
+    
+    if (layoutStyle === 'scattered') {
+      // Gensmo-style clean scattered layout
+      return items.map((item, index) => {
+        const scatteredPositions = [
+          { left: 80, top: 60, width: 180, height: 220 },
+          { left: 320, top: 120, width: 160, height: 200 },
+          { left: 550, top: 90, width: 170, height: 210 },
+          { left: 150, top: 320, width: 165, height: 195 },
+          { left: 420, top: 350, width: 175, height: 215 },
+          { left: 90, top: 480, width: 160, height: 190 }
+        ];
+        
+        const position = scatteredPositions[index] || {
+          left: (index % 3) * (containerWidth / 3) + 40,
+          top: Math.floor(index / 3) * (containerHeight / 2) + 40,
+          width: 170,
+          height: 200
+        };
+        
+        return {
+          ...item,
+          position: {
+            ...position,
+            zIndex: index + 1
+          }
+        };
+      });
+    } else {
+      // Original overlapping polaroid style
+      return items.map((item, index) => {
+        const overlappingPositions = [
+          { left: 50, top: 50, width: 200, height: 250, rotation: -5 },
+          { left: 180, top: 80, width: 190, height: 240, rotation: 3 },
+          { left: 350, top: 60, width: 200, height: 250, rotation: -2 },
+          { left: 120, top: 280, width: 185, height: 230, rotation: 4 },
+          { left: 320, top: 300, width: 195, height: 245, rotation: -3 },
+          { left: 80, top: 450, width: 180, height: 220, rotation: 2 }
+        ];
+        
+        const position = overlappingPositions[index] || {
+          left: (index % 3) * 150 + Math.random() * 100,
+          top: Math.floor(index / 3) * 200 + Math.random() * 80,
+          width: 180 + Math.random() * 40,
+          height: 220 + Math.random() * 50,
+          rotation: (Math.random() - 0.5) * 10
+        };
+        
+        return {
+          ...item,
+          position: {
+            ...position,
+            zIndex: index + 1
+          }
+        };
+      });
+    }
+  };
+
+  // Use improved positioning
+  const positionedItems = generateBetterPositions(items);
   
   // Generate brand links for the outfit details
   const generateBrandLinks = () => {
@@ -88,39 +159,73 @@ const ThemeCollage = ({ title, items = [], style }) => {
       <div className="theme-collage-container">
         <h1 className="theme-collage-title">{title || "Date Night King 👑"}</h1>
         
+        {/* Layout Toggle Controls */}
+        <div className="layout-controls">
+          <button 
+            className={`layout-btn ${layoutStyle === 'scattered' ? 'active' : ''}`}
+            onClick={() => setLayoutStyle('scattered')}
+          >
+            🎯 Clean Layout
+          </button>
+          <button 
+            className={`layout-btn ${layoutStyle === 'overlapping' ? 'active' : ''}`}
+            onClick={() => setLayoutStyle('overlapping')}
+          >
+            📸 Artistic Layout
+          </button>
+        </div>
+        
         <div className="collage-carousel" style={{ backgroundColor: bgColor }}>
           <div className="h-fit w-full pb-24 pt-14">
             <div className="h-auto w-full">
               <div className="relative w-full overflow-hidden rounded-lg">
-                {/* Main collage container with absolute positioning */}
-                <div style={{ height: '1358px', backgroundColor: bgColor }}>
+                {/* IMPROVED: Better collage container with controlled height */}
+                <div style={{ height: '700px', backgroundColor: bgColor, position: 'relative' }}>
                   
-                  {/* Map through items and position them absolutely */}
-                  {items && items.map((item, index) => (
+                  {/* Map through positioned items */}
+                  {positionedItems && positionedItems.map((item, index) => (
                     <div 
                       key={index}
-                      className="absolute cursor-pointer" 
+                      className={`absolute cursor-pointer collage-item ${layoutStyle === 'overlapping' ? 'polaroid-style' : 'clean-style'}`}
                       style={{
                         left: `${item.position.left}px`,
                         top: `${item.position.top}px`,
                         width: `${item.position.width}px`,
                         height: `${item.position.height}px`,
-                        zIndex: item.position.zIndex || 1
+                        zIndex: item.position.zIndex || 1,
+                        transform: layoutStyle === 'overlapping' ? `rotate(${item.position.rotation || 0}deg)` : 'none'
                       }}
                       onClick={() => handleItemClick(item)}
                       role="button"
                       tabIndex={0}
                     >
-                      <img
-                        alt={item.name || item.product_name || "Fashion item"}
-                        crossOrigin="anonymous"
-                        loading="lazy"
-                        width={item.position.width}
-                        height={item.position.height}
-                        className="h-full w-full object-contain animate-custom-bump-once transition-all hover:scale-110"
-                        src={item.imageUrl || item.image_url}
-                        style={{ color: 'transparent' }}
-                      />
+                      {layoutStyle === 'overlapping' ? (
+                        // Polaroid style with frame
+                        <div className="polaroid-frame">
+                          <img
+                            alt={item.name || item.product_name || "Fashion item"}
+                            crossOrigin="anonymous"
+                            loading="lazy"
+                            className="polaroid-image"
+                            src={item.imageUrl || item.image_url}
+                          />
+                          <div className="polaroid-caption">
+                            {item.product_name?.substring(0, 20) || `Item ${index + 1}`}
+                          </div>
+                        </div>
+                      ) : (
+                        // Clean style without frame
+                        <img
+                          alt={item.name || item.product_name || "Fashion item"}
+                          crossOrigin="anonymous"
+                          loading="lazy"
+                          width={item.position.width}
+                          height={item.position.height}
+                          className="h-full w-full object-contain transition-all hover:scale-105 shadow-lg rounded-lg"
+                          src={item.imageUrl || item.image_url}
+                          style={{ color: 'transparent' }}
+                        />
+                      )}
                     </div>
                   ))}
                   
@@ -184,11 +289,88 @@ const ThemeCollage = ({ title, items = [], style }) => {
           text-align: center;
         }
         
+        /* Layout Controls */
+        .layout-controls {
+          display: flex;
+          justify-content: center;
+          gap: 1rem;
+          margin-bottom: 2rem;
+        }
+        
+        .layout-btn {
+          background-color: #f5f5f5;
+          border: 2px solid #e0e0e0;
+          color: #666;
+          padding: 0.75rem 1.5rem;
+          border-radius: 25px;
+          font-weight: 500;
+          cursor: pointer;
+          transition: all 0.3s ease;
+        }
+        
+        .layout-btn.active {
+          background-color: #4a56e2;
+          border-color: #4a56e2;
+          color: white;
+        }
+        
+        .layout-btn:hover {
+          background-color: #e8e8e8;
+        }
+        
+        .layout-btn.active:hover {
+          background-color: #3a46d2;
+        }
+        
         .collage-carousel {
           border-radius: 1rem;
           overflow: hidden;
           position: relative;
           margin-bottom: 2rem;
+        }
+        
+        /* IMPROVED: Better styling for collage items */
+        .collage-item {
+          transition: transform 0.3s ease, box-shadow 0.3s ease;
+          border-radius: 8px;
+          overflow: hidden;
+        }
+        
+        .collage-item.clean-style:hover {
+          transform: translateY(-5px) scale(1.02);
+          box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+        }
+        
+        .collage-item.polaroid-style:hover {
+          transform: translateY(-3px) scale(1.05);
+          box-shadow: 0 12px 30px rgba(0, 0, 0, 0.2);
+        }
+        
+        /* Polaroid Frame Style */
+        .polaroid-frame {
+          background-color: white;
+          padding: 15px 15px 50px 15px;
+          box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
+          border-radius: 4px;
+          width: 100%;
+          height: 100%;
+          display: flex;
+          flex-direction: column;
+        }
+        
+        .polaroid-image {
+          width: 100%;
+          flex: 1;
+          object-fit: cover;
+          border-radius: 2px;
+        }
+        
+        .polaroid-caption {
+          color: #333;
+          font-size: 0.8rem;
+          text-align: center;
+          margin-top: 8px;
+          font-family: 'Courier New', monospace;
         }
         
         .outfit-details {
@@ -280,8 +462,8 @@ const ThemeCollage = ({ title, items = [], style }) => {
           transition-duration: 0.15s;
         }
         
-        .hover\\:scale-110:hover {
-          transform: scale(1.1);
+        .hover\\:scale-105:hover {
+          transform: scale(1.05);
         }
         
         /* Utility classes */
@@ -302,6 +484,29 @@ const ThemeCollage = ({ title, items = [], style }) => {
         .bg-white { background-color: white; }
         .p-2 { padding: 0.5rem; }
         .shadow-md { box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06); }
+        .shadow-lg { box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05); }
+        
+        /* Responsive improvements */
+        @media (max-width: 768px) {
+          .collage-carousel > div > div > div > div {
+            height: 500px !important;
+          }
+          
+          .collage-item {
+            width: 150px !important;
+            height: 180px !important;
+          }
+          
+          .layout-controls {
+            flex-direction: column;
+            align-items: center;
+          }
+          
+          .layout-btn {
+            width: 200px;
+            text-align: center;
+          }
+        }
       `}</style>
     </div>
   );
