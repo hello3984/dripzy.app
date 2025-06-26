@@ -52,154 +52,131 @@ const ThemeCollage = ({ title, items = [], style }) => {
     const { width: containerWidth, height: containerHeight } = containerDimensions;
     const isMobile = containerWidth < 768;
     
-    // IMPROVED: Larger responsive item sizing with bigger gaps
-    const baseItemWidth = isMobile ? 130 : 170;
-    const baseItemHeight = isMobile ? 160 : 210;
-    const minGap = isMobile ? 40 : 60; // INCREASED: Larger minimum gap between items
+    // COMPLETELY REDESIGNED: Much more robust positioning system
+    const baseItemWidth = isMobile ? 140 : 180;
+    const baseItemHeight = isMobile ? 170 : 220;
+    const minGap = isMobile ? 50 : 80; // MASSIVE GAP: Guarantee no overlaps
     
     const positions = [];
     const placedItems = [];
     
-    // Helper function to check if position collides with existing items
+    // SUPER AGGRESSIVE: Multiple collision checks with safety margins
     const hasCollision = (newPos, existingPositions, minGap) => {
       return existingPositions.some(pos => {
-        const horizontalOverlap = newPos.left < pos.left + pos.width + minGap && 
-                                 newPos.left + newPos.width + minGap > pos.left;
-        const verticalOverlap = newPos.top < pos.top + pos.height + minGap && 
-                               newPos.top + newPos.height + minGap > pos.top;
+        // Add extra safety margin to collision detection
+        const safetyMargin = 20;
+        const expandedGap = minGap + safetyMargin;
+        
+        const horizontalOverlap = newPos.left < pos.left + pos.width + expandedGap && 
+                                 newPos.left + newPos.width + expandedGap > pos.left;
+        const verticalOverlap = newPos.top < pos.top + pos.height + expandedGap && 
+                               newPos.top + newPos.height + expandedGap > pos.top;
+        
         return horizontalOverlap && verticalOverlap;
       });
     };
     
-    // IMPROVED: More aggressive boundary checking with larger margins
+    // ULTRA STRICT: Boundary checking with huge margins
     const isWithinBounds = (pos, containerWidth, containerHeight) => {
-      const margin = isMobile ? 20 : 30;
+      const margin = isMobile ? 40 : 60; // MASSIVE MARGINS
       return pos.left >= margin && 
              pos.top >= margin && 
              pos.left + pos.width <= containerWidth - margin && 
              pos.top + pos.height <= containerHeight - margin;
     };
     
-    if (layoutStyle === 'scattered') {
-      // CLEAN SCATTERED LAYOUT - Gensmo style
+    // GRID-FIRST APPROACH: Always use grid if more than 4 items
+    const shouldUseGrid = items.length > 4 || containerWidth < 600;
+    
+    if (shouldUseGrid || layoutStyle === 'scattered') {
+      // GUARANTEED NO OVERLAP: Grid-based positioning
+      const cols = isMobile ? 2 : (items.length > 6 ? 3 : 2);
+      const rows = Math.ceil(items.length / cols);
+      
+      // Calculate cell dimensions with generous padding
+      const padding = isMobile ? 40 : 60;
+      const usableWidth = containerWidth - (padding * 2);
+      const usableHeight = containerHeight - (padding * 2);
+      const cellWidth = usableWidth / cols;
+      const cellHeight = usableHeight / rows;
+      
+      // Ensure items fit within cells with spacing
+      const maxItemWidth = Math.min(cellWidth - minGap, baseItemWidth);
+      const maxItemHeight = Math.min(cellHeight - minGap, baseItemHeight);
+      
       items.forEach((item, index) => {
-        let attempts = 0;
-        let position;
+        const row = Math.floor(index / cols);
+        const col = index % cols;
         
-        do {
-          // IMPROVED: Smaller size variations for more predictable layouts
-          const widthVariation = Math.random() * 20 - 10; // ±10px (reduced)
-          const heightVariation = Math.random() * 15 - 7; // ±7px (reduced)
-          const margin = isMobile ? 20 : 30;
-          
-          position = {
-            left: Math.random() * (containerWidth - baseItemWidth - margin * 2) + margin,
-            top: Math.random() * (containerHeight - baseItemHeight - margin * 2) + margin,
-            width: Math.max(baseItemWidth + widthVariation, baseItemWidth * 0.9),
-            height: Math.max(baseItemHeight + heightVariation, baseItemHeight * 0.9),
-            zIndex: index + 1,
-            rotation: 0 // No rotation for clean layout
-          };
-          
-          attempts++;
-        } while (
-          (hasCollision(position, placedItems, minGap) || !isWithinBounds(position, containerWidth, containerHeight)) && 
-          attempts < 100 // INCREASED: More attempts for better positioning
-        );
+        // Center item in cell with slight random offset for artistic feel
+        const randomX = layoutStyle === 'overlapping' ? (Math.random() - 0.5) * 20 : 0;
+        const randomY = layoutStyle === 'overlapping' ? (Math.random() - 0.5) * 15 : 0;
         
-        // IMPROVED: More robust fallback grid positioning with padding
-        if (attempts >= 100) {
-          const cols = isMobile ? 2 : 3;
-          const rows = Math.ceil(items.length / cols);
-          const row = Math.floor(index / cols);
-          const col = index % cols;
-          
-          // Add padding to prevent edge touching
-          const padding = 20;
-          const usableWidth = containerWidth - (padding * 2);
-          const usableHeight = containerHeight - (padding * 2);
-          const cellWidth = usableWidth / cols;
-          const cellHeight = usableHeight / rows;
-          
-          // Calculate item size to fit in cell with gap
-          const maxItemWidth = Math.min(cellWidth - minGap, baseItemWidth * 0.8);
-          const maxItemHeight = Math.min(cellHeight - minGap, baseItemHeight * 0.8);
-          
-          position = {
-            left: padding + col * cellWidth + (cellWidth - maxItemWidth) / 2,
-            top: padding + row * cellHeight + (cellHeight - maxItemHeight) / 2,
-            width: maxItemWidth,
-            height: maxItemHeight,
-            zIndex: index + 1,
-            rotation: 0
-          };
-        }
+        const position = {
+          left: padding + col * cellWidth + (cellWidth - maxItemWidth) / 2 + randomX,
+          top: padding + row * cellHeight + (cellHeight - maxItemHeight) / 2 + randomY,
+          width: maxItemWidth,
+          height: maxItemHeight,
+          zIndex: index + 1,
+          rotation: layoutStyle === 'overlapping' ? (Math.random() - 0.5) * 6 : 0
+        };
         
-        placedItems.push(position);
+        // Double check bounds
+        position.left = Math.max(padding, Math.min(position.left, containerWidth - maxItemWidth - padding));
+        position.top = Math.max(padding, Math.min(position.top, containerHeight - maxItemHeight - padding));
+        
         positions.push({
           ...item,
           position
         });
       });
     } else {
-      // ARTISTIC OVERLAPPING LAYOUT - Controlled overlap
+      // RANDOM POSITIONING: Only for few items with ultra-careful placement
       items.forEach((item, index) => {
-        let attempts = 0;
         let position;
+        let attempts = 0;
+        let placed = false;
         
-        do {
-          const widthVariation = Math.random() * 30 - 15;
-          const heightVariation = Math.random() * 25 - 12;
+        // Try random positioning with extreme collision avoidance
+        while (!placed && attempts < 200) {
+          const widthVariation = layoutStyle === 'overlapping' ? Math.random() * 20 - 10 : 0;
+          const heightVariation = layoutStyle === 'overlapping' ? Math.random() * 15 - 7 : 0;
           
           position = {
-            left: Math.random() * (containerWidth - baseItemWidth - 20) + 10,
-            top: Math.random() * (containerHeight - baseItemHeight - 20) + 10,
+            left: Math.random() * (containerWidth - baseItemWidth - 120) + 60,
+            top: Math.random() * (containerHeight - baseItemHeight - 120) + 60,
             width: baseItemWidth + widthVariation,
             height: baseItemHeight + heightVariation,
             zIndex: index + 1,
-            rotation: (Math.random() - 0.5) * 8 // Subtle rotation ±4 degrees
+            rotation: layoutStyle === 'overlapping' ? (Math.random() - 0.5) * 8 : 0
           };
           
+          if (!hasCollision(position, placedItems, minGap) && isWithinBounds(position, containerWidth, containerHeight)) {
+            placed = true;
+            placedItems.push(position);
+          }
+          
           attempts++;
-        } while (
-          (hasCollision(position, placedItems, minGap * 0.5) || !isWithinBounds(position, containerWidth, containerHeight)) && 
-          attempts < 80 // IMPROVED: More attempts with slightly more overlap allowed for artistic style
-        );
+        }
         
-        // IMPROVED: Better controlled fallback with artistic positioning
-        if (attempts >= 80) {
-          const cols = isMobile ? 2 : 3;
-          const rows = Math.ceil(items.length / cols);
+        // FAILSAFE: Force grid position if random fails
+        if (!placed) {
+          const cols = 2;
           const row = Math.floor(index / cols);
           const col = index % cols;
-          
-          const padding = 30;
-          const usableWidth = containerWidth - (padding * 2);
-          const usableHeight = containerHeight - (padding * 2);
-          const cellWidth = usableWidth / cols;
-          const cellHeight = usableHeight / rows;
-          
-          // Add some artistic randomness but keep within bounds
-          const randomX = (Math.random() - 0.5) * 40; // ±20px variation
-          const randomY = (Math.random() - 0.5) * 30; // ±15px variation
+          const cellWidth = (containerWidth - 120) / cols;
+          const cellHeight = (containerHeight - 120) / Math.ceil(items.length / cols);
           
           position = {
-            left: Math.max(padding, Math.min(
-              padding + col * cellWidth + (cellWidth - baseItemWidth) / 2 + randomX,
-              containerWidth - baseItemWidth - padding
-            )),
-            top: Math.max(padding, Math.min(
-              padding + row * cellHeight + (cellHeight - baseItemHeight) / 2 + randomY,
-              containerHeight - baseItemHeight - padding
-            )),
-            width: baseItemWidth * 0.95,
-            height: baseItemHeight * 0.95,
+            left: 60 + col * cellWidth + (cellWidth - baseItemWidth) / 2,
+            top: 60 + row * cellHeight + (cellHeight - baseItemHeight) / 2,
+            width: baseItemWidth * 0.9,
+            height: baseItemHeight * 0.9,
             zIndex: index + 1,
-            rotation: (Math.random() - 0.5) * 4 // Reduced rotation for better control
+            rotation: 0
           };
         }
         
-        placedItems.push(position);
         positions.push({
           ...item,
           position
@@ -317,54 +294,94 @@ const ThemeCollage = ({ title, items = [], style }) => {
                 >
                   
                   {/* Map through smartly positioned items */}
-                  {positionedItems && positionedItems.map((item, index) => (
-                    <div 
-                      key={index}
-                      className={`absolute cursor-pointer collage-item ${layoutStyle === 'overlapping' ? 'polaroid-style' : 'clean-style'}`}
-                      style={{
-                        left: `${Math.max(0, Math.min(item.position.left, containerDimensions.width - item.position.width))}px`,
-                        top: `${Math.max(0, Math.min(item.position.top, containerDimensions.height - item.position.height))}px`,
-                        width: `${item.position.width}px`,
-                        height: `${item.position.height}px`,
-                        zIndex: item.position.zIndex || 1,
-                        transform: `rotate(${item.position.rotation || 0}deg)`
-                      }}
-                      onClick={() => handleItemClick(item)}
-                      role="button"
-                      tabIndex={0}
-                    >
-                      {layoutStyle === 'overlapping' ? (
-                        // Polaroid style with frame
-                        <div className="polaroid-frame">
-                          <img
-                            alt={item.name || item.product_name || "Fashion item"}
-                            crossOrigin="anonymous"
-                            loading="lazy"
-                            className="polaroid-image"
-                            src={item.imageUrl || item.image_url}
-                          />
-                          <div className="polaroid-caption">
-                            {item.product_name?.substring(0, 20) || `Item ${index + 1}`}
+                  {positionedItems && positionedItems.map((item, index) => {
+                    // IMPROVED: Better image source handling with multiple fallbacks
+                    const getImageSrc = (item) => {
+                      return item.imageUrl || 
+                             item.image_url || 
+                             item.img || 
+                             item.productImage || 
+                             item.src ||
+                             'https://via.placeholder.com/200x250/f0f0f0/999999?text=Fashion+Item';
+                    };
+                    
+                    return (
+                      <div 
+                        key={`${index}-${item.id || item.product_name || index}`}
+                        className={`absolute cursor-pointer collage-item ${layoutStyle === 'overlapping' ? 'polaroid-style' : 'clean-style'}`}
+                        style={{
+                          left: `${Math.max(0, Math.min(item.position.left, containerDimensions.width - item.position.width))}px`,
+                          top: `${Math.max(0, Math.min(item.position.top, containerDimensions.height - item.position.height))}px`,
+                          width: `${item.position.width}px`,
+                          height: `${item.position.height}px`,
+                          zIndex: item.position.zIndex || 1,
+                          transform: `rotate(${item.position.rotation || 0}deg)`
+                        }}
+                        onClick={() => handleItemClick(item)}
+                        role="button"
+                        tabIndex={0}
+                      >
+                        {layoutStyle === 'overlapping' ? (
+                          // Polaroid style with frame
+                          <div className="polaroid-frame">
+                            <img
+                              alt={item.name || item.product_name || "Fashion item"}
+                              crossOrigin="anonymous"
+                              loading="lazy"
+                              className="polaroid-image"
+                              src={getImageSrc(item)}
+                              onError={(e) => {
+                                // ROBUST: Multiple fallback attempts
+                                if (e.target.src !== 'https://via.placeholder.com/200x250/f0f0f0/999999?text=Fashion+Item') {
+                                  e.target.src = 'https://via.placeholder.com/200x250/f0f0f0/999999?text=Fashion+Item';
+                                }
+                              }}
+                              onLoad={(e) => {
+                                // Ensure image is visible once loaded
+                                e.target.style.opacity = '1';
+                              }}
+                              style={{
+                                opacity: '0',
+                                transition: 'opacity 0.3s ease'
+                              }}
+                            />
+                            <div className="polaroid-caption">
+                              {(item.product_name || item.name || `Item ${index + 1}`)?.substring(0, 20)}
+                            </div>
                           </div>
-                        </div>
-                      ) : (
-                        // Clean style without frame
-                        <div className="clean-item-container">
-                          <img
-                            alt={item.name || item.product_name || "Fashion item"}
-                            crossOrigin="anonymous"
-                            loading="lazy"
-                            className="clean-item-image"
-                            src={item.imageUrl || item.image_url}
-                          />
-                          <div className="clean-item-overlay">
-                            <div className="item-price">${item.price || '0.00'}</div>
-                            <div className="item-brand">{item.brand || 'Brand'}</div>
+                        ) : (
+                          // Clean style without frame
+                          <div className="clean-item-container">
+                            <img
+                              alt={item.name || item.product_name || "Fashion item"}
+                              crossOrigin="anonymous"
+                              loading="lazy"
+                              className="clean-item-image"
+                              src={getImageSrc(item)}
+                              onError={(e) => {
+                                // ROBUST: Multiple fallback attempts
+                                if (e.target.src !== 'https://via.placeholder.com/200x250/f0f0f0/999999?text=Fashion+Item') {
+                                  e.target.src = 'https://via.placeholder.com/200x250/f0f0f0/999999?text=Fashion+Item';
+                                }
+                              }}
+                              onLoad={(e) => {
+                                // Ensure image is visible once loaded
+                                e.target.style.opacity = '1';
+                              }}
+                              style={{
+                                opacity: '0',
+                                transition: 'opacity 0.3s ease'
+                              }}
+                            />
+                            <div className="clean-item-overlay">
+                              <div className="item-price">${item.price || '0.00'}</div>
+                              <div className="item-brand">{item.brand || 'Brand'}</div>
+                            </div>
                           </div>
-                        </div>
-                      )}
-                    </div>
-                  ))}
+                        )}
+                      </div>
+                    );
+                  })}
                   
                   {/* Action buttons */}
                   <div className="absolute bottom-5 right-5 flex gap-2">
@@ -472,6 +489,12 @@ const ThemeCollage = ({ title, items = [], style }) => {
           border-radius: 8px;
           overflow: hidden;
           will-change: transform;
+          /* DEFENSIVE: Prevent any layout shifts */
+          box-sizing: border-box;
+          position: absolute !important;
+          /* ENSURE: Always stay within bounds */
+          max-width: calc(100% - 40px);
+          max-height: calc(100% - 40px);
         }
         
         .collage-item.clean-style:hover {
@@ -495,6 +518,8 @@ const ThemeCollage = ({ title, items = [], style }) => {
           overflow: hidden;
           background: white;
           box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+          /* IMPROVED: Better loading state */
+          border: 2px solid #f0f0f0;
         }
         
         .clean-item-image {
@@ -502,6 +527,26 @@ const ThemeCollage = ({ title, items = [], style }) => {
           height: 85%;
           object-fit: cover;
           border-radius: 12px 12px 0 0;
+          /* IMPROVED: Better loading and error states */
+          background-color: #f8f8f8;
+          border: none;
+          display: block;
+        }
+        
+        /* IMPROVED: Loading state for images */
+        .clean-item-image[style*="opacity: 0"] {
+          background: linear-gradient(45deg, #f0f0f0 25%, transparent 25%), 
+                      linear-gradient(-45deg, #f0f0f0 25%, transparent 25%), 
+                      linear-gradient(45deg, transparent 75%, #f0f0f0 75%), 
+                      linear-gradient(-45deg, transparent 75%, #f0f0f0 75%);
+          background-size: 20px 20px;
+          background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
+          animation: loading 1s linear infinite;
+        }
+        
+        @keyframes loading {
+          0% { background-position: 0 0, 0 10px, 10px -10px, -10px 0px; }
+          100% { background-position: 20px 20px, 20px 30px, 30px 10px, 10px 20px; }
         }
         
         .clean-item-overlay {
@@ -514,18 +559,31 @@ const ThemeCollage = ({ title, items = [], style }) => {
           display: flex;
           justify-content: space-between;
           align-items: center;
+          /* DEFENSIVE: Ensure overlay stays in place */
+          box-sizing: border-box;
+          min-height: 15%;
         }
         
         .item-price {
           font-weight: 700;
           color: #ff6b6b;
           font-size: 0.9rem;
+          /* DEFENSIVE: Prevent text overflow */
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          max-width: 50%;
         }
         
         .item-brand {
           font-size: 0.8rem;
           color: #666;
           text-transform: uppercase;
+          /* DEFENSIVE: Prevent text overflow */
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          max-width: 50%;
         }
         
         /* Polaroid Frame Style */
@@ -538,6 +596,9 @@ const ThemeCollage = ({ title, items = [], style }) => {
           height: 100%;
           display: flex;
           flex-direction: column;
+          /* DEFENSIVE: Prevent content overflow */
+          box-sizing: border-box;
+          overflow: hidden;
         }
         
         .polaroid-image {
@@ -545,6 +606,22 @@ const ThemeCollage = ({ title, items = [], style }) => {
           flex: 1;
           object-fit: cover;
           border-radius: 2px;
+          /* IMPROVED: Better loading and error states */
+          background-color: #f8f8f8;
+          border: 1px solid #e0e0e0;
+          display: block;
+          min-height: 60%;
+        }
+        
+        /* IMPROVED: Loading state for polaroid images */
+        .polaroid-image[style*="opacity: 0"] {
+          background: linear-gradient(45deg, #f0f0f0 25%, transparent 25%), 
+                      linear-gradient(-45deg, #f0f0f0 25%, transparent 25%), 
+                      linear-gradient(45deg, transparent 75%, #f0f0f0 75%), 
+                      linear-gradient(-45deg, transparent 75%, #f0f0f0 75%);
+          background-size: 15px 15px;
+          background-position: 0 0, 0 7px, 7px -7px, -7px 0px;
+          animation: loading 1.5s linear infinite;
         }
         
         .polaroid-caption {
@@ -556,6 +633,10 @@ const ThemeCollage = ({ title, items = [], style }) => {
           white-space: nowrap;
           overflow: hidden;
           text-overflow: ellipsis;
+          /* DEFENSIVE: Ensure caption has space */
+          flex-shrink: 0;
+          height: 20px;
+          line-height: 20px;
         }
         
         .outfit-details {
