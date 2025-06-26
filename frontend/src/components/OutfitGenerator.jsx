@@ -250,20 +250,40 @@ const OutfitGenerator = () => {
               {generatedOutfit.items.map((item, index) => (
                 <div key={index} className="outfit-item">
                   <div className="item-image">
-                    {item.image_url && !item.image_url.includes('placeholder') && 
-                     !item.image_url.includes('unsplash') && 
+                    {/* ENHANCED: Show all legitimate images including SerpAPI */}
+                    {item.image_url && item.image_url.trim() && 
+                     item.image_url.startsWith('http') && 
                      !item.image_url.includes('via.placeholder') ? (
                       <img 
                         src={item.image_url} 
                         alt={item.product_name || item.type} 
                         onError={(e) => {
-                          e.target.style.display = 'none';
-                          e.target.parentNode.innerHTML = '<div class="missing-image-note">Image unavailable</div>';
+                          // IMPROVED: Better error handling with fallback
+                          console.log(`Failed to load image: ${item.image_url}`);
+                          e.target.src = `https://via.placeholder.com/300x400/f8f9fa/333333?text=${encodeURIComponent(item.product_name?.substring(0, 20) || 'Fashion Item')}`;
+                          e.target.style.opacity = '0.7';
+                          e.target.style.border = '2px dashed #ddd';
+                        }}
+                        onLoad={(e) => {
+                          // Image loaded successfully
+                          e.target.style.opacity = '1';
+                          e.target.style.border = 'none';
+                        }}
+                        style={{ 
+                          opacity: '0.8', 
+                          transition: 'opacity 0.3s ease',
+                          maxWidth: '100%',
+                          height: 'auto',
+                          objectFit: 'cover'
                         }}
                       />
                     ) : (
                       <div className="missing-image-note">
-                        Image for {item.product_name} will be available soon
+                        <div className="placeholder-icon" style={{fontSize: '2rem', marginBottom: '8px'}}>👗</div>
+                        <span>{item.product_name ? `${item.product_name.substring(0, 30)}...` : item.category || 'Fashion Item'}</span>
+                        <div style={{fontSize: '0.8rem', color: '#888', marginTop: '4px'}}>
+                          {item.brand && `by ${item.brand}`}
+                        </div>
                       </div>
                     )}
                   </div>
