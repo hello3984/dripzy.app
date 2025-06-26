@@ -1,9 +1,28 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { getBestRetailUrl } from '../utils/retailUrlHelper';
 
 const ThemeCollage = ({ title, items = [], style }) => {
   // Layout state - toggle between 'overlapping' and 'scattered'
   const [layoutStyle, setLayoutStyle] = useState('scattered'); // Default to cleaner layout
+  const [containerDimensions, setContainerDimensions] = useState({ width: 800, height: 600 });
+  const containerRef = useRef(null);
+  
+  // Update container dimensions on resize
+  useEffect(() => {
+    const updateDimensions = () => {
+      if (containerRef.current) {
+        const rect = containerRef.current.getBoundingClientRect();
+        setContainerDimensions({
+          width: Math.max(rect.width, 600),
+          height: Math.max(rect.height, 400)
+        });
+      }
+    };
+    
+    updateDimensions();
+    window.addEventListener('resize', updateDimensions);
+    return () => window.removeEventListener('resize', updateDimensions);
+  }, []);
   
   // Handle clicking on an item - open the product URL in a new tab
   const handleItemClick = (product) => {
@@ -26,73 +45,180 @@ const ThemeCollage = ({ title, items = [], style }) => {
   // Determine outfit name
   const outfitName = title?.replace('👑', '').trim() || "Stylish Outfit";
   
-  // IMPROVED: Better positioning logic to prevent excessive overlapping
-  const generateBetterPositions = (items) => {
+  // ADVANCED: Smart positioning with collision detection
+  const generateSmartPositions = (items) => {
     if (!items || items.length === 0) return [];
     
-    const containerWidth = 800;
-    const containerHeight = 600;
+    const { width: containerWidth, height: containerHeight } = containerDimensions;
+    const isMobile = containerWidth < 768;
+    
+    // IMPROVED: Larger responsive item sizing with bigger gaps
+    const baseItemWidth = isMobile ? 130 : 170;
+    const baseItemHeight = isMobile ? 160 : 210;
+    const minGap = isMobile ? 40 : 60; // INCREASED: Larger minimum gap between items
+    
+    const positions = [];
+    const placedItems = [];
+    
+    // Helper function to check if position collides with existing items
+    const hasCollision = (newPos, existingPositions, minGap) => {
+      return existingPositions.some(pos => {
+        const horizontalOverlap = newPos.left < pos.left + pos.width + minGap && 
+                                 newPos.left + newPos.width + minGap > pos.left;
+        const verticalOverlap = newPos.top < pos.top + pos.height + minGap && 
+                               newPos.top + newPos.height + minGap > pos.top;
+        return horizontalOverlap && verticalOverlap;
+      });
+    };
+    
+    // IMPROVED: More aggressive boundary checking with larger margins
+    const isWithinBounds = (pos, containerWidth, containerHeight) => {
+      const margin = isMobile ? 20 : 30;
+      return pos.left >= margin && 
+             pos.top >= margin && 
+             pos.left + pos.width <= containerWidth - margin && 
+             pos.top + pos.height <= containerHeight - margin;
+    };
     
     if (layoutStyle === 'scattered') {
-      // Gensmo-style clean scattered layout
-      return items.map((item, index) => {
-        const scatteredPositions = [
-          { left: 80, top: 60, width: 180, height: 220 },
-          { left: 320, top: 120, width: 160, height: 200 },
-          { left: 550, top: 90, width: 170, height: 210 },
-          { left: 150, top: 320, width: 165, height: 195 },
-          { left: 420, top: 350, width: 175, height: 215 },
-          { left: 90, top: 480, width: 160, height: 190 }
-        ];
+      // CLEAN SCATTERED LAYOUT - Gensmo style
+      items.forEach((item, index) => {
+        let attempts = 0;
+        let position;
         
-        const position = scatteredPositions[index] || {
-          left: (index % 3) * (containerWidth / 3) + 40,
-          top: Math.floor(index / 3) * (containerHeight / 2) + 40,
-          width: 170,
-          height: 200
-        };
+        do {
+          // IMPROVED: Smaller size variations for more predictable layouts
+          const widthVariation = Math.random() * 20 - 10; // ±10px (reduced)
+          const heightVariation = Math.random() * 15 - 7; // ±7px (reduced)
+          const margin = isMobile ? 20 : 30;
+          
+          position = {
+            left: Math.random() * (containerWidth - baseItemWidth - margin * 2) + margin,
+            top: Math.random() * (containerHeight - baseItemHeight - margin * 2) + margin,
+            width: Math.max(baseItemWidth + widthVariation, baseItemWidth * 0.9),
+            height: Math.max(baseItemHeight + heightVariation, baseItemHeight * 0.9),
+            zIndex: index + 1,
+            rotation: 0 // No rotation for clean layout
+          };
+          
+          attempts++;
+        } while (
+          (hasCollision(position, placedItems, minGap) || !isWithinBounds(position, containerWidth, containerHeight)) && 
+          attempts < 100 // INCREASED: More attempts for better positioning
+        );
         
-        return {
+        // IMPROVED: More robust fallback grid positioning with padding
+        if (attempts >= 100) {
+          const cols = isMobile ? 2 : 3;
+          const rows = Math.ceil(items.length / cols);
+          const row = Math.floor(index / cols);
+          const col = index % cols;
+          
+          // Add padding to prevent edge touching
+          const padding = 20;
+          const usableWidth = containerWidth - (padding * 2);
+          const usableHeight = containerHeight - (padding * 2);
+          const cellWidth = usableWidth / cols;
+          const cellHeight = usableHeight / rows;
+          
+          // Calculate item size to fit in cell with gap
+          const maxItemWidth = Math.min(cellWidth - minGap, baseItemWidth * 0.8);
+          const maxItemHeight = Math.min(cellHeight - minGap, baseItemHeight * 0.8);
+          
+          position = {
+            left: padding + col * cellWidth + (cellWidth - maxItemWidth) / 2,
+            top: padding + row * cellHeight + (cellHeight - maxItemHeight) / 2,
+            width: maxItemWidth,
+            height: maxItemHeight,
+            zIndex: index + 1,
+            rotation: 0
+          };
+        }
+        
+        placedItems.push(position);
+        positions.push({
           ...item,
-          position: {
-            ...position,
-            zIndex: index + 1
-          }
-        };
+          position
+        });
       });
     } else {
-      // Original overlapping polaroid style
-      return items.map((item, index) => {
-        const overlappingPositions = [
-          { left: 50, top: 50, width: 200, height: 250, rotation: -5 },
-          { left: 180, top: 80, width: 190, height: 240, rotation: 3 },
-          { left: 350, top: 60, width: 200, height: 250, rotation: -2 },
-          { left: 120, top: 280, width: 185, height: 230, rotation: 4 },
-          { left: 320, top: 300, width: 195, height: 245, rotation: -3 },
-          { left: 80, top: 450, width: 180, height: 220, rotation: 2 }
-        ];
+      // ARTISTIC OVERLAPPING LAYOUT - Controlled overlap
+      items.forEach((item, index) => {
+        let attempts = 0;
+        let position;
         
-        const position = overlappingPositions[index] || {
-          left: (index % 3) * 150 + Math.random() * 100,
-          top: Math.floor(index / 3) * 200 + Math.random() * 80,
-          width: 180 + Math.random() * 40,
-          height: 220 + Math.random() * 50,
-          rotation: (Math.random() - 0.5) * 10
-        };
+        do {
+          const widthVariation = Math.random() * 30 - 15;
+          const heightVariation = Math.random() * 25 - 12;
+          
+          position = {
+            left: Math.random() * (containerWidth - baseItemWidth - 20) + 10,
+            top: Math.random() * (containerHeight - baseItemHeight - 20) + 10,
+            width: baseItemWidth + widthVariation,
+            height: baseItemHeight + heightVariation,
+            zIndex: index + 1,
+            rotation: (Math.random() - 0.5) * 8 // Subtle rotation ±4 degrees
+          };
+          
+          attempts++;
+        } while (
+          (hasCollision(position, placedItems, minGap * 0.5) || !isWithinBounds(position, containerWidth, containerHeight)) && 
+          attempts < 80 // IMPROVED: More attempts with slightly more overlap allowed for artistic style
+        );
         
-        return {
+        // IMPROVED: Better controlled fallback with artistic positioning
+        if (attempts >= 80) {
+          const cols = isMobile ? 2 : 3;
+          const rows = Math.ceil(items.length / cols);
+          const row = Math.floor(index / cols);
+          const col = index % cols;
+          
+          const padding = 30;
+          const usableWidth = containerWidth - (padding * 2);
+          const usableHeight = containerHeight - (padding * 2);
+          const cellWidth = usableWidth / cols;
+          const cellHeight = usableHeight / rows;
+          
+          // Add some artistic randomness but keep within bounds
+          const randomX = (Math.random() - 0.5) * 40; // ±20px variation
+          const randomY = (Math.random() - 0.5) * 30; // ±15px variation
+          
+          position = {
+            left: Math.max(padding, Math.min(
+              padding + col * cellWidth + (cellWidth - baseItemWidth) / 2 + randomX,
+              containerWidth - baseItemWidth - padding
+            )),
+            top: Math.max(padding, Math.min(
+              padding + row * cellHeight + (cellHeight - baseItemHeight) / 2 + randomY,
+              containerHeight - baseItemHeight - padding
+            )),
+            width: baseItemWidth * 0.95,
+            height: baseItemHeight * 0.95,
+            zIndex: index + 1,
+            rotation: (Math.random() - 0.5) * 4 // Reduced rotation for better control
+          };
+        }
+        
+        placedItems.push(position);
+        positions.push({
           ...item,
-          position: {
-            ...position,
-            zIndex: index + 1
-          }
-        };
+          position
+        });
       });
     }
+    
+    return positions;
   };
 
-  // Use improved positioning
-  const positionedItems = generateBetterPositions(items);
+  // Use smart positioning
+  const positionedItems = generateSmartPositions(items);
+  
+  // Calculate responsive container height
+  const getContainerHeight = () => {
+    if (containerDimensions.width < 768) return '500px'; // Mobile
+    if (containerDimensions.width < 1024) return '600px'; // Tablet
+    return '700px'; // Desktop
+  };
   
   // Generate brand links for the outfit details
   const generateBrandLinks = () => {
@@ -179,21 +305,29 @@ const ThemeCollage = ({ title, items = [], style }) => {
           <div className="h-fit w-full pb-24 pt-14">
             <div className="h-auto w-full">
               <div className="relative w-full overflow-hidden rounded-lg">
-                {/* IMPROVED: Better collage container with controlled height */}
-                <div style={{ height: '700px', backgroundColor: bgColor, position: 'relative' }}>
+                {/* SMART: Responsive collage container */}
+                <div 
+                  ref={containerRef}
+                  style={{ 
+                    height: getContainerHeight(), 
+                    backgroundColor: bgColor, 
+                    position: 'relative',
+                    minHeight: '400px'
+                  }}
+                >
                   
-                  {/* Map through positioned items */}
+                  {/* Map through smartly positioned items */}
                   {positionedItems && positionedItems.map((item, index) => (
                     <div 
                       key={index}
                       className={`absolute cursor-pointer collage-item ${layoutStyle === 'overlapping' ? 'polaroid-style' : 'clean-style'}`}
                       style={{
-                        left: `${item.position.left}px`,
-                        top: `${item.position.top}px`,
+                        left: `${Math.max(0, Math.min(item.position.left, containerDimensions.width - item.position.width))}px`,
+                        top: `${Math.max(0, Math.min(item.position.top, containerDimensions.height - item.position.height))}px`,
                         width: `${item.position.width}px`,
                         height: `${item.position.height}px`,
                         zIndex: item.position.zIndex || 1,
-                        transform: layoutStyle === 'overlapping' ? `rotate(${item.position.rotation || 0}deg)` : 'none'
+                        transform: `rotate(${item.position.rotation || 0}deg)`
                       }}
                       onClick={() => handleItemClick(item)}
                       role="button"
@@ -215,16 +349,19 @@ const ThemeCollage = ({ title, items = [], style }) => {
                         </div>
                       ) : (
                         // Clean style without frame
-                        <img
-                          alt={item.name || item.product_name || "Fashion item"}
-                          crossOrigin="anonymous"
-                          loading="lazy"
-                          width={item.position.width}
-                          height={item.position.height}
-                          className="h-full w-full object-contain transition-all hover:scale-105 shadow-lg rounded-lg"
-                          src={item.imageUrl || item.image_url}
-                          style={{ color: 'transparent' }}
-                        />
+                        <div className="clean-item-container">
+                          <img
+                            alt={item.name || item.product_name || "Fashion item"}
+                            crossOrigin="anonymous"
+                            loading="lazy"
+                            className="clean-item-image"
+                            src={item.imageUrl || item.image_url}
+                          />
+                          <div className="clean-item-overlay">
+                            <div className="item-price">${item.price || '0.00'}</div>
+                            <div className="item-brand">{item.brand || 'Brand'}</div>
+                          </div>
+                        </div>
                       )}
                     </div>
                   ))}
@@ -329,28 +466,73 @@ const ThemeCollage = ({ title, items = [], style }) => {
           margin-bottom: 2rem;
         }
         
-        /* IMPROVED: Better styling for collage items */
+        /* SMART: Enhanced collage items with no overlap issues */
         .collage-item {
-          transition: transform 0.3s ease, box-shadow 0.3s ease;
+          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
           border-radius: 8px;
           overflow: hidden;
+          will-change: transform;
         }
         
         .collage-item.clean-style:hover {
-          transform: translateY(-5px) scale(1.02);
-          box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+          transform: translateY(-8px) scale(1.05) !important;
+          box-shadow: 0 15px 35px rgba(0, 0, 0, 0.15);
+          z-index: 1000 !important;
         }
         
         .collage-item.polaroid-style:hover {
-          transform: translateY(-3px) scale(1.05);
-          box-shadow: 0 12px 30px rgba(0, 0, 0, 0.2);
+          transform: translateY(-5px) scale(1.03) rotate(0deg) !important;
+          box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
+          z-index: 1000 !important;
+        }
+        
+        /* Clean Item Style */
+        .clean-item-container {
+          position: relative;
+          width: 100%;
+          height: 100%;
+          border-radius: 12px;
+          overflow: hidden;
+          background: white;
+          box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+        }
+        
+        .clean-item-image {
+          width: 100%;
+          height: 85%;
+          object-fit: cover;
+          border-radius: 12px 12px 0 0;
+        }
+        
+        .clean-item-overlay {
+          position: absolute;
+          bottom: 0;
+          left: 0;
+          right: 0;
+          background: white;
+          padding: 8px 12px;
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+        }
+        
+        .item-price {
+          font-weight: 700;
+          color: #ff6b6b;
+          font-size: 0.9rem;
+        }
+        
+        .item-brand {
+          font-size: 0.8rem;
+          color: #666;
+          text-transform: uppercase;
         }
         
         /* Polaroid Frame Style */
         .polaroid-frame {
           background-color: white;
-          padding: 15px 15px 50px 15px;
-          box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
+          padding: 15px 15px 45px 15px;
+          box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
           border-radius: 4px;
           width: 100%;
           height: 100%;
@@ -367,10 +549,13 @@ const ThemeCollage = ({ title, items = [], style }) => {
         
         .polaroid-caption {
           color: #333;
-          font-size: 0.8rem;
+          font-size: 0.75rem;
           text-align: center;
           margin-top: 8px;
           font-family: 'Courier New', monospace;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
         }
         
         .outfit-details {
@@ -444,28 +629,6 @@ const ThemeCollage = ({ title, items = [], style }) => {
           cursor: pointer;
         }
         
-        /* Animations */
-        @keyframes custom-bump-once {
-          0% { transform: scale(1); }
-          50% { transform: scale(1.05); }
-          100% { transform: scale(1); }
-        }
-        
-        .animate-custom-bump-once {
-          animation: custom-bump-once 0.75s ease-in-out forwards;
-        }
-        
-        /* Transitions */
-        .transition-all {
-          transition-property: all;
-          transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
-          transition-duration: 0.15s;
-        }
-        
-        .hover\\:scale-105:hover {
-          transform: scale(1.05);
-        }
-        
         /* Utility classes */
         .h-fit { height: fit-content; }
         .w-full { width: 100%; }
@@ -484,17 +647,55 @@ const ThemeCollage = ({ title, items = [], style }) => {
         .bg-white { background-color: white; }
         .p-2 { padding: 0.5rem; }
         .shadow-md { box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06); }
-        .shadow-lg { box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05); }
         
-        /* Responsive improvements */
+        /* RESPONSIVE: Smart mobile adaptations */
         @media (max-width: 768px) {
-          .collage-carousel > div > div > div > div {
-            height: 500px !important;
+          .theme-collage-container {
+            padding: 1rem;
+          }
+          
+          .theme-collage-title {
+            font-size: 1.8rem;
+          }
+          
+          .layout-controls {
+            gap: 0.5rem;
+          }
+          
+          .layout-btn {
+            padding: 0.5rem 1rem;
+            font-size: 0.9rem;
           }
           
           .collage-item {
-            width: 150px !important;
-            height: 180px !important;
+            min-width: 120px !important;
+            min-height: 150px !important;
+          }
+          
+          .polaroid-frame {
+            padding: 10px 10px 35px 10px;
+          }
+          
+          .polaroid-caption {
+            font-size: 0.7rem;
+          }
+          
+          .clean-item-overlay {
+            padding: 6px 8px;
+          }
+          
+          .item-price {
+            font-size: 0.8rem;
+          }
+          
+          .item-brand {
+            font-size: 0.7rem;
+          }
+        }
+        
+        @media (max-width: 480px) {
+          .theme-collage-title {
+            font-size: 1.5rem;
           }
           
           .layout-controls {
