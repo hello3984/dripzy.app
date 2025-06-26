@@ -276,11 +276,33 @@ class SerpAPIService:
     ) -> List[Dict[str, Any]]:
         """Process and format the search results."""
         products = []
+        excluded_brands = ["shein", "temu"]  # Completely blocked brands
         
-        # Take only the requested number of results
-        results = results[:limit]
-        
+        # Filter out excluded brands BEFORE processing
+        filtered_results = []
         for result in results:
+            # Extract brand, source, and title for checking
+            brand = self._extract_brand(result).lower()
+            source = result.get("source", "").lower()
+            title = result.get("title", "").lower()
+            
+            # Skip if any excluded brand is detected
+            is_excluded = (
+                any(excluded_brand in brand for excluded_brand in excluded_brands) or
+                any(excluded_brand in source for excluded_brand in excluded_brands) or
+                any(excluded_brand in title for excluded_brand in excluded_brands)
+            )
+            
+            if is_excluded:
+                logger.info(f"🚫 EXCLUDED BRAND FILTERED OUT: {result.get('title', 'Unknown')} - Brand: {brand}")
+                continue  # Skip this product completely
+            
+            filtered_results.append(result)
+        
+        # Take only the requested number of results from filtered list
+        filtered_results = filtered_results[:limit]
+        
+        for result in filtered_results:
             # Generate a unique product ID
             product_id = f"serpapi-{uuid.uuid4()}"
             
@@ -943,33 +965,36 @@ class SerpAPIService:
         return keywords[:4]  # Limit to 4 most relevant keywords
     
     def _choose_optimal_retailer(self, brand: str, category: str, search_query: str) -> str:
-        """Choose the optimal retailer based on brand positioning (like competitor)."""
+        """FARFETCH-FIRST retailer selection - prioritizes Farfetch for all products."""
         brand_lower = brand.lower() if brand else ""
         query_lower = search_query.lower()
         
-        # High-end brands → Farfetch (matches competitor strategy)
-        luxury_indicators = [
-            "designer", "luxury", "premium", "collection", "couture",
-            "saint laurent", "gucci", "prada", "balenciaga", "jacquemus"
-        ]
+        # FARFETCH-FIRST APPROACH: Always try Farfetch first for best selection
+        # Only use exceptions for very specific cases
         
-        if any(indicator in brand_lower or indicator in query_lower for indicator in luxury_indicators):
-            return "farfetch"
-        
-        # Mid-tier brands → Nordstrom (good selection and image quality)
-        mid_tier_indicators = [
-            "theory", "j.crew", "banana republic", "everlane", "cos"
-        ]
-        
-        if any(indicator in brand_lower for indicator in mid_tier_indicators):
-            return "nordstrom"
-        
-        # Amazon sellers → Use Amazon directly for better images
+        # Exception 1: Direct Amazon sellers (when product is already from Amazon)
         if "amazon" in brand_lower or "seller" in brand_lower:
             return "amazon"
         
-        # Default strategy: Nordstrom for best general selection
-        return "nordstrom"
+        # Exception 2: Ultra-budget brands (Shein/Temu completely excluded)
+        ultra_budget_brands = ["wish", "aliexpress"]
+        excluded_brands = ["shein", "temu"]  # These brands are completely blocked
+        
+        # Block excluded brands completely - return Farfetch (but they shouldn't appear)
+        if any(brand_name in brand_lower for brand_name in excluded_brands):
+            return "farfetch"  # Excluded brands forced to Farfetch but should be filtered out
+            
+        if any(brand_name in brand_lower for brand_name in ultra_budget_brands):
+            return "nordstrom"
+        
+        # Exception 3: Athletic brands that are better represented on Nordstrom
+        athletic_brands = ["nike", "adidas", "under armour", "lululemon", "athleta", "reebok"]
+        if any(brand_name in brand_lower for brand_name in athletic_brands) and any(keyword in query_lower for keyword in ["workout", "gym", "athletic", "sportswear"]):
+            return "nordstrom"
+        
+        # DEFAULT: Use Farfetch for all other cases (luxury, designer, contemporary, casual, etc.)
+        # This includes: Saint Laurent, Gucci, Prada, Zara, H&M, J.Crew, Theory, etc.
+        return "farfetch"
     
     def _extract_first_product_from_search(self, search_url: str, retailer: str) -> str:
         """Extract the first actual product URL from retailer search results."""
@@ -1313,63 +1338,35 @@ class SerpAPIService:
         return keywords
     
     def _choose_best_retailer_url(self, brand: str, category: str, encoded_query: str) -> str:
-        """Choose the best retailer based on brand and category with enhanced targeting."""
-        
-        # High-end/luxury brands -> Prioritize Farfetch (like competitor)
-        luxury_brands = {
-            "cinq a sept", "cinq à sept", "gucci", "prada", "versace", "balenciaga", 
-            "saint laurent", "bottega veneta", "celine", "loewe", "jacquemus", 
-            "ganni", "staud", "khaite", "isabel marant", "acne studios", "helmut lang",
-            "theory", "vince", "rag & bone", "proenza schouler", "3.1 phillip lim"
-        }
-        
-        # Premium contemporary brands -> Nordstrom or Farfetch
-        contemporary_brands = {
-            "theory", "vince", "rag & bone", "helmut lang", "acne studios",
-            "cos", "arket", "everlane", "reformation", "ganni", "sandro", "maje"
-        }
-        
-        # Athletic/streetwear brands -> Nordstrom or brand direct
-        athletic_brands = {
-            "nike", "adidas", "puma", "new balance", "asics", "vans", "converse",
-            "off-white", "stone island", "kenzo", "palm angels"
-        }
-        
-        # Accessible luxury brands -> Nordstrom
-        accessible_brands = {
-            "zara", "h&m", "uniqlo", "gap", "banana republic", "j.crew", 
-            "madewell", "everlane", "cos", "arket", "massimo dutti"
-        }
+        """FARFETCH-FIRST URL selection - always prioritizes Farfetch URLs."""
         
         brand_lower = brand.lower()
         
-        # Enhanced retailer selection logic
-        if any(luxury_brand in brand_lower for luxury_brand in luxury_brands):
-            # Luxury brands - prioritize Farfetch (matches competitor strategy)
+        # FARFETCH-FIRST APPROACH: Use Farfetch for almost everything
+        # Only very specific exceptions use other retailers
+        
+        # Exception 1: Ultra-budget brands (Shein/Temu completely excluded)
+        ultra_budget_brands = ["wish", "aliexpress", "forever 21"]
+        excluded_brands = ["shein", "temu"]  # These brands are completely blocked
+        
+        # Block excluded brands completely - force Farfetch (but they shouldn't appear)
+        if any(brand_name in brand_lower for brand_name in excluded_brands):
             return f"https://www.farfetch.com/shopping/search/items.aspx?q={encoded_query}&storeid=9359"
-        
-        elif any(contemporary_brand in brand_lower for contemporary_brand in contemporary_brands):
-            # Contemporary brands - use Nordstrom (excellent contemporary selection)
-            return f"https://www.nordstrom.com/sr?keyword={encoded_query}&origin=keywordsearch"
-        
-        elif any(athletic_brand in brand_lower for athletic_brand in athletic_brands):
-            # Athletic brands - use Nordstrom (comprehensive athletic selection)
-            return f"https://www.nordstrom.com/sr?keyword={encoded_query}&origin=keywordsearch"
-        
-        elif any(accessible_brand in brand_lower for accessible_brand in accessible_brands):
-            # Accessible brands - use Nordstrom
-            return f"https://www.nordstrom.com/sr?keyword={encoded_query}&origin=keywordsearch"
-        
-        else:
-            # Default strategy - alternate between Farfetch and Nordstrom
-            # This ensures variety and matches competitor's multi-retailer approach
-            import hashlib
-            hash_value = int(hashlib.md5(brand_lower.encode()).hexdigest(), 16)
             
-            if hash_value % 2 == 0:
-                return f"https://www.farfetch.com/shopping/search/items.aspx?q={encoded_query}&storeid=9359"
-            else:
-                return f"https://www.nordstrom.com/sr?keyword={encoded_query}&origin=keywordsearch"
+        if any(brand_name in brand_lower for brand_name in ultra_budget_brands):
+            return f"https://www.nordstrom.com/sr?keyword={encoded_query}&origin=keywordsearch"
+        
+        # Exception 2: Athletic brands for sportswear context
+        athletic_brands = ["nike", "adidas", "under armour", "lululemon", "athleta", "reebok", "puma", "new balance"]
+        if any(brand_name in brand_lower for brand_name in athletic_brands):
+            return f"https://www.nordstrom.com/sr?keyword={encoded_query}&origin=keywordsearch"
+        
+        # DEFAULT: Use Farfetch for ALL other brands
+        # This includes luxury brands (Gucci, Prada, Saint Laurent)
+        # Contemporary brands (Theory, Vince, Rag & Bone) 
+        # Accessible brands (Zara, H&M, J.Crew, Gap)
+        # Unknown brands and everything else
+        return f"https://www.farfetch.com/shopping/search/items.aspx?q={encoded_query}&storeid=9359"
 
 # --- Removed global instance creation ---
 # No longer create the instance here

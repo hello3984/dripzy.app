@@ -56,7 +56,11 @@ const ThemeCollage = ({ title, items = [], style }) => {
           
           // Create search URL if direct URL not available
           const searchQuery = encodeURIComponent(`${brand} ${items[0]?.product_name || ''}`);
-          const retailer = index % 2 === 0 ? 'Farfetch' : 'Nordstrom';
+          
+          // FARFETCH-FIRST: Use Farfetch for all categories, only exception for athletic brands
+          const brandLower = brand.toLowerCase();
+          const isAthletic = ['nike', 'adidas', 'under armour', 'lululemon', 'athleta'].some(b => brandLower.includes(b));
+          const retailer = isAthletic ? 'Nordstrom' : 'Farfetch';
           const retailerUrl = retailer === 'Farfetch' 
             ? `https://www.farfetch.com/search?q=${searchQuery}`
             : `https://www.nordstrom.com/sr?keyword=${searchQuery}`;

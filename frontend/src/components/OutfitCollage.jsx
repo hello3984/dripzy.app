@@ -184,13 +184,15 @@ const OutfitCollage = ({ outfit, prompt }) => {
             const productName = item.product_name || '';
             const searchQuery = encodeURIComponent(`${originalRetailerName} ${productName}`).trim();
             
-            // Always use only Nordstrom and Farfetch (alternating)
-            const nordstromUrl = `https://www.nordstrom.com/sr?keyword=${searchQuery}`;
+            // FARFETCH-FIRST: Use Farfetch as primary option
             const farfetchUrl = `https://www.farfetch.com/search?q=${searchQuery}`;
+            const nordstromUrl = `https://www.nordstrom.com/sr?keyword=${searchQuery}`;
             
-            // Alternate between Nordstrom and Farfetch
-            const retailerUrl = index % 2 === 0 ? nordstromUrl : farfetchUrl;
-            const retailerName = index % 2 === 0 ? "Nordstrom" : "Farfetch";
+            // FARFETCH-FIRST: Use Farfetch for all items, only exception for athletic brands
+            const brand = (originalRetailerName || '').toLowerCase();
+            const isAthletic = ['nike', 'adidas', 'under armour', 'lululemon', 'athleta'].some(b => brand.includes(b));
+            const retailerUrl = isAthletic ? nordstromUrl : farfetchUrl;
+            const retailerName = isAthletic ? "Nordstrom" : "Farfetch";
             
             // Add the proper separator based on position
             const separator = index === 0 ? '' : ', ';

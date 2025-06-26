@@ -76,7 +76,7 @@ export const getNordstromUrl = (product) => {
 };
 
 /**
- * Get the best retail URL for a product based on brand or preference
+ * Get the best retail URL for a product based on FARFETCH-FIRST approach
  * @param {Object} product - Product info
  * @param {string} preferredRetailer - Preferred retailer (farfetch, nordstrom)
  * @returns {string} - Valid retail URL
@@ -94,16 +94,25 @@ export const getBestRetailUrl = (product, preferredRetailer = '') => {
     return getNordstromUrl(product);
   }
   
-  // Default behavior - alternate between retailers
-  // Use Farfetch for luxury/designer brands, Nordstrom for the rest
-  const luxuryBrands = [
-    'gucci', 'prada', 'balenciaga', 'valentino', 'saint laurent', 
-    'fendi', 'burberry', 'off-white', 'versace', 'balmain',
-    'givenchy', 'dolce', 'gabbana', 'alexander mcqueen', 'bottega veneta'
-  ];
-  
+  // FARFETCH-FIRST approach: Use Farfetch for almost all products
+  // Only specific exceptions use Nordstrom
   const brand = (product.brand || '').toLowerCase();
-  const isLuxuryBrand = luxuryBrands.some(luxuryBrand => brand.includes(luxuryBrand));
   
-  return isLuxuryBrand ? getFarfetchUrl(product) : getNordstromUrl(product);
+  // Exception 1: Athletic brands
+  const athleticBrands = ['nike', 'adidas', 'under armour', 'lululemon', 'athleta', 'reebok'];
+  const isAthletic = athleticBrands.some(brand_name => brand.includes(brand_name));
+  
+  // Exception 2: Ultra-budget brands (Shein/Temu completely excluded)
+  const ultraBudgetBrands = ['forever 21', 'h&m'];
+  const excludedBrands = ['shein', 'temu'];  // These brands are completely blocked
+  const isUltraBudget = ultraBudgetBrands.some(brand_name => brand.includes(brand_name));
+  const isExcluded = excludedBrands.some(brand_name => brand.includes(brand_name));
+  
+  // Excluded brands get forced to Farfetch (but shouldn't appear anyway)
+  if (isExcluded) {
+    return getFarfetchUrl(product);  // Force Farfetch for excluded brands
+  }
+  
+  // Use Nordstrom only for athletic/ultra-budget exceptions, Farfetch for everything else
+  return (isAthletic || isUltraBudget) ? getNordstromUrl(product) : getFarfetchUrl(product);
 }; 

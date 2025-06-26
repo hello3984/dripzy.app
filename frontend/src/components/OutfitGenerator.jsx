@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import './OutfitGenerator.css';
 import MoodChart from './ui/MoodChart';
 import LoadingIndicator from './ui/LoadingIndicator';
+import analytics, { trackOutfitGeneration, trackThemeSelection, trackProductClick, trackPageView, trackError, trackPerformance } from '../services/analytics';
 
 const OutfitGenerator = () => {
   const [prompt, setPrompt] = useState('');
@@ -11,6 +12,15 @@ const OutfitGenerator = () => {
   const [gender, setGender] = useState('female'); // Default to female
   const [budget, setBudget] = useState(200); // Default budget as a number
   const [selectedMood, setSelectedMood] = useState(null);
+
+  // Analytics tracking on component mount
+  useEffect(() => {
+    trackPageView('Outfit Generator');
+    analytics.setSessionProperties({
+      page: 'outfit_generator',
+      timestamp: new Date().toISOString()
+    });
+  }, []);
 
   // Define API base URL based on environment
   const API_BASE_URL = process.env.NODE_ENV === 'development' 
@@ -33,6 +43,16 @@ const OutfitGenerator = () => {
 
   const handleMoodSelect = (moodId) => {
     setSelectedMood(moodId);
+    
+    // Analytics: Track mood/theme selection
+    trackThemeSelection(moodId);
+    analytics.trackStylePreference({
+      type: 'mood',
+      value: moodId,
+      gender: gender,
+      budgetRange: budget
+    });
+    
     // Update prompt based on selected mood
     const moodMap = {
       'boho': 'bohemian free-spirited outfit with natural elements',
@@ -58,6 +78,11 @@ const OutfitGenerator = () => {
 
     setLoading(true);
     setError(null);
+    
+    const startTime = Date.now();
+    
+    // Analytics: Track outfit generation start
+    analytics.trackOutfitGenerationStart(prompt);
     
     // Using Enhanced API endpoint with smart retailer selection
 
@@ -100,13 +125,39 @@ const OutfitGenerator = () => {
       }
 
       const data = await response.json();
-      // API response received
+      const responseTime = Date.now() - startTime;
+      
+      // Analytics: Track API response performance
+      analytics.trackApiResponse('/outfits/ultra-fast-generate', responseTime, true);
+      trackPerformance('outfit_generation_time', responseTime, prompt);
       
       if (!data.outfits || !data.outfits.length) {
         throw new Error("No outfits returned from API");
       }
       
-      setGeneratedOutfit(data.outfits[0]); // Use the first outfit from the array
+      const outfit = data.outfits[0];
+      setGeneratedOutfit(outfit);
+      
+      // Analytics: Track successful outfit generation
+      trackOutfitGeneration({
+        prompt: prompt,
+        gender: gender,
+        budget: budget,
+        style: outfit.style,
+        occasion: outfit.occasion,
+        responseTime: responseTime,
+        itemsCount: outfit.items.length,
+        totalPrice: outfit.total_price,
+        success: true
+      });
+      
+      analytics.trackOutfitGenerationComplete({
+        prompt: prompt,
+        success: true,
+        responseTime: responseTime,
+        itemsCount: outfit.items.length,
+        totalPrice: outfit.total_price
+      });
     } catch (err) {
       // Failed to generate outfit
       setError(`Failed to generate outfit: ${err.message}`);

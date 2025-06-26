@@ -97,12 +97,14 @@ const OutfitCollage = ({ collageImage, imageMap, outfitName, outfit }) => {
               // Create search query
               const searchQuery = encodeURIComponent(`${item.brand || ''} ${item.product_name || ''}`).trim();
               
-              // Create Nordstrom and Farfetch URLs
-              const nordstromUrl = `https://www.nordstrom.com/sr?keyword=${searchQuery}`;
+              // Create Farfetch URL as primary option
               const farfetchUrl = `https://www.farfetch.com/search?q=${searchQuery}`;
+              const nordstromUrl = `https://www.nordstrom.com/sr?keyword=${searchQuery}`;
               
-              // Alternate between Nordstrom and Farfetch
-              const retailerUrl = index % 2 === 0 ? nordstromUrl : farfetchUrl;
+              // FARFETCH-FIRST: Use Farfetch for all items, only exception for athletic brands
+              const brand = (item.brand || '').toLowerCase();
+              const isAthletic = ['nike', 'adidas', 'under armour', 'lululemon', 'athleta'].some(b => brand.includes(b));
+              const retailerUrl = isAthletic ? nordstromUrl : farfetchUrl;
               
               // Use item URL if available, otherwise use the retailer URL
               const finalUrl = item.url || retailerUrl;
@@ -156,9 +158,6 @@ const OutfitCollage = ({ collageImage, imageMap, outfitName, outfit }) => {
                   brandsHtml += categoryIndex === 0 ? '' : ', ';
                   brandsHtml += `<span class="category-name">${category}</span> `;
                   
-                  // Determine retailer based on category index
-                  const retailer = categoryIndex % 2 === 0 ? 'Nordstrom' : 'Farfetch';
-                  
                   // Get related items for this category
                   const itemsInCategory = validItems.filter(item => {
                     const itemCategory = item.category || '';
@@ -170,6 +169,11 @@ const OutfitCollage = ({ collageImage, imageMap, outfitName, outfit }) => {
                   // Create search query from first item in category
                   const firstItem = itemsInCategory[0] || {};
                   const searchQuery = encodeURIComponent(`${firstItem.brand || ''} ${firstItem.product_name || ''}`).trim();
+                  
+                  // FARFETCH-FIRST: Use Farfetch for all categories, only exception for athletic brands
+                  const brand = (firstItem.brand || '').toLowerCase();
+                  const isAthletic = ['nike', 'adidas', 'under armour', 'lululemon', 'athleta'].some(b => brand.includes(b));
+                  const retailer = isAthletic ? 'Nordstrom' : 'Farfetch';
                   
                   // Create retailer URL
                   const retailerUrl = retailer === 'Nordstrom' 

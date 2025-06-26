@@ -1283,24 +1283,38 @@ async def _find_products_for_item(query: str, category: str,
                 else: 
                     logger.debug(f"Rejected Link: {link}")
             
-            # Priority 3: ENHANCED FALLBACK - Create smart search URLs when no direct URL
+            # Priority 3: FARFETCH-FIRST FALLBACK - Create smart search URLs when no direct URL
             if final_url is None:
                 logger.info(f"No direct URL found for '{cleaned_product_name}', creating smart search URL")
                 # Create targeted search URLs for better user experience
                 search_terms = f"{cleaned_brand} {cleaned_product_name}".replace(" ", "+")
                 
-                if "farfetch" in source_lower or not source_lower:
-                    # Default to Farfetch for luxury items
+                # FARFETCH-FIRST approach: Use Farfetch for almost everything
+                # Only specific exceptions use Nordstrom
+                brand_lower = cleaned_brand.lower()
+                
+                # Exception 1: Athletic brands
+                athletic_brands = ["nike", "adidas", "under armour", "lululemon", "athleta", "reebok"]
+                is_athletic = any(brand_name in brand_lower for brand_name in athletic_brands)
+                
+                # Exception 2: Ultra-budget brands (Shein/Temu excluded completely)
+                ultra_budget_brands = ["forever 21", "h&m"]
+                excluded_brands = ["shein", "temu"]  # Completely blocked brands
+                is_ultra_budget = any(brand_name in brand_lower for brand_name in ultra_budget_brands)
+                is_excluded = any(brand_name in brand_lower for brand_name in excluded_brands)
+                
+                if is_excluded:
+                    # Excluded brands (Shein/Temu) - Force Farfetch but they shouldn't appear anyway
                     final_url = f"https://www.farfetch.com/shopping/search/items.aspx?q={search_terms}&storeid=9359"
-                    logger.info(f"Created Farfetch search URL: {search_terms}")
-                elif "nordstrom" in source_lower:
-                    # Use Nordstrom search
+                    logger.warning(f"EXCLUDED BRAND '{cleaned_brand}' forced to Farfetch: {search_terms}")
+                elif is_athletic or is_ultra_budget:
+                    # Use Nordstrom for athletic or remaining ultra-budget brands
                     final_url = f"https://www.nordstrom.com/sr?keyword={search_terms}&origin=keywordsearch"
-                    logger.info(f"Created Nordstrom search URL: {search_terms}")
+                    logger.info(f"Created Nordstrom search URL for exception brand: {search_terms}")
                 else:
-                    # Generic fallback to Farfetch (best luxury selection)
+                    # DEFAULT: Use Farfetch for all other brands (luxury, designer, contemporary, casual)
                     final_url = f"https://www.farfetch.com/shopping/search/items.aspx?q={search_terms}&storeid=9359"
-                    logger.info(f"Created fallback Farfetch URL: {search_terms}")
+                    logger.info(f"Created Farfetch search URL (FARFETCH-FIRST): {search_terms}")
             
             product_data = { # Assemble using cleaned data
                 "product_id": best_match.get("product_id", f"gen-{uuid.uuid4()}"),
@@ -2476,12 +2490,12 @@ async def enhance_outfits_with_products_fast(outfit_concepts: List[Dict[str, Any
                         # Build search query from AI description
                         search_query = f"{description} {request.gender or ''} {color}".strip()
                         
-                        # Determine which retailer to search based on theme/budget
-                        retailer_choice = _determine_retailer_choice(
+                        # Initial retailer choice (will be updated after getting real product)
+                        initial_retailer_choice = _determine_retailer_choice(
                             prompt=request.prompt,
                             style=concept.get("style", "casual"),
                             budget=request.budget or 300,
-                            brand="",  # Don't pre-assign brand
+                            brand="",  # Don't pre-assign brand yet
                             category=category
                         )
                         
@@ -2499,8 +2513,25 @@ async def enhance_outfits_with_products_fast(outfit_concepts: List[Dict[str, Any
                         logger.info(f"🎯 SERPAPI RESULTS: got {len(real_products) if real_products else 0} products")
                         
                         if real_products and len(real_products) > 0:
-                            # Use REAL product from search results
+                            # Use REAL product from search results with FARFETCH-FIRST URL logic
                             real_product = real_products[0]  # Take first/best result
+                            
+                            # RECALCULATE retailer choice with ACTUAL BRAND from real product
+                            retailer_choice = _determine_retailer_choice(
+                                prompt=request.prompt,
+                                style=concept.get("style", "casual"),
+                                budget=request.budget or 300,
+                                brand=real_product.get("brand", ""),  # Use REAL brand for decision
+                                category=category
+                            )
+                            
+                            # APPLY FARFETCH-FIRST: Generate smart URL for real products too
+                            smart_url = _generate_smart_product_url(
+                                brand=real_product.get("brand", "Designer"),
+                                product_name=real_product.get("product_name", description),
+                                description=description,
+                                retailer_choice=retailer_choice
+                            )
                             
                             outfit_item = OutfitItem(
                                 product_id=f"real-{uuid.uuid4()}",
@@ -2508,8 +2539,8 @@ async def enhance_outfits_with_products_fast(outfit_concepts: List[Dict[str, Any
                                 brand=real_product.get("brand", "Designer"),
                                 category=category.lower(),
                                 price=real_product.get("price", random.uniform(50.0, 200.0)),
-                                url=real_product.get("url", ""),  # REAL product URL
-                                image_url=real_product.get("image_url", ""),  # REAL product image
+                                url=smart_url,  # FARFETCH-FIRST URL instead of original
+                                image_url=real_product.get("image_url", ""),  # Keep real product image
                                 description=description,
                                 concept_description=description,
                                 color=color,
@@ -2523,7 +2554,7 @@ async def enhance_outfits_with_products_fast(outfit_concepts: List[Dict[str, Any
                                 brand=mock_data["brand"],
                                 product_name=mock_data["name"],
                                 description=description,
-                                retailer_choice=retailer_choice
+                                retailer_choice=initial_retailer_choice
                             )
                             
                             outfit_item = OutfitItem(
@@ -2548,6 +2579,7 @@ async def enhance_outfits_with_products_fast(outfit_concepts: List[Dict[str, Any
                         logger.error(f"❌ FULL TRACEBACK: {traceback.format_exc()}")
                         # Enhanced fallback with realistic product names
                         mock_data = _get_mock_product(category, description, color, request.prompt, request.budget or 300)
+                        # For error fallback, recalculate with mock brand
                         retailer_choice = _determine_retailer_choice(
                             prompt=request.prompt,
                             style=concept.get("style", "casual"),
@@ -2657,8 +2689,8 @@ async def ultra_fast_generate_outfit(request: OutfitGenerateRequest):
 
 def _determine_retailer_choice(prompt: str, style: str, budget: float, brand: str = "", category: str = "") -> Dict[str, Any]:
     """
-    COMPREHENSIVE SMART RETAILER SELECTION SYSTEM
-    Analyzes keywords, theme, budget, brand, and category to determine the best retailer.
+    FARFETCH-FIRST RETAILER SELECTION SYSTEM
+    Always prioritizes Farfetch as the first option, with fallback logic for specific cases.
     
     Args:
         prompt: User's original prompt
@@ -2668,152 +2700,69 @@ def _determine_retailer_choice(prompt: str, style: str, budget: float, brand: st
         category: Product category
         
     Returns:
-        Dict with retailer choice, confidence score, and reasoning
+        Dict with retailer choice (Farfetch prioritized), confidence score, and reasoning
     """
     
-    # SCORING SYSTEM: Higher score = More likely for Farfetch
-    farfetch_score = 0
-    reasons = []
+    # FARFETCH-FIRST APPROACH: Start with Farfetch as default
+    chosen_retailer = "farfetch"
+    retailer_name = "Farfetch"
+    retailer_reasoning = "Farfetch prioritized as first option"
+    confidence = 0.9  # High confidence in Farfetch selection
+    reasons = ["Farfetch selected as primary retailer"]
     
-    # 1. KEYWORD ANALYSIS (40% weight)
-    luxury_keywords = [
-        "luxury", "designer", "high-end", "premium", "sophisticated", "elegant", 
-        "couture", "bespoke", "exclusive", "artisanal", "handcrafted", "investment",
-        "timeless", "classic", "refined", "upscale", "chic", "avant-garde"
-    ]
-    
-    casual_keywords = [
-        "casual", "everyday", "basic", "affordable", "budget", "simple", 
-        "comfortable", "practical", "trendy", "fast fashion", "accessible",
-        "mainstream", "versatile", "essential", "staple"
-    ]
-    
-    prompt_lower = prompt.lower()
-    luxury_matches = sum(1 for keyword in luxury_keywords if keyword in prompt_lower)
-    casual_matches = sum(1 for keyword in casual_keywords if keyword in prompt_lower)
-    
-    keyword_score = (luxury_matches * 10) - (casual_matches * 5)
-    farfetch_score += keyword_score
-    
-    if luxury_matches > 0:
-        reasons.append(f"Luxury keywords detected: {luxury_matches}")
-    if casual_matches > 0:
-        reasons.append(f"Casual keywords detected: {casual_matches}")
-    
-    # 2. STYLE/THEME ANALYSIS (30% weight)
-    style_lower = style.lower()
-    theme_mapping = {
-        # Farfetch styles (+points)
-        "formal": 15, "evening": 15, "cocktail": 12, "business": 10, 
-        "professional": 10, "sophisticated": 12, "elegant": 12,
-        "minimalist": 8, "contemporary": 6, "artistic": 8,
-        
-        # Nordstrom styles (-points) 
-        "casual": -10, "streetwear": -8, "athleisure": -12, "sporty": -10,
-        "bohemian": -5, "festival": -8, "beach": -6, "weekend": -8
-    }
-    
-    style_score = theme_mapping.get(style_lower, 0)
-    farfetch_score += style_score
-    
-    if style_score != 0:
-        retailer_tendency = "Farfetch" if style_score > 0 else "Nordstrom"
-        reasons.append(f"Style '{style}' favors {retailer_tendency}")
-    
-    # 3. BUDGET ANALYSIS (20% weight)
-    if budget > 800:
-        budget_score = 20
-        reasons.append(f"High budget (${budget}) → Luxury retailers")
-    elif budget > 500:
-        budget_score = 10
-        reasons.append(f"Mid-high budget (${budget}) → Premium options")
-    elif budget > 250:
-        budget_score = -5
-        reasons.append(f"Mid budget (${budget}) → Accessible luxury")
-    else:
-        budget_score = -15
-        reasons.append(f"Lower budget (${budget}) → Accessible retailers")
-    
-    farfetch_score += budget_score
-    
-    # 4. BRAND POSITIONING ANALYSIS (10% weight)
+    # EXCEPTIONAL CASES: Only use Nordstrom for very specific scenarios
     brand_lower = brand.lower() if brand else ""
+    prompt_lower = prompt.lower()
     
-    # Farfetch exclusive/primary brands
-    farfetch_brands = {
-        "saint laurent": 15, "gucci": 15, "prada": 15, "balenciaga": 15,
-        "bottega veneta": 12, "acne studios": 10, "ganni": 8, "jacquemus": 10,
-        "isabel marant": 10, "khaite": 8, "staud": 6, "rotate": 6
-    }
+    # Exception 1: Extremely budget-conscious requests with specific affordable brands
+    # NOTE: Shein and Temu are EXCLUDED as retailers - not allowed in the system
+    ultra_budget_brands = ["h&m", "forever 21", "aliexpress"]
+    excluded_brands = ["shein", "temu"]  # These brands are completely blocked
     
-    # Nordstrom accessible brands  
-    nordstrom_brands = {
-        "zara": -10, "h&m": -12, "uniqlo": -8, "gap": -10, "j.crew": -6,
-        "everlane": -4, "levi's": -8, "nike": -6, "adidas": -6
-    }
-    
-    brand_score = 0
-    for brand_name, score in farfetch_brands.items():
-        if brand_name in brand_lower:
-            brand_score = score
-            reasons.append(f"Brand '{brand}' → Farfetch specialist")
-            break
-    
-    if brand_score == 0:  # Check Nordstrom brands
-        for brand_name, score in nordstrom_brands.items():
-            if brand_name in brand_lower:
-                brand_score = score
-                reasons.append(f"Brand '{brand}' → Nordstrom specialist")
-                break
-    
-    farfetch_score += brand_score
-    
-    # 5. CATEGORY-SPECIFIC LOGIC
-    category_lower = category.lower() if category else ""
-    if "shoes" in category_lower and budget > 400:
-        farfetch_score += 5
-        reasons.append("Premium footwear → Farfetch specialty")
-    elif "accessory" in category_lower and budget > 200:
-        farfetch_score += 3
-        reasons.append("Luxury accessories → Farfetch selection")
-    
-    # FINAL DECISION
-    confidence = min(abs(farfetch_score) / 20.0, 1.0)  # Normalize to 0-1
-    
-    if farfetch_score > 5:
+    # Block excluded brands completely
+    is_excluded = any(brand_name in brand_lower for brand_name in excluded_brands)
+    if is_excluded:
+        # Force Farfetch for excluded brands (they shouldn't appear anyway)
         chosen_retailer = "farfetch"
-        retailer_name = "Farfetch"
-        retailer_reasoning = "Best for luxury/designer items"
-    elif farfetch_score < -5:
-        chosen_retailer = "nordstrom"
-        retailer_name = "Nordstrom"
-        retailer_reasoning = "Best for accessible/contemporary items"
+        retailer_name = "Farfetch" 
+        retailer_reasoning = "Excluded brand redirected to Farfetch"
+        confidence = 0.9
+        reasons = [f"Brand '{brand}' is excluded - using Farfetch"]
     else:
-        # Tie-breaker logic
-        if budget > 300:
-            chosen_retailer = "farfetch"
-            retailer_name = "Farfetch"
-            retailer_reasoning = "Default for mid-high budget"
-        else:
+        is_ultra_budget = any(brand_name in brand_lower for brand_name in ultra_budget_brands)
+        has_budget_keywords = any(keyword in prompt_lower for keyword in ["cheap", "budget", "affordable", "under $50", "bargain"])
+        
+        if is_ultra_budget and has_budget_keywords and budget < 100:
             chosen_retailer = "nordstrom"
             retailer_name = "Nordstrom"
-            retailer_reasoning = "Default for accessible budget"
-        confidence = 0.3  # Lower confidence for tie-breaker
+            retailer_reasoning = "Exception: Ultra-budget request with specific affordable brands"
+            confidence = 0.7
+            reasons = [f"Ultra-budget brand '{brand}' with budget ${budget}"]
+        else:
+            # Exception 2: Athletic/sportswear with specific athletic brands and keywords
+            athletic_brands = ["nike", "adidas", "under armour", "lululemon", "athleta", "reebok"]
+            is_athletic_brand = any(brand_name in brand_lower for brand_name in athletic_brands)
+            has_athletic_keywords = any(keyword in prompt_lower for keyword in ["workout", "gym", "athletic", "sportswear", "activewear", "running"])
+            
+            if is_athletic_brand and has_athletic_keywords:
+                chosen_retailer = "nordstrom"
+                retailer_name = "Nordstrom"  
+                retailer_reasoning = "Exception: Athletic wear with specific sportswear brands"
+                confidence = 0.8
+                reasons = [f"Athletic brand '{brand}' with sportswear context"]
+    
+    # For all other cases, keep Farfetch as the primary choice
+    # This includes luxury, designer, casual, formal, etc. - everything goes to Farfetch first
     
     return {
         "retailer": chosen_retailer,
         "retailer_name": retailer_name,
         "confidence": confidence,
-        "score": farfetch_score,
-        "reasoning": f"{retailer_reasoning}. " + "; ".join(reasons),
-        "original_prompt": prompt.lower(),  # ADD: Original prompt for theme detection
-        "style_context": style.lower(),     # ADD: Style context for URL generation
-        "factors": {
-            "keyword_score": keyword_score,
-            "style_score": style_score, 
-            "budget_score": budget_score,
-            "brand_score": brand_score
-        }
+        "reasoning": retailer_reasoning,
+        "reasons": reasons,
+        "score": 100 if chosen_retailer == "farfetch" else -100,  # High positive score for Farfetch
+        "original_prompt": prompt,
+        "style_context": style
     }
 
 
