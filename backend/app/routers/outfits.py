@@ -2437,15 +2437,31 @@ async def generate_outfit_concepts_fast(request: OutfitGenerateRequest) -> List[
         logger.info(f"[generate_outfit_concepts_fast] Fast Claude call")
         start_time = time.time()
         
+        # FIXED: Enhanced gender-aware prompt for better recognition
+        gender_instruction = ""
+        if "man" in prompt.lower() or "male" in prompt.lower() or gender.lower() in ["male", "men", "man"]:
+            gender_instruction = "FOR MEN'S CLOTHING ONLY. All items must be masculine/men's fashion."
+        elif "woman" in prompt.lower() or "female" in prompt.lower() or gender.lower() in ["female", "women", "woman"]:
+            gender_instruction = "FOR WOMEN'S CLOTHING ONLY. All items must be feminine/women's fashion."
+        else:
+            gender_instruction = f"FOR {gender.upper()} CLOTHING."
+        
         # PERFORMANCE: Ultra-minimal prompt for fastest response
         response = anthropic_client.messages.create(
             model="claude-3-sonnet-20240229",  # Fastest available model
-            max_tokens=800,  # Minimal tokens
+            max_tokens=1200,  # Increased for more complete outfits
             temperature=0.3,  # Lower temperature for faster, more focused response
-            system="Expert fashion AI. Return only JSON array.",
+            system=f"Expert fashion AI. {gender_instruction} Return only JSON array with complete outfits including shoes and accessories.",
             messages=[{
                 "role": "user", 
-                "content": f'Generate 1 outfit for "{prompt}" ${budget} {gender}. JSON only: [{{"outfit_name":"Name","description":"Brief","style":"casual","occasion":"daily","stylist_rationale":"Works because...","items":[{{"category":"top","description":"item","color":"blue","search_keywords":["kw1","kw2"]}}]}}]'
+                "content": f"""Generate 1 COMPLETE outfit for "{prompt}" ${budget} {gender_instruction}
+
+REQUIREMENTS:
+- Include 5-6 items: top, bottom, shoes, and 2-3 accessories (bag, jewelry, outerwear)
+- {gender_instruction}
+- All items must match the gender specified
+
+JSON only: [{{"outfit_name":"Name","description":"Brief","style":"casual","occasion":"daily","stylist_rationale":"Works because...","items":[{{"category":"top","description":"item","color":"blue","search_keywords":["kw1","kw2"]}},{{"category":"bottom","description":"item","color":"black","search_keywords":["kw1","kw2"]}},{{"category":"shoes","description":"item","color":"brown","search_keywords":["kw1","kw2"]}},{{"category":"accessory","description":"bag or jewelry","color":"color","search_keywords":["kw1","kw2"]}}]}}]"""
             }]
         )
         
@@ -2478,8 +2494,8 @@ async def enhance_outfits_with_products_fast(outfit_concepts: List[Dict[str, Any
             outfit_items = []
             total_price = 0.0
             
-            # PERFORMANCE: Process only first 3 items for speed
-            for item_concept in items_data[:3]:
+            # FIXED: Process ALL items instead of limiting to 3 - now includes shoes and accessories
+            for item_concept in items_data:  # REMOVED [:3] limit!
                 try:
                     category = _match_categories(item_concept.get("category", ""))
                     description = item_concept.get("description", "")
@@ -2525,13 +2541,19 @@ async def enhance_outfits_with_products_fast(outfit_concepts: List[Dict[str, Any
                                 category=category
                             )
                             
-                            # APPLY FARFETCH-FIRST: Generate smart URL for real products too
-                            smart_url = _generate_smart_product_url(
-                                brand=real_product.get("brand", "Designer"),
-                                product_name=real_product.get("product_name", description),
-                                description=description,
-                                retailer_choice=retailer_choice
-                            )
+                            # FIXED: Use original product URL from SerpAPI instead of generating broken search URLs
+                            product_url = real_product.get("product_url", "")
+                            
+                            # Only generate smart URL if no direct product URL exists
+                            if not product_url or "search" in product_url:
+                                smart_url = _generate_smart_product_url(
+                                    brand=real_product.get("brand", "Designer"),
+                                    product_name=real_product.get("product_name", description),
+                                    description=description,
+                                    retailer_choice=retailer_choice
+                                )
+                            else:
+                                smart_url = product_url  # Use the actual direct product URL
                             
                             outfit_item = OutfitItem(
                                 product_id=f"real-{uuid.uuid4()}",
@@ -2539,7 +2561,7 @@ async def enhance_outfits_with_products_fast(outfit_concepts: List[Dict[str, Any
                                 brand=real_product.get("brand", "Designer"),
                                 category=category.lower(),
                                 price=real_product.get("price", random.uniform(50.0, 200.0)),
-                                url=smart_url,  # FARFETCH-FIRST URL instead of original
+                                url=smart_url,  # Use direct URL when available
                                 image_url=real_product.get("image_url", ""),  # Keep real product image
                                 description=description,
                                 concept_description=description,

@@ -894,7 +894,8 @@ class SerpAPIService:
             if chosen_retailer == "nordstrom":
                 search_url = f"https://www.nordstrom.com/sr?keyword={urllib.parse.quote_plus(search_query)}&origin=keywordsearch"
             elif chosen_retailer == "farfetch":
-                search_url = f"https://www.farfetch.com/shopping/search/items.aspx?q={urllib.parse.quote_plus(search_query)}&storeid=9359"
+                # FIXED: Use working Farfetch URL format
+                search_url = f"https://www.farfetch.com/shopping/search/?q={urllib.parse.quote_plus(search_query)}"
             elif chosen_retailer == "amazon":
                 search_url = f"https://www.amazon.com/s?k={urllib.parse.quote_plus(search_query)}&ref=sr_pg_1"
             else:
@@ -1351,7 +1352,8 @@ class SerpAPIService:
         
         # Block excluded brands completely - force Farfetch (but they shouldn't appear)
         if any(brand_name in brand_lower for brand_name in excluded_brands):
-            return f"https://www.farfetch.com/shopping/search/items.aspx?q={encoded_query}&storeid=9359"
+            # FIXED: Use working Farfetch URL format
+            return f"https://www.farfetch.com/shopping/search/?q={encoded_query}"
             
         if any(brand_name in brand_lower for brand_name in ultra_budget_brands):
             return f"https://www.nordstrom.com/sr?keyword={encoded_query}&origin=keywordsearch"
@@ -1362,11 +1364,8 @@ class SerpAPIService:
             return f"https://www.nordstrom.com/sr?keyword={encoded_query}&origin=keywordsearch"
         
         # DEFAULT: Use Farfetch for ALL other brands
-        # This includes luxury brands (Gucci, Prada, Saint Laurent)
-        # Contemporary brands (Theory, Vince, Rag & Bone) 
-        # Accessible brands (Zara, H&M, J.Crew, Gap)
-        # Unknown brands and everything else
-        return f"https://www.farfetch.com/shopping/search/items.aspx?q={encoded_query}&storeid=9359"
+        # FIXED: Use working Farfetch URL format without deprecated parameters
+        return f"https://www.farfetch.com/shopping/search/?q={encoded_query}"
 
 # --- Removed global instance creation ---
 # No longer create the instance here
