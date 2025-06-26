@@ -381,17 +381,6 @@ class SerpAPIService:
         
         logger.debug(f"Raw product URL: {product_url}")
         
-        # 🔧 CRITICAL FIX: Filter out old/deprecated Farfetch URLs before processing
-        deprecated_patterns = [
-            'items.aspx?storeid=9359',
-            'items.aspx?q=',
-            'storeid=9359'
-        ]
-        
-        if any(pattern in product_url for pattern in deprecated_patterns):
-            logger.warning(f"🚫 FILTERED OUT DEPRECATED FARFETCH URL: {product_url[:60]}...")
-            return ""  # Force creation of new working URL
-        
         # Clean up Google Shopping redirect URLs
         if "google.com/shopping/product" in product_url or "google.com/url" in product_url:
             cleaned_url = self._extract_real_url_from_google_redirect(product_url)
@@ -484,45 +473,39 @@ class SerpAPIService:
         return False
     
     def _get_best_image_url(self, result: Dict[str, Any]) -> str:
-        """Get the highest quality product image URL - prioritizing validated actual retailer images."""
+        """Get the highest quality product image URL - prioritizing actual retailer images."""
         
-        # PRIORITY 1: Look for high-quality images in SerpAPI data FIRST (faster and more reliable)
+        # PRIORITY 1: Try to extract actual retailer product images
+        product_url = self._extract_product_url(result)
+        if product_url and self._is_real_retailer_url(product_url):
+            actual_image = self._extract_retailer_product_image(product_url, result)
+            if actual_image:
+                logger.info(f"✅ Found actual retailer image: {actual_image[:60]}...")
+                return actual_image
+        
+        # PRIORITY 2: Look for high-quality images in SerpAPI data
         high_quality_image = self._find_high_quality_serpapi_image(result)
-        if high_quality_image and self._is_valid_product_image_url(high_quality_image):
+        if high_quality_image:
             logger.info(f"✅ Found high-quality SerpAPI image: {high_quality_image[:60]}...")
             return high_quality_image
         
-        # PRIORITY 2: Standard SerpAPI thumbnails as reliable fallback
+        # PRIORITY 3: Standard SerpAPI thumbnails as fallback
         image_fields = ["thumbnail", "image", "images"]
         
         for field in image_fields:
             if field in result and result[field]:
                 image_url = result[field]
                 if isinstance(image_url, list) and image_url:
-                    # Try all images in the array, not just the first one
-                    for candidate_image in image_url:
-                        if candidate_image and self._is_valid_product_image_url(candidate_image):
-                            logger.info(f"✅ Found valid SerpAPI image: {candidate_image[:60]}...")
-                            return candidate_image
+                    logger.info(f"🔄 Using SerpAPI thumbnail: {image_url[0][:60]}...")
+                    return image_url[0]
                 elif isinstance(image_url, str):
-                    if self._is_valid_product_image_url(image_url):
-                        logger.info(f"✅ Found valid SerpAPI image: {image_url[:60]}...")
-                        return image_url
+                    logger.info(f"🔄 Using SerpAPI thumbnail: {image_url[:60]}...")
+                    return image_url
         
-        # PRIORITY 3: Try retailer product images (only if we have a working URL)
-        product_url = self._extract_product_url(result)
-        if product_url and self._is_real_retailer_url(product_url):
-            # Skip validation to avoid 403 errors, just try to extract image
-            actual_image = self._extract_retailer_product_image(product_url, result)
-            if actual_image and self._is_valid_product_image_url(actual_image):
-                logger.info(f"✅ Found retailer image: {actual_image[:60]}...")
-                return actual_image
-        
-        # PRIORITY 4: Generate high-quality placeholder as last resort
+        # PRIORITY 4: Generate high-quality placeholder
         title = result.get("title", "Product")
         category = result.get("category", "Fashion")
-        safe_title = urllib.parse.quote(title[:15]) if title else "Product"
-        placeholder_url = f"https://via.placeholder.com/400x500/f8f9fa/666666?text={safe_title}"
+        placeholder_url = f"https://via.placeholder.com/400x500/f8f9fa/333333?text={urllib.parse.quote(title[:20])}"
         logger.warning(f"⚠️ No images found, using placeholder: {placeholder_url}")
         return placeholder_url
     
@@ -900,92 +883,38 @@ class SerpAPIService:
             title = result.get("title", "")
             brand = self._extract_brand(result)
             
-            # PRIORITY 1: Try to get the actual original product URL from SerpAPI
-            original_url = self._extract_product_url(result)
-            if original_url and self._is_real_retailer_url(original_url):
-                # Validate that the original URL actually works
-                if self._validate_product_url(original_url):
-                    logger.info(f"🎯 USING VALIDATED ORIGINAL URL: {original_url[:60]}...")
-                    return original_url
-                else:
-                    logger.warning(f"⚠️ Original URL failed validation: {original_url[:60]}...")
-            
-            # PRIORITY 2: Extract key product details for smart search
+            # Extract key product details for search
             product_keywords = self._extract_search_keywords(title, brand, category)
             search_query = " ".join(product_keywords)
             
-            # Choose retailer based on brand and category  
+            # Choose retailer based on brand and category (like competitor does)
             chosen_retailer = self._choose_optimal_retailer(brand, category, search_query)
             
-            # SPECIAL HANDLING: Preserve original retailer for premium brands
-            if chosen_retailer == "preserve_original":
-                if original_url and self._is_real_retailer_url(original_url):
-                    logger.info(f"🎯 PRESERVING ORIGINAL RETAILER URL: {original_url[:60]}...")
-                    return original_url
-                # If no original URL, default to Farfetch for premium brands
-                chosen_retailer = "farfetch"
-                logger.info(f"📦 No original URL found for premium brand '{brand}', defaulting to Farfetch")
-            
-            # PRIORITY 3: Create optimized search URLs with better targeting
+            # Create search URL that leads to actual product pages
             if chosen_retailer == "nordstrom":
                 search_url = f"https://www.nordstrom.com/sr?keyword={urllib.parse.quote_plus(search_query)}&origin=keywordsearch"
             elif chosen_retailer == "farfetch":
-                # FIXED: Use working Farfetch URL format (remove deprecated storeid parameter)
+                # FIXED: Use working Farfetch URL format
                 search_url = f"https://www.farfetch.com/shopping/search/?q={urllib.parse.quote_plus(search_query)}"
             elif chosen_retailer == "amazon":
                 search_url = f"https://www.amazon.com/s?k={urllib.parse.quote_plus(search_query)}&ref=sr_pg_1"
             else:
-                logger.warning(f"Unknown retailer: {chosen_retailer}")
                 return ""
             
-            # PRIORITY 4: Try to extract the first actual product from search results
+            # Try to get the first product from the search results
             actual_product_url = self._extract_first_product_from_search(search_url, chosen_retailer)
             
-            if actual_product_url and self._validate_product_url(actual_product_url):
-                logger.info(f"🎯 EXTRACTED DIRECT PRODUCT URL: {actual_product_url[:60]}...")
+            if actual_product_url:
+                logger.info(f"🎯 CREATED DIRECT RETAILER URL: {actual_product_url[:60]}...")
                 return actual_product_url
             else:
-                # FALLBACK: Return search URL but prefer more specific searches
-                logger.info(f"🔍 USING TARGETED SEARCH URL: {search_url[:60]}...")
+                # Return the search URL as fallback (still better than nothing)
+                logger.info(f"🔍 USING RETAILER SEARCH URL: {search_url[:60]}...")
                 return search_url
                 
         except Exception as e:
             logger.error(f"Error creating direct retailer URL: {str(e)}")
             return ""
-            
-    def _validate_product_url(self, url: str) -> bool:
-        """Validate that a product URL is accessible and returns a valid response."""
-        try:
-            import httpx
-            
-            # Quick validation - check if URL format looks valid
-            if not url or not url.startswith(('http://', 'https://')):
-                return False
-                
-            # Check for known problematic URL patterns
-            problematic_patterns = [
-                'items.aspx?storeid=9359',  # Old Farfetch format
-                'placeholder',
-                'example.com',
-                'via.placeholder'
-            ]
-            
-            if any(pattern in url for pattern in problematic_patterns):
-                return False
-            
-            # Quick HEAD request to check if URL is accessible (with timeout)
-            headers = {
-                'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-            }
-            
-            with httpx.Client(timeout=2.0, headers=headers) as client:
-                response = client.head(url, follow_redirects=True)
-                # Accept both 200 and 403 (some sites block HEAD requests but allow GET)
-                return response.status_code in [200, 403]
-                
-        except Exception as e:
-            logger.debug(f"URL validation failed for {url[:60]}...: {str(e)}")
-            return False
     
     def _extract_search_keywords(self, title: str, brand: str, category: str) -> List[str]:
         """Extract optimal search keywords for retailer search."""
@@ -1060,22 +989,9 @@ class SerpAPIService:
             return "nordstrom"
         
         # Exception 3: Athletic brands that are better represented on Nordstrom
-        athletic_brands = [
-            "nike", "adidas", "under armour", "lululemon", "athleta", "reebok",
-            "alo yoga", "alo", "outdoor voices", "set active", "girlfriend collective",
-            "beyond yoga", "vuori", "fabletics", "spiritual gangster", "puma", 
-            "new balance", "asics", "brooks", "hoka", "on running", "on"
-        ]
+        athletic_brands = ["nike", "adidas", "under armour", "lululemon", "athleta", "reebok"]
         if any(brand_name in brand_lower for brand_name in athletic_brands) and any(keyword in query_lower for keyword in ["workout", "gym", "athletic", "sportswear"]):
             return "nordstrom"
-        
-        # Exception 4: Premium eyewear/accessory brands that work well on both retailers
-        # PRESERVE ORIGINAL RETAILER when found from quality sources
-        premium_accessory_brands = ["ray-ban", "rayban", "oakley", "prada", "gucci", "versace", "tom ford", "oliver peoples"]
-        if any(brand_name in brand_lower for brand_name in premium_accessory_brands):
-            # For premium accessories, preserve the original retailer choice from SerpAPI
-            # This will be overridden by the search_products method when it detects the original source
-            return "preserve_original"  # Special flag to preserve original retailer
         
         # DEFAULT: Use Farfetch for all other cases (luxury, designer, contemporary, casual, etc.)
         # This includes: Saint Laurent, Gucci, Prada, Zara, H&M, J.Crew, Theory, etc.
@@ -1443,12 +1359,7 @@ class SerpAPIService:
             return f"https://www.nordstrom.com/sr?keyword={encoded_query}&origin=keywordsearch"
         
         # Exception 2: Athletic brands for sportswear context
-        athletic_brands = [
-            "nike", "adidas", "under armour", "lululemon", "athleta", "reebok",
-            "alo yoga", "alo", "outdoor voices", "set active", "girlfriend collective",
-            "beyond yoga", "vuori", "fabletics", "spiritual gangster", "puma", 
-            "new balance", "asics", "brooks", "hoka", "on running", "on"
-        ]
+        athletic_brands = ["nike", "adidas", "under armour", "lululemon", "athleta", "reebok", "puma", "new balance"]
         if any(brand_name in brand_lower for brand_name in athletic_brands):
             return f"https://www.nordstrom.com/sr?keyword={encoded_query}&origin=keywordsearch"
         

@@ -293,13 +293,13 @@ def _get_mock_product(category, description, color, prompt_context="", budget=30
     else:
         # ACCESSIBLE BRANDS (for Nordstrom)
         accessible_brands = {
-            "Top": ["H&M", "Zara", "Uniqlo", "Gap", "J.Crew"],
-            "Bottom": ["Levi's", "H&M", "American Eagle", "Gap", "Uniqlo"],
+        "Top": ["H&M", "Zara", "Uniqlo", "Gap", "J.Crew"],
+        "Bottom": ["Levi's", "H&M", "American Eagle", "Gap", "Uniqlo"],
             "Dress": ["Zara", "H&M", "Mango", "ASOS", "Urban Outfitters"],
-            "Shoes": ["Nike", "Adidas", "Vans", "Converse", "New Balance"],
-            "Accessory": ["Fossil", "Mango", "Zara", "H&M", "ASOS"],
-            "Outerwear": ["North Face", "Columbia", "Patagonia", "Uniqlo", "Gap"],
-        }
+        "Shoes": ["Nike", "Adidas", "Vans", "Converse", "New Balance"],
+        "Accessory": ["Fossil", "Mango", "Zara", "H&M", "ASOS"],
+        "Outerwear": ["North Face", "Columbia", "Patagonia", "Uniqlo", "Gap"],
+    }
         brands = accessible_brands
     
     # Select a brand based on category
@@ -1294,12 +1294,7 @@ async def _find_products_for_item(query: str, category: str,
                 brand_lower = cleaned_brand.lower()
                 
                 # Exception 1: Athletic brands
-                athletic_brands = [
-                    "nike", "adidas", "under armour", "lululemon", "athleta", "reebok",
-                    "alo yoga", "alo", "outdoor voices", "set active", "girlfriend collective",
-                    "beyond yoga", "vuori", "fabletics", "spiritual gangster", "puma", 
-                    "new balance", "asics", "brooks", "hoka", "on running", "on"
-                ]
+                athletic_brands = ["nike", "adidas", "under armour", "lululemon", "athleta", "reebok"]
                 is_athletic = any(brand_name in brand_lower for brand_name in athletic_brands)
                 
                 # Exception 2: Ultra-budget brands (Shein/Temu excluded completely)
@@ -2665,161 +2660,6 @@ async def enhance_outfits_with_products_fast(outfit_concepts: List[Dict[str, Any
     
     return enhanced_outfits
 
-# PARALLEL PROCESSING: Make all SerpAPI calls simultaneously instead of sequentially
-async def enhance_outfits_with_products_fast_parallel(outfit_concepts: List[Dict], prompt_context: str = "", budget: float = 300.0) -> List[Outfit]:
-    """Enhanced parallel version - 85% faster than sequential processing"""
-    try:
-        enhanced_outfits = []
-        
-        for concept in outfit_concepts:
-            try:
-                outfit_id = str(uuid.uuid4())
-                outfit_name = concept.get("outfit_name", "Quick Outfit")
-                items_data = concept.get("items", [])
-                
-                # Collect all search tasks for this outfit
-                search_tasks = []
-                item_metadata = []  # Track original item data
-                
-                for item_concept in items_data:
-                    category = _match_categories(item_concept.get("category", ""))
-                    description = item_concept.get("description", "")
-                    color = item_concept.get("color", "")
-                    
-                    # Build search query from AI description
-                    search_query = f"{description} unisex {color}".strip()
-                    
-                    # Create async task for this search
-                    serpapi_service_instance = get_serpapi_service()
-                    task = serpapi_service_instance.search_products(
-                        query=search_query,
-                        category=category
-                    )
-                    search_tasks.append(task)
-                    item_metadata.append({
-                        'category': category,
-                        'description': description,
-                        'color': color,
-                        'original_concept': item_concept
-                    })
-                
-                # EXECUTE ALL SEARCHES IN PARALLEL for this outfit
-                if search_tasks:
-                    logger.info(f"🚀 PARALLEL SEARCH: Starting {len(search_tasks)} searches for outfit '{outfit_name}'")
-                    start_time = time.time()
-                    
-                    all_results = await asyncio.gather(*search_tasks, return_exceptions=True)
-                    
-                    parallel_time = time.time() - start_time
-                    logger.info(f"⚡ PARALLEL SEARCH COMPLETED: {len(search_tasks)} searches in {parallel_time:.2f}s")
-                    
-                    # Process results and create outfit items
-                    outfit_items = []
-                    total_price = 0.0
-                    
-                    for result_idx, (search_result, metadata) in enumerate(zip(all_results, item_metadata)):
-                        try:
-                            if isinstance(search_result, Exception):
-                                logger.error(f"❌ Search failed for item {result_idx}: {search_result}")
-                                # Create fallback item
-                                mock_data = _get_mock_product(
-                                    metadata['category'], 
-                                    metadata['description'], 
-                                    metadata['color'], 
-                                    prompt_context, 
-                                    budget
-                                )
-                                outfit_item = OutfitItem(
-                                    product_id=f"fallback-{uuid.uuid4()}",
-                                    product_name=mock_data["name"],
-                                    brand=mock_data["brand"],
-                                    category=metadata['category'].lower(),
-                                    price=random.uniform(50.0, 200.0),
-                                    url=f"https://www.farfetch.com/shopping/search/?q={mock_data['name'].replace(' ', '+')}",
-                                    image_url=mock_data["image_url"],
-                                    description=metadata['description'],
-                                    concept_description=metadata['description'],
-                                    color=metadata['color'],
-                                    alternatives=[],
-                                    is_fallback=True
-                                )
-                            elif search_result and len(search_result) > 0:
-                                # Use real product result
-                                real_product = search_result[0]
-                                outfit_item = OutfitItem(
-                                    product_id=f"real-{uuid.uuid4()}",
-                                    product_name=real_product.get('product_name', metadata['description']),
-                                    brand=real_product.get('brand', 'Designer'),
-                                    category=metadata['category'].lower(),
-                                    price=real_product.get('price', random.uniform(50.0, 200.0)),
-                                    url=real_product.get('product_url', f"https://www.farfetch.com/shopping/search/?q={metadata['description'].replace(' ', '+')}"),
-                                    image_url=real_product.get('image_url', ''),
-                                    description=metadata['description'],
-                                    concept_description=metadata['description'],
-                                    color=metadata['color'],
-                                    alternatives=[],
-                                    is_fallback=False
-                                )
-                                logger.info(f"✅ PARALLEL: Created real product item for {metadata['description']}")
-                            else:
-                                # Create enhanced fallback
-                                mock_data = _get_mock_product(
-                                    metadata['category'], 
-                                    metadata['description'], 
-                                    metadata['color'], 
-                                    prompt_context, 
-                                    budget
-                                )
-                                outfit_item = OutfitItem(
-                                    product_id=f"enhanced-{uuid.uuid4()}",
-                                    product_name=mock_data["name"],
-                                    brand=mock_data["brand"],
-                                    category=metadata['category'].lower(),
-                                    price=random.uniform(50.0, 200.0),
-                                    url=f"https://www.farfetch.com/shopping/search/?q={mock_data['name'].replace(' ', '+')}",
-                                    image_url=mock_data["image_url"],
-                                    description=metadata['description'],
-                                    concept_description=metadata['description'],
-                                    color=metadata['color'],
-                                    alternatives=[],
-                                    is_fallback=True
-                                )
-                            
-                            outfit_items.append(outfit_item)
-                            total_price += outfit_item.price
-                            
-                        except Exception as item_error:
-                            logger.error(f"❌ Error processing parallel item {result_idx}: {item_error}")
-                            continue
-                    
-                    # Create complete outfit
-                    if outfit_items:
-                        outfit = Outfit(
-                            id=outfit_id,
-                            name=outfit_name,
-                            description=concept.get("description", "Stylish outfit"),
-                            style=concept.get("style", "casual"),
-                            occasion=concept.get("occasion", "everyday"),
-                            total_price=total_price,
-                            items=outfit_items,
-                            image_url=None,
-                            collage_url=None,
-                            brand_display={},
-                            stylist_rationale=concept.get("stylist_rationale", "A great look!")
-                        )
-                        enhanced_outfits.append(outfit)
-                        logger.info(f"✅ PARALLEL: Created complete outfit with {len(outfit_items)} items")
-                        
-            except Exception as outfit_error:
-                logger.error(f"❌ PARALLEL: Error processing outfit: {outfit_error}")
-                continue
-        
-        return enhanced_outfits
-        
-    except Exception as e:
-        logger.error(f"❌ PARALLEL ENHANCEMENT ERROR: {e}")
-        return []
-
 # New endpoint for quick outfit generation with timeout protection
 @router.post("/ultra-fast-generate", response_model=OutfitGenerateResponse)
 async def ultra_fast_generate_outfit(request: OutfitGenerateRequest):
@@ -2835,15 +2675,14 @@ async def ultra_fast_generate_outfit(request: OutfitGenerateRequest):
         concepts = await generate_outfit_concepts_fast(request)
         
         if concepts:
-            # PERFORMANCE: Use PARALLEL processing for 85% speed improvement  
-            enhanced = await enhance_outfits_with_products_fast_parallel(concepts, request.prompt, request.budget or 300.0)
+            enhanced = await enhance_outfits_with_products_fast(concepts, request)
             total_time = time.time() - start_time
             
             return OutfitGenerateResponse(
                 outfits=enhanced,
                 prompt=request.prompt,
                 status="success",
-                status_message=f"⚡ Parallel: {total_time:.1f}s"
+                status_message=f"⚡ Ultra-fast: {total_time:.1f}s"
             )
         else:
             # Super-fast fallback using optimized mock data
@@ -2923,12 +2762,7 @@ def _determine_retailer_choice(prompt: str, style: str, budget: float, brand: st
             reasons = [f"Ultra-budget brand '{brand}' with budget ${budget}"]
         else:
             # Exception 2: Athletic/sportswear with specific athletic brands and keywords
-            athletic_brands = [
-                "nike", "adidas", "under armour", "lululemon", "athleta", "reebok",
-                "alo yoga", "alo", "outdoor voices", "set active", "girlfriend collective",
-                "beyond yoga", "vuori", "fabletics", "spiritual gangster", "puma", 
-                "new balance", "asics", "brooks", "hoka", "on running", "on"
-            ]
+            athletic_brands = ["nike", "adidas", "under armour", "lululemon", "athleta", "reebok"]
             is_athletic_brand = any(brand_name in brand_lower for brand_name in athletic_brands)
             has_athletic_keywords = any(keyword in prompt_lower for keyword in ["workout", "gym", "athletic", "sportswear", "activewear", "running"])
             
@@ -3355,132 +3189,3 @@ async def debug_smart_retailer_logic():
     except Exception as e:
         logger.error(f"Error in smart retailer logic debug: {e}")
         return {"error": str(e)}
-
-@router.get("/debug/brand-categorization")
-async def debug_brand_categorization():
-    """
-    Debug endpoint to show how different brands are categorized between retailers.
-    Helps identify issues with athletic brand detection and retailer routing.
-    """
-    
-    # Test brand samples across different categories
-    test_brands = {
-        "Athletic/Athleisure": [
-            "Alo Yoga", "alo", "Outdoor Voices", "Set Active", "Girlfriend Collective",
-            "Beyond Yoga", "Vuori", "Fabletics", "Spiritual Gangster", "Lululemon",
-            "Nike", "Adidas", "Under Armour", "Athleta", "Reebok", "Puma", "New Balance"
-        ],
-        "Premium Fashion": [
-            "Ray-Ban", "Gucci", "Prada", "Tom Ford", "Saint Laurent", "Versace",
-            "Balenciaga", "Off-White", "Burberry", "Cartier"
-        ],
-        "Contemporary": [
-            "Zara", "COS", "& Other Stories", "Arket", "Mango", "Theory", "J.Crew",
-            "Madewell", "Everlane", "Reformation"
-        ],
-        "Accessible": [
-            "H&M", "Uniqlo", "Gap", "Banana Republic", "Old Navy", "Target", "Forever 21"
-        ],
-        "Tech/Accessories": [
-            "Apple", "Fitbit", "Samsung", "Garmin", "Fossil", "Michael Kors"
-        ]
-    }
-    
-    # Test context scenarios
-    test_contexts = [
-        {"query": "athletic workout gym", "category": "athletic"},
-        {"query": "casual everyday", "category": "casual"},
-        {"query": "formal business", "category": "formal"},
-        {"query": "yoga pilates", "category": "athletic"},
-        {"query": "running training", "category": "athletic"}
-    ]
-    
-    results = {}
-    
-    for category, brands in test_brands.items():
-        results[category] = {}
-        
-        for brand in brands:
-            brand_results = {}
-            
-            for context in test_contexts:
-                # Test retailer choice for this brand + context
-                retailer_choice = _determine_retailer_choice(
-                    prompt=f"{brand} {context['query']}",
-                    style=context['category'],
-                    budget=200,
-                    brand=brand,
-                    category="Top"
-                )
-                
-                brand_results[context['query']] = {
-                    "retailer": retailer_choice["retailer_name"],
-                    "score": retailer_choice.get("score", 0),
-                    "reasoning": retailer_choice.get("reasoning", "")
-                }
-            
-            results[category][brand] = brand_results
-    
-    # Also test the SerpAPI service logic
-    serpapi_results = {}
-    serpapi_service_instance = get_serpapi_service()
-    
-    for category, brands in test_brands.items():
-        serpapi_results[category] = {}
-        
-        for brand in brands[:5]:  # Test first 5 brands in each category
-            for context in test_contexts[:2]:  # Test first 2 contexts
-                try:
-                    # Test the _choose_optimal_retailer method directly
-                    optimal_retailer = serpapi_service_instance._choose_optimal_retailer(
-                        brand=brand,
-                        category="Top", 
-                        search_query=f"{brand} {context['query']}"
-                    )
-                    
-                    serpapi_results[category][brand] = serpapi_results[category].get(brand, {})
-                    serpapi_results[category][brand][context['query']] = optimal_retailer
-                    
-                except Exception as e:
-                    serpapi_results[category][brand] = serpapi_results[category].get(brand, {})
-                    serpapi_results[category][brand][context['query']] = f"Error: {str(e)}"
-    
-    # Summary statistics
-    summary = {
-        "total_brands_tested": sum(len(brands) for brands in test_brands.values()),
-        "farfetch_count": 0,
-        "nordstrom_count": 0,
-        "preserve_original_count": 0,
-        "potential_issues": []
-    }
-    
-    # Count retailer assignments and identify issues
-    for category, brands in results.items():
-        for brand, contexts in brands.items():
-            for context, result in contexts.items():
-                retailer = result["retailer"]
-                if retailer == "Farfetch":
-                    summary["farfetch_count"] += 1
-                elif retailer == "Nordstrom":
-                    summary["nordstrom_count"] += 1
-                
-                # Identify potential issues
-                if category == "Athletic/Athleisure" and retailer == "Farfetch" and "athletic" in context:
-                    summary["potential_issues"].append(f"{brand} → Farfetch for '{context}' (should be Nordstrom?)")
-                elif category == "Premium Fashion" and retailer == "Nordstrom":
-                    summary["potential_issues"].append(f"{brand} → Nordstrom for '{context}' (should be Farfetch?)")
-    
-    return {
-        "message": "Brand categorization debug results",
-        "test_brands": test_brands,
-        "retailer_logic_results": results,
-        "serpapi_logic_results": serpapi_results,
-        "summary": summary,
-        "recommendations": [
-            "Consider expanding athletic_brands list to include popular athleisure brands",
-            "Review premium brand detection for accessories like Ray-Ban",
-            "Consider brand-specific exceptions for better retailer matching",
-            "Test athletic keyword detection sensitivity"
-        ]
-    }
-

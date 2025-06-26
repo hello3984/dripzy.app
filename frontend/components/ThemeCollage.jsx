@@ -59,12 +59,7 @@ const ThemeCollage = ({ title, items = [], style }) => {
           
           // FARFETCH-FIRST: Use Farfetch for all categories, only exception for athletic brands
           const brandLower = brand.toLowerCase();
-          const isAthletic = [
-            'nike', 'adidas', 'under armour', 'lululemon', 'athleta', 'reebok',
-            'alo yoga', 'alo', 'outdoor voices', 'set active', 'girlfriend collective',
-            'beyond yoga', 'vuori', 'fabletics', 'spiritual gangster', 'puma', 
-            'new balance', 'asics', 'brooks', 'hoka', 'on running', 'on'
-          ].some(b => brandLower.includes(b));
+          const isAthletic = ['nike', 'adidas', 'under armour', 'lululemon', 'athleta'].some(b => brandLower.includes(b));
           const retailer = isAthletic ? 'Nordstrom' : 'Farfetch';
           const retailerUrl = retailer === 'Farfetch' 
             ? `https://www.farfetch.com/search?q=${searchQuery}`

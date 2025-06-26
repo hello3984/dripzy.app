@@ -94,40 +94,20 @@ const OutfitCollage = ({ collageImage, imageMap, outfitName, outfit }) => {
           
           <div className="outfit-items-grid">
             {validItems.map((item, index) => {
-              // FIXED: Preserve backend URLs and only create fallback for missing URLs
-              let finalUrl = '';
+              // Create search query
+              const searchQuery = encodeURIComponent(`${item.brand || ''} ${item.product_name || ''}`).trim();
               
-              // Priority 1: Use backend-generated URL if available and valid
-              if (item.product_url && item.product_url !== '#' && !item.product_url.includes('placeholder')) {
-                finalUrl = item.product_url;
-              } else if (item.url && item.url !== '#' && !item.url.includes('placeholder')) {
-                finalUrl = item.url;
-              } else {
-                // Priority 2: Create smart search URL only as last resort
-                const searchQuery = encodeURIComponent(`${item.brand || ''} ${item.product_name || ''}`).trim();
-                
-                // For premium brands (like Ray-Ban), preserve original retailer choice
-                const brand = (item.brand || '').toLowerCase();
-                const premiumBrands = ['ray-ban', 'rayban', 'oakley', 'prada', 'gucci', 'versace', 'tom ford'];
-                const athleticBrands = [
-                  'nike', 'adidas', 'under armour', 'lululemon', 'athleta', 'reebok',
-                  'alo yoga', 'alo', 'outdoor voices', 'set active', 'girlfriend collective',
-                  'beyond yoga', 'vuori', 'fabletics', 'spiritual gangster', 'puma', 
-                  'new balance', 'asics', 'brooks', 'hoka', 'on running', 'on'
-                ];
-                
-                const isPremium = premiumBrands.some(b => brand.includes(b));
-                const isAthletic = athleticBrands.some(b => brand.includes(b));
-                
-                if (isAthletic) {
-                  finalUrl = `https://www.nordstrom.com/sr?keyword=${searchQuery}`;
-                } else if (isPremium) {
-                  finalUrl = `https://www.farfetch.com/shopping/search/?q=${searchQuery}`;
-                } else {
-                  // Default FARFETCH-FIRST for other brands
-                  finalUrl = `https://www.farfetch.com/shopping/search/?q=${searchQuery}`;
-                }
-              }
+              // Create Farfetch URL as primary option
+              const farfetchUrl = `https://www.farfetch.com/search?q=${searchQuery}`;
+              const nordstromUrl = `https://www.nordstrom.com/sr?keyword=${searchQuery}`;
+              
+              // FARFETCH-FIRST: Use Farfetch for all items, only exception for athletic brands
+              const brand = (item.brand || '').toLowerCase();
+              const isAthletic = ['nike', 'adidas', 'under armour', 'lululemon', 'athleta'].some(b => brand.includes(b));
+              const retailerUrl = isAthletic ? nordstromUrl : farfetchUrl;
+              
+              // Use item URL if available, otherwise use the retailer URL
+              const finalUrl = item.url || retailerUrl;
               
               return (
                 <div 
@@ -192,12 +172,7 @@ const OutfitCollage = ({ collageImage, imageMap, outfitName, outfit }) => {
                   
                   // FARFETCH-FIRST: Use Farfetch for all categories, only exception for athletic brands
                   const brand = (firstItem.brand || '').toLowerCase();
-                  const isAthletic = [
-                    'nike', 'adidas', 'under armour', 'lululemon', 'athleta', 'reebok',
-                    'alo yoga', 'alo', 'outdoor voices', 'set active', 'girlfriend collective',
-                    'beyond yoga', 'vuori', 'fabletics', 'spiritual gangster', 'puma', 
-                    'new balance', 'asics', 'brooks', 'hoka', 'on running', 'on'
-                  ].some(b => brand.includes(b));
+                  const isAthletic = ['nike', 'adidas', 'under armour', 'lululemon', 'athleta'].some(b => brand.includes(b));
                   const retailer = isAthletic ? 'Nordstrom' : 'Farfetch';
                   
                   // Create retailer URL
