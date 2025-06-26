@@ -381,6 +381,17 @@ class SerpAPIService:
         
         logger.debug(f"Raw product URL: {product_url}")
         
+        # 🔧 CRITICAL FIX: Filter out old/deprecated Farfetch URLs before processing
+        deprecated_patterns = [
+            'items.aspx?storeid=9359',
+            'items.aspx?q=',
+            'storeid=9359'
+        ]
+        
+        if any(pattern in product_url for pattern in deprecated_patterns):
+            logger.warning(f"🚫 FILTERED OUT DEPRECATED FARFETCH URL: {product_url[:60]}...")
+            return ""  # Force creation of new working URL
+        
         # Clean up Google Shopping redirect URLs
         if "google.com/shopping/product" in product_url or "google.com/url" in product_url:
             cleaned_url = self._extract_real_url_from_google_redirect(product_url)
@@ -475,41 +486,44 @@ class SerpAPIService:
     def _get_best_image_url(self, result: Dict[str, Any]) -> str:
         """Get the highest quality product image URL - prioritizing validated actual retailer images."""
         
-        # PRIORITY 1: Try to extract actual retailer product images from validated URLs
-        product_url = self._extract_product_url(result)
-        if product_url and self._is_real_retailer_url(product_url) and self._validate_product_url(product_url):
-            actual_image = self._extract_retailer_product_image(product_url, result)
-            if actual_image and self._is_valid_product_image_url(actual_image):
-                logger.info(f"✅ Found validated retailer image: {actual_image[:60]}...")
-                return actual_image
-        
-        # PRIORITY 2: Look for high-quality images in SerpAPI data
+        # PRIORITY 1: Look for high-quality images in SerpAPI data FIRST (faster and more reliable)
         high_quality_image = self._find_high_quality_serpapi_image(result)
         if high_quality_image and self._is_valid_product_image_url(high_quality_image):
-            logger.info(f"✅ Found validated high-quality SerpAPI image: {high_quality_image[:60]}...")
+            logger.info(f"✅ Found high-quality SerpAPI image: {high_quality_image[:60]}...")
             return high_quality_image
         
-        # PRIORITY 3: Standard SerpAPI thumbnails as fallback (with validation)
+        # PRIORITY 2: Standard SerpAPI thumbnails as reliable fallback
         image_fields = ["thumbnail", "image", "images"]
         
         for field in image_fields:
             if field in result and result[field]:
                 image_url = result[field]
                 if isinstance(image_url, list) and image_url:
-                    candidate_image = image_url[0]
-                    if self._is_valid_product_image_url(candidate_image):
-                        logger.info(f"🔄 Using validated SerpAPI thumbnail: {candidate_image[:60]}...")
-                        return candidate_image
+                    # Try all images in the array, not just the first one
+                    for candidate_image in image_url:
+                        if candidate_image and self._is_valid_product_image_url(candidate_image):
+                            logger.info(f"✅ Found valid SerpAPI image: {candidate_image[:60]}...")
+                            return candidate_image
                 elif isinstance(image_url, str):
                     if self._is_valid_product_image_url(image_url):
-                        logger.info(f"🔄 Using validated SerpAPI thumbnail: {image_url[:60]}...")
+                        logger.info(f"✅ Found valid SerpAPI image: {image_url[:60]}...")
                         return image_url
         
-        # PRIORITY 4: Generate high-quality placeholder
+        # PRIORITY 3: Try retailer product images (only if we have a working URL)
+        product_url = self._extract_product_url(result)
+        if product_url and self._is_real_retailer_url(product_url):
+            # Skip validation to avoid 403 errors, just try to extract image
+            actual_image = self._extract_retailer_product_image(product_url, result)
+            if actual_image and self._is_valid_product_image_url(actual_image):
+                logger.info(f"✅ Found retailer image: {actual_image[:60]}...")
+                return actual_image
+        
+        # PRIORITY 4: Generate high-quality placeholder as last resort
         title = result.get("title", "Product")
         category = result.get("category", "Fashion")
-        placeholder_url = f"https://via.placeholder.com/400x500/f8f9fa/333333?text={urllib.parse.quote(title[:20])}"
-        logger.warning(f"⚠️ No validated images found, using placeholder: {placeholder_url}")
+        safe_title = urllib.parse.quote(title[:15]) if title else "Product"
+        placeholder_url = f"https://via.placeholder.com/400x500/f8f9fa/666666?text={safe_title}"
+        logger.warning(f"⚠️ No images found, using placeholder: {placeholder_url}")
         return placeholder_url
     
     def _extract_retailer_product_image(self, product_url: str, result: Dict[str, Any]) -> str:

@@ -137,10 +137,11 @@
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   grid-auto-rows: minmax(200px, auto);
-  gap: 10px;
+  gap: 15px;
   padding: 20px;
   position: relative;
   background-color: #f4f4f4;
+  min-height: 450px; /* Ensure enough space for items */
 }
 
 .outfit-item-card {
@@ -367,18 +368,30 @@
 
 .image-load-error {
   position: relative;
-  background-color: #f8f8f8;
-  min-height: 150px;
+  background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+  min-height: 180px;
   border-radius: 8px;
   display: flex;
   align-items: center;
   justify-content: center;
+  border: 2px dashed #dee2e6;
 }
 
 .image-load-error::after {
-  content: "Image unavailable";
+  content: "Image loading...";
   position: absolute;
-  color: #666;
-  font-size: 0.85rem;
-  font-style: italic;
+  color: #6c757d;
+  font-size: 0.9rem;
+  font-weight: 500;
+  text-align: center;
+  padding: 10px;
+}
+
+.item-image-container img {
+  transition: opacity 0.3s ease;
+}
+
+.item-image-container img[src*="placeholder"] {
+  background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+  border: 2px dashed #dee2e6;
 } 
