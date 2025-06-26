@@ -1305,7 +1305,7 @@ async def _find_products_for_item(query: str, category: str,
                 
                 if is_excluded:
                     # Excluded brands (Shein/Temu) - Force Farfetch but they shouldn't appear anyway
-                    final_url = f"https://www.farfetch.com/shopping/search/items.aspx?q={search_terms}&storeid=9359"
+                    final_url = f"https://www.farfetch.com/shopping/search/?q={search_terms}"
                     logger.warning(f"EXCLUDED BRAND '{cleaned_brand}' forced to Farfetch: {search_terms}")
                 elif is_athletic or is_ultra_budget:
                     # Use Nordstrom for athletic or remaining ultra-budget brands
@@ -1313,7 +1313,7 @@ async def _find_products_for_item(query: str, category: str,
                     logger.info(f"Created Nordstrom search URL for exception brand: {search_terms}")
                 else:
                     # DEFAULT: Use Farfetch for all other brands (luxury, designer, contemporary, casual)
-                    final_url = f"https://www.farfetch.com/shopping/search/items.aspx?q={search_terms}&storeid=9359"
+                    final_url = f"https://www.farfetch.com/shopping/search/?q={search_terms}"
                     logger.info(f"Created Farfetch search URL (FARFETCH-FIRST): {search_terms}")
             
             product_data = { # Assemble using cleaned data
@@ -2962,7 +2962,7 @@ def _generate_smart_product_url(brand: str, product_name: str, description: str,
     search_query = search_terms.replace(" ", "+").replace("++", "+")
     
     if retailer == "farfetch":
-        return f"https://www.farfetch.com/shopping/search/items.aspx?q={search_query}&storeid=9359"
+        return f"https://www.farfetch.com/shopping/search/?q={search_query}"
     else:
         return f"https://www.nordstrom.com/sr?keyword={search_query}&origin=keywordsearch"
 
