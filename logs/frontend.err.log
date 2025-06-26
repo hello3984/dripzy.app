@@ -16,3 +16,21 @@
 2025-04-30 13:45:08: (node:95850) [DEP_WEBPACK_DEV_SERVER_ON_AFTER_SETUP_MIDDLEWARE] DeprecationWarning: 'onAfterSetupMiddleware' option is deprecated. Please use the 'setupMiddlewares' option.
 2025-04-30 13:45:08: (Use `node --trace-deprecation ...` to show where the warning was created)
 2025-04-30 13:45:08: (node:95850) [DEP_WEBPACK_DEV_SERVER_ON_BEFORE_SETUP_MIDDLEWARE] DeprecationWarning: 'onBeforeSetupMiddleware' option is deprecated. Please use the 'setupMiddlewares' option.
+2025-06-25 13:38:56: (node:69375) [DEP_WEBPACK_DEV_SERVER_ON_AFTER_SETUP_MIDDLEWARE] DeprecationWarning: 'onAfterSetupMiddleware' option is deprecated. Please use the 'setupMiddlewares' option.
+2025-06-25 13:38:56: (Use `node --trace-deprecation ...` to show where the warning was created)
+2025-06-25 13:38:56: (node:69375) [DEP_WEBPACK_DEV_SERVER_ON_BEFORE_SETUP_MIDDLEWARE] DeprecationWarning: 'onBeforeSetupMiddleware' option is deprecated. Please use the 'setupMiddlewares' option.
+2025-06-25 15:31:31: /Users/fatihbayraktar/fashion AI/frontend/node_modules/react-scripts/scripts/start.js:19
+2025-06-25 15:31:31:   throw err;
+2025-06-25 15:31:31:   ^
+2025-06-25 15:31:31: 
+2025-06-25 15:31:31: [Error: ENOENT: no such file or directory, stat '/Users/fatihbayraktar/fashion AI/frontend/node_modules/.cache/default-development/0.pack'] {
+2025-06-25 15:31:31:   errno: -2,
+2025-06-25 15:31:31:   code: 'ENOENT',
+2025-06-25 15:31:31:   syscall: 'stat',
+2025-06-25 15:31:31:   path: '/Users/fatihbayraktar/fashion AI/frontend/node_modules/.cache/default-development/0.pack'
+2025-06-25 15:31:31: }
+2025-06-25 15:31:31: 
+2025-06-25 15:31:31: Node.js v20.13.1
+2025-06-25 15:31:36: (node:78202) [DEP_WEBPACK_DEV_SERVER_ON_AFTER_SETUP_MIDDLEWARE] DeprecationWarning: 'onAfterSetupMiddleware' option is deprecated. Please use the 'setupMiddlewares' option.
+2025-06-25 15:31:36: (Use `node --trace-deprecation ...` to show where the warning was created)
+2025-06-25 15:31:36: (node:78202) [DEP_WEBPACK_DEV_SERVER_ON_BEFORE_SETUP_MIDDLEWARE] DeprecationWarning: 'onBeforeSetupMiddleware' option is deprecated. Please use the 'setupMiddlewares' option.

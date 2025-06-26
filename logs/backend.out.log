@@ -147,3 +147,87 @@
 2025-06-25 13:07:48: INFO:     127.0.0.1:58469 - "GET /debug-serpapi HTTP/1.1" 200 OK
 2025-06-25 13:08:25: INFO:     127.0.0.1:58608 - "GET /test-serpapi?query=nike+sneakers&category=Shoes HTTP/1.1" 200 OK
 2025-06-25 13:09:25: INFO:     127.0.0.1:58862 - "GET /test-serpapi?query=nike+air+max+sneakers&category=Shoes HTTP/1.1" 200 OK
+2025-06-25 13:39:10: INFO:     127.0.0.1:51178 - "GET /health HTTP/1.1" 200 OK
+2025-06-25 13:43:39: INFO:     127.0.0.1:52425 - "POST /outfits/ultra-fast-generate HTTP/1.1" 405 Method Not Allowed
+2025-06-25 13:44:02: INFO:     127.0.0.1:52522 - "GET /health HTTP/1.1" 200 OK
+2025-06-25 13:44:14: INFO:     127.0.0.1:52560 - "POST /outfits/ultra-fast-generate HTTP/1.1" 200 OK
+2025-06-25 13:44:25: INFO:     127.0.0.1:52608 - "POST /outfits/ultra-fast-generate HTTP/1.1" 200 OK
+2025-06-25 13:44:38: INFO:     127.0.0.1:52661 - "POST /outfits/quick-generate HTTP/1.1" 200 OK
+2025-06-25 13:47:32: INFO:     127.0.0.1:53470 - "POST /outfits/ultra-fast-generate HTTP/1.1" 200 OK
+2025-06-25 13:47:40: INFO:     127.0.0.1:53519 - "POST /outfits/ultra-fast-generate HTTP/1.1" 200 OK
+2025-06-25 13:56:00: INFO:     127.0.0.1:55421 - "POST /outfits/quick-generate HTTP/1.1" 200 OK
+2025-06-25 14:33:12: INFO:     127.0.0.1:64199 - "POST /outfits/ultra-fast-generate HTTP/1.1" 200 OK
+2025-06-25 14:33:31: INFO:     127.0.0.1:64282 - "POST /outfits/quick-generate HTTP/1.1" 200 OK
+2025-06-25 14:37:57: INFO:     127.0.0.1:65448 - "POST /outfits/ultra-fast-generate HTTP/1.1" 200 OK
+2025-06-25 14:39:22: INFO:     127.0.0.1:49472 - "POST /outfits/ultra-fast-generate HTTP/1.1" 200 OK
+2025-06-25 14:40:27: INFO:     127.0.0.1:49755 - "POST /outfits/ultra-fast-generate HTTP/1.1" 200 OK
+2025-06-25 14:40:51: INFO:     127.0.0.1:49861 - "POST /outfits/quick-generate HTTP/1.1" 200 OK
+2025-06-25 14:44:58: INFO:     127.0.0.1:50919 - "POST /outfits/ultra-fast-generate HTTP/1.1" 200 OK
+2025-06-25 14:45:16: INFO:     127.0.0.1:50995 - "POST /outfits/quick-generate HTTP/1.1" 200 OK
+2025-06-25 14:48:44: INFO:     127.0.0.1:51894 - "POST /outfits/ultra-fast-generate HTTP/1.1" 200 OK
+2025-06-25 14:49:58: INFO:     127.0.0.1:52256 - "POST /outfits/ultra-fast-generate HTTP/1.1" 200 OK
+2025-06-25 14:51:06: INFO:     127.0.0.1:52553 - "POST /outfits/ultra-fast-generate HTTP/1.1" 200 OK
+2025-06-25 14:51:44: INFO:     127.0.0.1:52711 - "POST /outfits/ultra-fast-generate HTTP/1.1" 200 OK
+2025-06-25 14:52:20: INFO:     127.0.0.1:52868 - "POST /outfits/ultra-fast-generate HTTP/1.1" 200 OK
+2025-06-25 14:52:53: INFO:     127.0.0.1:53069 - "GET /outfits/test-mock-product HTTP/1.1" 404 Not Found
+2025-06-25 14:52:59: INFO:     127.0.0.1:53096 - "GET /outfits/test-mock-product HTTP/1.1" 404 Not Found
+2025-06-25 14:53:37: INFO:     127.0.0.1:53272 - "GET /outfits/test-mock-product HTTP/1.1" 404 Not Found
+2025-06-25 14:56:02: INFO:     127.0.0.1:53940 - "GET /outfits/debug/smart-retailer-logic HTTP/1.1" 405 Method Not Allowed
+2025-06-25 14:56:23: INFO:     127.0.0.1:54006 - "POST /outfits/ultra-fast-generate HTTP/1.1" 200 OK
+2025-06-25 14:57:08: INFO:     127.0.0.1:54203 - "POST /outfits/ultra-fast-generate HTTP/1.1" 200 OK
+2025-06-25 14:57:44: INFO:     127.0.0.1:54391 - "GET /outfits/test/brand-selection HTTP/1.1" 405 Method Not Allowed
+2025-06-25 14:57:51: INFO:     127.0.0.1:54425 - "GET /outfits/test/brand-selection HTTP/1.1" 405 Method Not Allowed
+2025-06-25 14:58:16: INFO:     127.0.0.1:54526 - "POST /outfits/ultra-fast-generate HTTP/1.1" 200 OK
+2025-06-25 14:58:23: INFO:     127.0.0.1:54558 - "POST /outfits/ultra-fast-generate HTTP/1.1" 200 OK
+2025-06-25 14:58:28: INFO:     127.0.0.1:54589 - "POST /outfits/ultra-fast-generate HTTP/1.1" 200 OK
+2025-06-25 15:02:27: INFO:     127.0.0.1:55683 - "POST /outfits/ultra-fast-generate HTTP/1.1" 200 OK
+2025-06-25 15:46:21: INFO:     127.0.0.1:52219 - "GET /outfits/debug/smart-retailer-logic HTTP/1.1" 200 OK
+2025-06-25 15:46:21: INFO:     127.0.0.1:52221 - "GET /health HTTP/1.1" 200 OK
+2025-06-25 15:46:36: INFO:     127.0.0.1:52268 - "POST /outfits/ultra-fast-generate HTTP/1.1" 200 OK
+2025-06-25 15:47:44: INFO:     127.0.0.1:52600 - "POST /outfits/ultra-fast-generate HTTP/1.1" 200 OK
+2025-06-25 15:50:03: INFO:     127.0.0.1:53291 - "GET /outfits/debug/theme-aware-search-terms HTTP/1.1" 405 Method Not Allowed
+2025-06-25 15:50:26: INFO:     127.0.0.1:53372 - "POST /outfits/ultra-fast-generate HTTP/1.1" 200 OK
+2025-06-25 15:57:00: INFO:     127.0.0.1:55275 - "GET /health HTTP/1.1" 200 OK
+2025-06-25 15:57:37: INFO:     127.0.0.1:55441 - "POST /outfits/theme-collage HTTP/1.1" 405 Method Not Allowed
+2025-06-25 15:57:44: INFO:     127.0.0.1:55474 - "GET /docs HTTP/1.1" 200 OK
+2025-06-25 16:02:53: INFO:     127.0.0.1:56924 - "POST /outfits/ultra-fast-generate HTTP/1.1" 200 OK
+2025-06-25 16:03:47: INFO:     127.0.0.1:57173 - "POST /outfits/ultra-fast-generate HTTP/1.1" 200 OK
+2025-06-25 16:05:11: INFO:     127.0.0.1:57590 - "POST /outfits/ultra-fast-generate HTTP/1.1" 200 OK
+2025-06-25 16:05:23: INFO:     127.0.0.1:57654 - "POST /outfits/ultra-fast-generate HTTP/1.1" 200 OK
+2025-06-25 16:05:35: INFO:     127.0.0.1:57704 - "POST /outfits/ultra-fast-generate HTTP/1.1" 200 OK
+2025-06-25 16:05:48: INFO:     127.0.0.1:57773 - "POST /outfits/ultra-fast-generate HTTP/1.1" 200 OK
+2025-06-25 16:06:01: INFO:     127.0.0.1:57837 - "POST /outfits/ultra-fast-generate HTTP/1.1" 200 OK
+2025-06-25 16:06:16: INFO:     127.0.0.1:57905 - "POST /outfits/ultra-fast-generate HTTP/1.1" 200 OK
+2025-06-25 16:06:30: INFO:     127.0.0.1:57973 - "POST /outfits/ultra-fast-generate HTTP/1.1" 200 OK
+2025-06-25 16:09:29: INFO:     127.0.0.1:58825 - "POST /outfits/ultra-fast-generate HTTP/1.1" 200 OK
+2025-06-25 16:12:12: INFO:     127.0.0.1:59613 - "POST /outfits/ultra-fast-generate HTTP/1.1" 200 OK
+2025-06-25 16:14:03: INFO:     127.0.0.1:60156 - "POST /outfits/ultra-fast-generate HTTP/1.1" 200 OK
+2025-06-25 16:14:15: INFO:     127.0.0.1:60238 - "GET /health HTTP/1.1" 200 OK
+2025-06-25 16:14:22: INFO:     127.0.0.1:60274 - "GET /test_serpapi?query=chunky%20knit%20sweater&category=top HTTP/1.1" 405 Method Not Allowed
+2025-06-25 16:14:35: INFO:     127.0.0.1:60325 - "GET /outfits/debug/check-serpapi HTTP/1.1" 200 OK
+2025-06-25 16:14:41: INFO:     127.0.0.1:60365 - "GET /debug/serpapi HTTP/1.1" 405 Method Not Allowed
+2025-06-25 16:15:22: INFO:     127.0.0.1:60530 - "POST /outfits/ultra-fast-generate HTTP/1.1" 200 OK
+2025-06-25 16:15:38: INFO:     127.0.0.1:60626 - "GET /outfits/debug/check-serpapi HTTP/1.1" 200 OK
+2025-06-25 16:15:39: INFO:     127.0.0.1:60634 - "GET /main/search-products?query=chunky%20knit%20sweater&category=top HTTP/1.1" 405 Method Not Allowed
+2025-06-25 16:16:23: INFO:     127.0.0.1:60841 - "POST /outfits/ultra-fast-generate HTTP/1.1" 200 OK
+2025-06-25 16:17:25: INFO:     127.0.0.1:61070 - "POST /outfits/ultra-fast-generate HTTP/1.1" 200 OK
+2025-06-25 16:17:54: INFO:     127.0.0.1:61198 - "POST /outfits/ultra-fast-generate HTTP/1.1" 200 OK
+2025-06-25 16:18:29: INFO:     127.0.0.1:61357 - "POST /outfits/ultra-fast-generate HTTP/1.1" 200 OK
+2025-06-25 16:24:34: INFO:     127.0.0.1:63002 - "POST /outfits/ultra-fast-generate HTTP/1.1" 200 OK
+2025-06-25 16:25:15: INFO:     127.0.0.1:63168 - "POST /outfits/ultra-fast-generate HTTP/1.1" 200 OK
+2025-06-25 16:29:50: INFO:     127.0.0.1:64472 - "POST /outfits/ultra-fast-generate HTTP/1.1" 200 OK
+2025-06-25 16:34:34: INFO:     127.0.0.1:49337 - "POST /outfits/ultra-fast-generate HTTP/1.1" 200 OK
+2025-06-25 16:36:06: INFO:     127.0.0.1:49848 - "POST /outfits/ultra-fast-generate HTTP/1.1" 200 OK
+2025-06-25 16:36:31: INFO:     127.0.0.1:49938 - "POST /outfits/ultra-fast-generate HTTP/1.1" 200 OK
+2025-06-25 16:37:57: INFO:     127.0.0.1:50366 - "POST /outfits/ultra-fast-generate HTTP/1.1" 200 OK
+2025-06-25 20:20:04: INFO:     127.0.0.1:55336 - "GET /health HTTP/1.1" 200 OK
+2025-06-25 20:20:22: INFO:     127.0.0.1:55414 - "POST /outfits/ultra-fast-generate HTTP/1.1" 200 OK
+2025-06-25 20:20:45: INFO:     127.0.0.1:55530 - "POST /outfits/ultra-fast-generate HTTP/1.1" 200 OK
+2025-06-25 20:30:13: INFO:     127.0.0.1:58571 - "GET /health HTTP/1.1" 200 OK
+2025-06-25 20:30:46: INFO:     127.0.0.1:58654 - "POST /outfits/ultra-fast-generate HTTP/1.1" 200 OK
+2025-06-25 20:31:21: INFO:     127.0.0.1:58800 - "POST /outfits/ultra-fast-generate HTTP/1.1" 200 OK
+2025-06-25 20:31:48: INFO:     127.0.0.1:58965 - "POST /outfits/ultra-fast-generate HTTP/1.1" 200 OK
+2025-06-25 20:32:01: INFO:     127.0.0.1:59109 - "POST /outfits/debug/smart-retailer-logic HTTP/1.1" 405 Method Not Allowed
+2025-06-25 22:16:12: INFO:     127.0.0.1:60155 - "POST /outfits/ultra-fast-generate HTTP/1.1" 200 OK
+2025-06-25 22:16:20: INFO:     127.0.0.1:60408 - "GET /outfits/debug/brand-categorization HTTP/1.1" 200 OK
+2025-06-25 22:16:54: INFO:     127.0.0.1:60460 - "POST /outfits/ultra-fast-generate HTTP/1.1" 200 OK
