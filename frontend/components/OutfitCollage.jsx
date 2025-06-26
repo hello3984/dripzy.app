@@ -75,13 +75,42 @@ const OutfitCollage = ({ outfit, prompt }) => {
 
       <div className="collage-grid">
         {outfit.items.map((item, index) => {
-          // Generate product URL
-          const productUrl = item.product_url || item.url || '';
-          const searchQuery = encodeURIComponent(`${item.brand || ''} ${item.product_name || ''} ${item.category || ''}`).trim();
-          const fallbackUrl = `https://www.google.com/search?tbm=shop&q=${searchQuery}`;
-          const finalUrl = productUrl || fallbackUrl;
+          // FIXED: Preserve backend URLs and only use fallback for missing URLs
+          let finalUrl = '';
           
-          console.log(`Item ${index} URL:`, finalUrl);
+          // Priority 1: Use backend-generated URL if available and valid
+          if (item.product_url && item.product_url !== '#' && !item.product_url.includes('placeholder')) {
+            finalUrl = item.product_url;
+          } else if (item.url && item.url !== '#' && !item.url.includes('placeholder')) {
+            finalUrl = item.url;
+          } else {
+            // Priority 2: Create smart search URL only as last resort
+            const searchQuery = encodeURIComponent(`${item.brand || ''} ${item.product_name || ''} ${item.category || ''}`).trim();
+            
+            // For premium brands (like Ray-Ban), prefer Farfetch unless it's athletic
+            const brand = (item.brand || '').toLowerCase();
+            const premiumBrands = ['ray-ban', 'rayban', 'oakley', 'prada', 'gucci', 'versace', 'tom ford'];
+            const athleticBrands = [
+              'nike', 'adidas', 'under armour', 'lululemon', 'athleta', 'reebok',
+              'alo yoga', 'alo', 'outdoor voices', 'set active', 'girlfriend collective',
+              'beyond yoga', 'vuori', 'fabletics', 'spiritual gangster', 'puma', 
+              'new balance', 'asics', 'brooks', 'hoka', 'on running', 'on'
+            ];
+            
+            const isPremium = premiumBrands.some(b => brand.includes(b));
+            const isAthletic = athleticBrands.some(b => brand.includes(b));
+            
+            if (isAthletic) {
+              finalUrl = `https://www.nordstrom.com/sr?keyword=${searchQuery}`;
+            } else if (isPremium) {
+              finalUrl = `https://www.farfetch.com/shopping/search/?q=${searchQuery}`;
+            } else {
+              // Default FARFETCH-FIRST for other brands
+              finalUrl = `https://www.farfetch.com/shopping/search/?q=${searchQuery}`;
+            }
+          }
+          
+          console.log(`Item ${index} (${item.brand} ${item.product_name}) URL:`, finalUrl);
           
           return (
             <motion.div 

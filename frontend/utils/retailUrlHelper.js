@@ -99,7 +99,12 @@ export const getBestRetailUrl = (product, preferredRetailer = '') => {
   const brand = (product.brand || '').toLowerCase();
   
   // Exception 1: Athletic brands
-  const athleticBrands = ['nike', 'adidas', 'under armour', 'lululemon', 'athleta', 'reebok'];
+  const athleticBrands = [
+    'nike', 'adidas', 'under armour', 'lululemon', 'athleta', 'reebok',
+    'alo yoga', 'alo', 'outdoor voices', 'set active', 'girlfriend collective',
+    'beyond yoga', 'vuori', 'fabletics', 'spiritual gangster', 'puma', 
+    'new balance', 'asics', 'brooks', 'hoka', 'on running', 'on'
+  ];
   const isAthletic = athleticBrands.some(brand_name => brand.includes(brand_name));
   
   // Exception 2: Ultra-budget brands (Shein/Temu completely excluded)

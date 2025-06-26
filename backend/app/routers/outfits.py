@@ -1294,7 +1294,12 @@ async def _find_products_for_item(query: str, category: str,
                 brand_lower = cleaned_brand.lower()
                 
                 # Exception 1: Athletic brands
-                athletic_brands = ["nike", "adidas", "under armour", "lululemon", "athleta", "reebok"]
+                athletic_brands = [
+                    "nike", "adidas", "under armour", "lululemon", "athleta", "reebok",
+                    "alo yoga", "alo", "outdoor voices", "set active", "girlfriend collective",
+                    "beyond yoga", "vuori", "fabletics", "spiritual gangster", "puma", 
+                    "new balance", "asics", "brooks", "hoka", "on running", "on"
+                ]
                 is_athletic = any(brand_name in brand_lower for brand_name in athletic_brands)
                 
                 # Exception 2: Ultra-budget brands (Shein/Temu excluded completely)
@@ -2762,7 +2767,12 @@ def _determine_retailer_choice(prompt: str, style: str, budget: float, brand: st
             reasons = [f"Ultra-budget brand '{brand}' with budget ${budget}"]
         else:
             # Exception 2: Athletic/sportswear with specific athletic brands and keywords
-            athletic_brands = ["nike", "adidas", "under armour", "lululemon", "athleta", "reebok"]
+            athletic_brands = [
+                "nike", "adidas", "under armour", "lululemon", "athleta", "reebok",
+                "alo yoga", "alo", "outdoor voices", "set active", "girlfriend collective",
+                "beyond yoga", "vuori", "fabletics", "spiritual gangster", "puma", 
+                "new balance", "asics", "brooks", "hoka", "on running", "on"
+            ]
             is_athletic_brand = any(brand_name in brand_lower for brand_name in athletic_brands)
             has_athletic_keywords = any(keyword in prompt_lower for keyword in ["workout", "gym", "athletic", "sportswear", "activewear", "running"])
             
@@ -3189,3 +3199,131 @@ async def debug_smart_retailer_logic():
     except Exception as e:
         logger.error(f"Error in smart retailer logic debug: {e}")
         return {"error": str(e)}
+
+@router.get("/debug/brand-categorization")
+async def debug_brand_categorization():
+    """
+    Debug endpoint to show how different brands are categorized between retailers.
+    Helps identify issues with athletic brand detection and retailer routing.
+    """
+    
+    # Test brand samples across different categories
+    test_brands = {
+        "Athletic/Athleisure": [
+            "Alo Yoga", "alo", "Outdoor Voices", "Set Active", "Girlfriend Collective",
+            "Beyond Yoga", "Vuori", "Fabletics", "Spiritual Gangster", "Lululemon",
+            "Nike", "Adidas", "Under Armour", "Athleta", "Reebok", "Puma", "New Balance"
+        ],
+        "Premium Fashion": [
+            "Ray-Ban", "Gucci", "Prada", "Tom Ford", "Saint Laurent", "Versace",
+            "Balenciaga", "Off-White", "Burberry", "Cartier"
+        ],
+        "Contemporary": [
+            "Zara", "COS", "& Other Stories", "Arket", "Mango", "Theory", "J.Crew",
+            "Madewell", "Everlane", "Reformation"
+        ],
+        "Accessible": [
+            "H&M", "Uniqlo", "Gap", "Banana Republic", "Old Navy", "Target", "Forever 21"
+        ],
+        "Tech/Accessories": [
+            "Apple", "Fitbit", "Samsung", "Garmin", "Fossil", "Michael Kors"
+        ]
+    }
+    
+    # Test context scenarios
+    test_contexts = [
+        {"query": "athletic workout gym", "category": "athletic"},
+        {"query": "casual everyday", "category": "casual"},
+        {"query": "formal business", "category": "formal"},
+        {"query": "yoga pilates", "category": "athletic"},
+        {"query": "running training", "category": "athletic"}
+    ]
+    
+    results = {}
+    
+    for category, brands in test_brands.items():
+        results[category] = {}
+        
+        for brand in brands:
+            brand_results = {}
+            
+            for context in test_contexts:
+                # Test retailer choice for this brand + context
+                retailer_choice = _determine_retailer_choice(
+                    prompt=f"{brand} {context['query']}",
+                    style=context['category'],
+                    budget=200,
+                    brand=brand,
+                    category="Top"
+                )
+                
+                brand_results[context['query']] = {
+                    "retailer": retailer_choice["retailer_name"],
+                    "score": retailer_choice.get("score", 0),
+                    "reasoning": retailer_choice.get("reasoning", "")
+                }
+            
+            results[category][brand] = brand_results
+    
+    # Also test the SerpAPI service logic
+    serpapi_results = {}
+    serpapi_service_instance = get_serpapi_service()
+    
+    for category, brands in test_brands.items():
+        serpapi_results[category] = {}
+        
+        for brand in brands[:5]:  # Test first 5 brands in each category
+            for context in test_contexts[:2]:  # Test first 2 contexts
+                try:
+                    # Test the _choose_optimal_retailer method directly
+                    optimal_retailer = serpapi_service_instance._choose_optimal_retailer(
+                        brand=brand,
+                        category="Top", 
+                        search_query=f"{brand} {context['query']}"
+                    )
+                    
+                    serpapi_results[category][brand] = serpapi_results[category].get(brand, {})
+                    serpapi_results[category][brand][context['query']] = optimal_retailer
+                    
+                except Exception as e:
+                    serpapi_results[category][brand] = serpapi_results[category].get(brand, {})
+                    serpapi_results[category][brand][context['query']] = f"Error: {str(e)}"
+    
+    # Summary statistics
+    summary = {
+        "total_brands_tested": sum(len(brands) for brands in test_brands.values()),
+        "farfetch_count": 0,
+        "nordstrom_count": 0,
+        "preserve_original_count": 0,
+        "potential_issues": []
+    }
+    
+    # Count retailer assignments and identify issues
+    for category, brands in results.items():
+        for brand, contexts in brands.items():
+            for context, result in contexts.items():
+                retailer = result["retailer"]
+                if retailer == "Farfetch":
+                    summary["farfetch_count"] += 1
+                elif retailer == "Nordstrom":
+                    summary["nordstrom_count"] += 1
+                
+                # Identify potential issues
+                if category == "Athletic/Athleisure" and retailer == "Farfetch" and "athletic" in context:
+                    summary["potential_issues"].append(f"{brand} → Farfetch for '{context}' (should be Nordstrom?)")
+                elif category == "Premium Fashion" and retailer == "Nordstrom":
+                    summary["potential_issues"].append(f"{brand} → Nordstrom for '{context}' (should be Farfetch?)")
+    
+    return {
+        "message": "Brand categorization debug results",
+        "test_brands": test_brands,
+        "retailer_logic_results": results,
+        "serpapi_logic_results": serpapi_results,
+        "summary": summary,
+        "recommendations": [
+            "Consider expanding athletic_brands list to include popular athleisure brands",
+            "Review premium brand detection for accessories like Ray-Ban",
+            "Consider brand-specific exceptions for better retailer matching",
+            "Test athletic keyword detection sensitivity"
+        ]
+    }
