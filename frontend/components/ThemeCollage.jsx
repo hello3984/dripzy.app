@@ -52,137 +52,92 @@ const ThemeCollage = ({ title, items = [], style }) => {
     const { width: containerWidth, height: containerHeight } = containerDimensions;
     const isMobile = containerWidth < 768;
     
-    // COMPLETELY REDESIGNED: Much more robust positioning system
-    const baseItemWidth = isMobile ? 140 : 180;
-    const baseItemHeight = isMobile ? 170 : 220;
-    const minGap = isMobile ? 50 : 80; // MASSIVE GAP: Guarantee no overlaps
+    // SIMPLE HORIZONTAL LAYOUT: Arrange cards in straight X direction
+    const itemWidth = isMobile ? 140 : 180;
+    const itemHeight = isMobile ? 170 : 220;
+    const gap = isMobile ? 20 : 30; // Gap between items
+    const topMargin = isMobile ? 40 : 60; // Top margin from container
     
     const positions = [];
-    const placedItems = [];
     
-    // SUPER AGGRESSIVE: Multiple collision checks with safety margins
-    const hasCollision = (newPos, existingPositions, minGap) => {
-      return existingPositions.some(pos => {
-        // Add extra safety margin to collision detection
-        const safetyMargin = 20;
-        const expandedGap = minGap + safetyMargin;
-        
-        const horizontalOverlap = newPos.left < pos.left + pos.width + expandedGap && 
-                                 newPos.left + newPos.width + expandedGap > pos.left;
-        const verticalOverlap = newPos.top < pos.top + pos.height + expandedGap && 
-                               newPos.top + newPos.height + expandedGap > pos.top;
-        
-        return horizontalOverlap && verticalOverlap;
-      });
-    };
+    // Force single row if 'scattered' layout is selected
+    const forceSingleRow = layoutStyle === 'scattered';
     
-    // ULTRA STRICT: Boundary checking with huge margins
-    const isWithinBounds = (pos, containerWidth, containerHeight) => {
-      const margin = isMobile ? 40 : 60; // MASSIVE MARGINS
-      return pos.left >= margin && 
-             pos.top >= margin && 
-             pos.left + pos.width <= containerWidth - margin && 
-             pos.top + pos.height <= containerHeight - margin;
-    };
+    // Calculate total width needed
+    const totalItemsWidth = items.length * itemWidth + (items.length - 1) * gap;
+    const availableWidth = containerWidth - 40; // Container padding
     
-    // GRID-FIRST APPROACH: Always use grid if more than 4 items
-    const shouldUseGrid = items.length > 4 || containerWidth < 600;
-    
-    if (shouldUseGrid || layoutStyle === 'scattered') {
-      // GUARANTEED NO OVERLAP: Grid-based positioning
-      const cols = isMobile ? 2 : (items.length > 6 ? 3 : 2);
-      const rows = Math.ceil(items.length / cols);
+    // SINGLE ROW LAYOUT: Always try to fit in one row first
+    if (totalItemsWidth <= availableWidth || forceSingleRow) {
+      let finalItemWidth = itemWidth;
+      let finalGap = gap;
       
-      // Calculate cell dimensions with generous padding
-      const padding = isMobile ? 40 : 60;
-      const usableWidth = containerWidth - (padding * 2);
-      const usableHeight = containerHeight - (padding * 2);
-      const cellWidth = usableWidth / cols;
-      const cellHeight = usableHeight / rows;
+      // If forcing single row but items don't fit, reduce size
+      if (forceSingleRow && totalItemsWidth > availableWidth) {
+        const totalGaps = (items.length - 1) * gap;
+        const availableForItems = availableWidth - totalGaps;
+        finalItemWidth = Math.max(80, availableForItems / items.length); // Minimum 80px width
+        
+        // Adjust gap if items are too small
+        if (finalItemWidth < 100) {
+          finalGap = Math.max(10, gap / 2);
+          const totalGapsNew = (items.length - 1) * finalGap;
+          const availableForItemsNew = availableWidth - totalGapsNew;
+          finalItemWidth = Math.max(80, availableForItemsNew / items.length);
+        }
+      }
       
-      // Ensure items fit within cells with spacing
-      const maxItemWidth = Math.min(cellWidth - minGap, baseItemWidth);
-      const maxItemHeight = Math.min(cellHeight - minGap, baseItemHeight);
+      // Center all items in one straight horizontal line
+      const totalWidth = items.length * finalItemWidth + (items.length - 1) * finalGap;
+      const startX = (containerWidth - totalWidth) / 2;
       
       items.forEach((item, index) => {
-        const row = Math.floor(index / cols);
-        const col = index % cols;
-        
-        // Center item in cell with slight random offset for artistic feel
-        const randomX = layoutStyle === 'overlapping' ? (Math.random() - 0.5) * 20 : 0;
-        const randomY = layoutStyle === 'overlapping' ? (Math.random() - 0.5) * 15 : 0;
-        
         const position = {
-          left: padding + col * cellWidth + (cellWidth - maxItemWidth) / 2 + randomX,
-          top: padding + row * cellHeight + (cellHeight - maxItemHeight) / 2 + randomY,
-          width: maxItemWidth,
-          height: maxItemHeight,
+          left: startX + index * (finalItemWidth + finalGap),
+          top: (containerHeight - itemHeight) / 2, // Center vertically
+          width: finalItemWidth,
+          height: itemHeight,
           zIndex: index + 1,
-          rotation: layoutStyle === 'overlapping' ? (Math.random() - 0.5) * 6 : 0
+          rotation: 0 // No rotation for clean horizontal layout
         };
         
-        // Double check bounds
-        position.left = Math.max(padding, Math.min(position.left, containerWidth - maxItemWidth - padding));
-        position.top = Math.max(padding, Math.min(position.top, containerHeight - maxItemHeight - padding));
-        
         positions.push({
           ...item,
           position
         });
       });
-    } else {
-      // RANDOM POSITIONING: Only for few items with ultra-careful placement
-      items.forEach((item, index) => {
-        let position;
-        let attempts = 0;
-        let placed = false;
-        
-        // Try random positioning with extreme collision avoidance
-        while (!placed && attempts < 200) {
-          const widthVariation = layoutStyle === 'overlapping' ? Math.random() * 20 - 10 : 0;
-          const heightVariation = layoutStyle === 'overlapping' ? Math.random() * 15 - 7 : 0;
-          
-          position = {
-            left: Math.random() * (containerWidth - baseItemWidth - 120) + 60,
-            top: Math.random() * (containerHeight - baseItemHeight - 120) + 60,
-            width: baseItemWidth + widthVariation,
-            height: baseItemHeight + heightVariation,
-            zIndex: index + 1,
-            rotation: layoutStyle === 'overlapping' ? (Math.random() - 0.5) * 8 : 0
-          };
-          
-          if (!hasCollision(position, placedItems, minGap) && isWithinBounds(position, containerWidth, containerHeight)) {
-            placed = true;
-            placedItems.push(position);
-          }
-          
-          attempts++;
-        }
-        
-        // FAILSAFE: Force grid position if random fails
-        if (!placed) {
-          const cols = 2;
-          const row = Math.floor(index / cols);
-          const col = index % cols;
-          const cellWidth = (containerWidth - 120) / cols;
-          const cellHeight = (containerHeight - 120) / Math.ceil(items.length / cols);
-          
-          position = {
-            left: 60 + col * cellWidth + (cellWidth - baseItemWidth) / 2,
-            top: 60 + row * cellHeight + (cellHeight - baseItemHeight) / 2,
-            width: baseItemWidth * 0.9,
-            height: baseItemHeight * 0.9,
-            zIndex: index + 1,
-            rotation: 0
-          };
-        }
-        
-        positions.push({
-          ...item,
-          position
-        });
-      });
+      
+      return positions;
     }
+    
+    // MULTI-ROW HORIZONTAL LAYOUT: When items don't fit in single row
+    const itemsPerRow = Math.floor(availableWidth / (itemWidth + gap));
+    const finalItemWidth = (availableWidth - (itemsPerRow - 1) * gap) / itemsPerRow;
+    const finalGap = gap;
+    
+    items.forEach((item, index) => {
+      const row = Math.floor(index / itemsPerRow);
+      const col = index % itemsPerRow;
+      
+      // Center each row horizontally
+      const itemsInThisRow = Math.min(itemsPerRow, items.length - row * itemsPerRow);
+      const rowWidth = itemsInThisRow * finalItemWidth + (itemsInThisRow - 1) * finalGap;
+      const rowStartX = (containerWidth - rowWidth) / 2;
+      
+      const position = {
+        left: rowStartX + col * (finalItemWidth + finalGap),
+        top: topMargin + row * (itemHeight + 30), // 30px row gap
+        width: finalItemWidth,
+        height: itemHeight,
+        zIndex: index + 1,
+        rotation: 0 // No rotation for clean horizontal layout
+      };
+      
+      positions.push({
+        ...item,
+        position
+      });
+    });
     
     return positions;
   };
@@ -268,13 +223,13 @@ const ThemeCollage = ({ title, items = [], style }) => {
             className={`layout-btn ${layoutStyle === 'scattered' ? 'active' : ''}`}
             onClick={() => setLayoutStyle('scattered')}
           >
-            🎯 Clean Layout
+            📐 Single Row
           </button>
           <button 
             className={`layout-btn ${layoutStyle === 'overlapping' ? 'active' : ''}`}
             onClick={() => setLayoutStyle('overlapping')}
           >
-            📸 Artistic Layout
+            📋 Multi Row
           </button>
         </div>
         
